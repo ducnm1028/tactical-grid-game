@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrono Clash - WEGO Tactics 20x7</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="title-container">
+            <h1>Chrono Clash: WEGO 20x7</h1>
+            <div class="subtitle">Game Chiến thuật Bàn cờ Lượt đồng thời • Nhập 4 hành động</div>
+        </div>
+        <div class="header-controls" style="display: flex; gap: 8px;">
+            <button id="btnOpenCharSelect" class="btn-change-char" title="Mở màn hình chọn tướng">
+                👤 Đổi Nhân Vật
+            </button>
+            <button id="soundToggleBtn" class="key-badge" style="cursor:pointer;" title="Bật/Tắt âm thanh">
+                🔊 Âm thanh: BẬT
+            </button>
+        </div>
+    </header>
+
+    <!-- Top HUD: Máu & Lượt -->
+    <div class="hud-top">
+        <div class="fighter-card player">
+            <div class="fighter-info">
+                <span id="playerNameBadge">OPERATOR [BẠN]</span>
+                <span id="playerHpText">100 / 100 HP</span>
+            </div>
+            <div class="hp-bar-bg">
+                <div id="playerHpFill" class="hp-fill" style="width: 100%;"></div>
+            </div>
+            <div style="font-size: 0.72rem; color: #38bdf8; margin-top: 5px;">
+                Hướng hiện tại: <b id="currentDirText">PHẢI (D)</b>
+            </div>
+        </div>
+
+        <div class="turn-badge">
+            <div class="turn-num" id="turnDisplay">LƯỢT 1</div>
+            <div class="turn-phase" id="phaseDisplay">LẬP KẾ HOẠCH</div>
+        </div>
+
+        <div class="fighter-card cpu">
+            <div class="fighter-info">
+                <span id="cpuNameBadge">SENTINEL [CPU]</span>
+                <span id="cpuHpText">100 / 100 HP</span>
+            </div>
+            <div class="hp-bar-bg">
+                <div id="cpuHpFill" class="hp-fill" style="width: 100%;"></div>
+            </div>
+            <div style="font-size: 0.72rem; color: #ff3366; margin-top: 5px;">
+                Trạng thái: <b id="cpuStatusText">ĐANG TÍNH TOÁN</b>
+            </div>
+        </div>
+    </div>
+
+    <!-- Arena Stage with Canvas & Minimap -->
+    <div class="main-stage">
+        <canvas id="gameCanvas" width="960" height="380"></canvas>
+
+        <div class="minimap-overlay">
+            <div class="minimap-title">Toàn cảnh 20x7</div>
+            <canvas id="minimapCanvas" width="160" height="56"></canvas>
+        </div>
+    </div>
+
+    <!-- 4-Action Command Queue & Combat Log -->
+    <div class="queue-section">
+        <div class="action-queues-container">
+            <!-- Player Action Queue -->
+            <div class="queue-row">
+                <div class="queue-label">
+                    <span>Hàng đợi lệnh của Bạn (4 Hành động)</span>
+                    <span id="queueCountText" style="color: #38bdf8; font-weight: bold;">0 / 4</span>
+                </div>
+                <div class="queue-slots" id="playerQueueSlots">
+                    <div class="queue-slot" id="p-slot-0"><span class="slot-step-num">#1</span><span class="slot-icon">?</span><span class="slot-name">Trống</span></div>
+                    <div class="queue-slot" id="p-slot-1"><span class="slot-step-num">#2</span><span class="slot-icon">?</span><span class="slot-name">Trống</span></div>
+                    <div class="queue-slot" id="p-slot-2"><span class="slot-step-num">#3</span><span class="slot-icon">?</span><span class="slot-name">Trống</span></div>
+                    <div class="queue-slot" id="p-slot-3"><span class="slot-step-num">#4</span><span class="slot-icon">?</span><span class="slot-name">Trống</span></div>
+                </div>
+            </div>
+
+            <!-- CPU Action Queue (Hidden during planning) -->
+            <div class="queue-row">
+                <div class="queue-label">
+                    <span>Lệnh bí mật của CPU (Giải mã khi thực thi)</span>
+                    <span style="color: #ff3366;">BÍ MẬT</span>
+                </div>
+                <div class="queue-slots" id="cpuQueueSlots">
+                    <div class="queue-slot" id="c-slot-0"><span class="slot-step-num">#1</span><span class="slot-icon">🔒</span><span class="slot-name">Bí mật</span></div>
+                    <div class="queue-slot" id="c-slot-1"><span class="slot-step-num">#2</span><span class="slot-icon">🔒</span><span class="slot-name">Bí mật</span></div>
+                    <div class="queue-slot" id="c-slot-2"><span class="slot-step-num">#3</span><span class="slot-icon">🔒</span><span class="slot-name">Bí mật</span></div>
+                    <div class="queue-slot" id="c-slot-3"><span class="slot-step-num">#4</span><span class="slot-icon">🔒</span><span class="slot-name">Bí mật</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Combat Log -->
+        <div class="sidebar-panel">
+            <div class="combat-log-box">
+                <div class="log-title">Nhật ký chiến trường</div>
+                <div class="log-content" id="combatLog">
+                    <div class="log-entry system">Trận đấu bắt đầu! Hãy lên 4 lệnh cho nhân vật.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thông báo chế độ vẽ lộ trình -->
+    <div id="pathPlannerNotice" class="path-planner-notice" style="display: none;">
+        <span class="path-pulse-icon">👟</span>
+        <span id="pathStepCount" style="font-weight: 800; color: #38bdf8;">Đang vẽ Lộ trình: 0 / 3 bước</span>
+        <span class="path-subtext">Nhấn phím hướng (WASD/QEZC) để vẽ đường đi • Bấm [1]/[Space] để chốt lộ trình • [⌫] lùi 1 bước</span>
+        <button id="btnFinishPath" class="key-badge" style="border-color: #38bdf8; background: #0284c7; color: white; padding: 3px 10px;">Chốt Lệnh [Space]</button>
+    </div>
+
+    <!-- Hotkey HUD (ĐÃ HOÁN ĐỔI: Thêm Hành Động ở TRƯỚC, Chọn Hướng ở SAU) -->
+    <div class="hotkey-guide">
+        <!-- 1. THÊM HÀNH ĐỘNG (Bên Trái) -->
+        <div class="hotkey-group" id="actionButtonsGroup">
+            <span class="hotkey-group-label">Thêm Hành động:</span>
+            <div id="dynamicSkillButtons" style="display: inline-flex; gap: 8px;">
+                <!-- Sinh tự động theo nhân vật được chọn -->
+            </div>
+        </div>
+
+        <!-- 2. CHỌN HƯỚNG (8 Hướng Thẳng & Chéo) -->
+        <div class="hotkey-group" id="directionButtonsGroup">
+            <span class="hotkey-group-label">Hướng (8 Hướng):</span>
+            <div class="dir-buttons-container">
+                <button class="key-badge dir-btn" id="btnKeyQ" data-key="q" title="Lên-Trái (Q / Num 7)">Q ↖</button>
+                <button class="key-badge dir-btn" id="btnKeyW" data-key="w" title="Lên (W / Num 8)">W ↑</button>
+                <button class="key-badge dir-btn" id="btnKeyE" data-key="e" title="Lên-Phải (E / Num 9)">E ↗</button>
+                <button class="key-badge dir-btn" id="btnKeyA" data-key="a" title="Trái (A / Num 4)">A ←</button>
+                <button class="key-badge dir-btn" id="btnKeyS" data-key="s" title="Dưới (S / Num 2)">S ↓</button>
+                <button class="key-badge dir-btn" id="btnKeyD" data-key="d" title="Phải (D / Num 6)">D →</button>
+                <button class="key-badge dir-btn" id="btnKeyZ" data-key="z" title="Dưới-Trái (Z / Num 1)">Z ↙</button>
+                <button class="key-badge dir-btn" id="btnKeyC" data-key="c" title="Dưới-Phải (C / Num 3)">C ↘</button>
+            </div>
+        </div>
+
+        <!-- 3. ĐIỀU KHIỂN & KHÓA LỆNH -->
+        <div class="hotkey-group">
+            <button class="key-badge" id="btnUndo" title="Xóa lệnh vừa chọn"><b>[⌫/Backspace]</b> Xóa 1</button>
+            <button class="key-badge" id="btnClear" title="Xóa toàn bộ 4 lệnh"><b>[Esc]</b> Hủy hết</button>
+            <button class="commit-btn" id="btnCommit" disabled>
+                <span><b>[SPACE]</b> THỰC THI (0/4)</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameModal" class="game-modal" style="display: none;">
+        <div class="modal-card">
+            <div id="modalTitle" class="modal-title victory">CHIẾN THẮNG!</div>
+            <div id="modalDesc" class="modal-desc">Bạn đã đánh bại Sentinel của CPU!</div>
+            <button id="restartBtn" class="restart-btn">Chơi Lại Ván Mới (Enter)</button>
+        </div>
+    </div>
+
+    <!-- Màn hình Chọn Nhân vật (Character Selection Screen) -->
+    <div id="charSelectScreen" class="char-select-screen">
+        <div class="char-select-header">
+            <h2>CHỌN CHIẾN BINH CỦA BẠN</h2>
+            <p>Mỗi nhân vật sở hữu phong cách chiến đấu và 4 chiêu thức độc nhất</p>
+        </div>
+        <div class="char-grid" id="charGridContainer">
+            <!-- Được render tự động từ characters.js -->
+        </div>
+
+        <!-- Tùy Chọn Đối Thủ CPU -->
+        <div class="cpu-select-section">
+            <span class="cpu-select-label">🎯 ĐỐI THỦ CPU:</span>
+            <div class="cpu-select-options" id="cpuSelectOptions">
+                <button class="cpu-opt-btn active" data-cpuchar="random">🎲 Ngẫu Nhiên</button>
+                <button class="cpu-opt-btn" data-cpuchar="trooper">🪖 Trooper</button>
+                <button class="cpu-opt-btn" data-cpuchar="hookman">🪝 Hookman</button>
+                <button class="cpu-opt-btn" data-cpuchar="smoke_guy">🚬 Smoke Guy</button>
+                <button class="cpu-opt-btn" data-cpuchar="razor">⚡ Razor</button>
+            </div>
+        </div>
+
+        <div class="char-select-footer">
+            <button id="btnStartBattle" class="start-battle-btn">VÀO TRẬN ĐẤU (SPACE / ENTER)</button>
+        </div>
+    </div>
+
+    <script src="audio.js"></script>
+    <script src="characters.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
