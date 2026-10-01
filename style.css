@@ -553,9 +553,33 @@ header {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 24px;
+    justify-content: flex-start;
+    padding: 32px 20px 48px 20px;
     box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: #334155 rgba(15, 23, 42, 0.7);
+}
+
+/* Custom scrollbar mượt mà cho trang chọn nhân vật */
+.char-select-screen::-webkit-scrollbar {
+    width: 8px;
+}
+
+.char-select-screen::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.7);
+}
+
+.char-select-screen::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+
+.char-select-screen::-webkit-scrollbar-thumb:hover {
+    background: #0284c7;
 }
 
 .char-select-header {
@@ -701,6 +725,8 @@ header {
     display: flex;
     gap: 16px;
     align-items: center;
+    margin-top: 10px;
+    margin-bottom: 40px;
 }
 
 .start-battle-btn {
