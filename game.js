@@ -31,7 +31,8 @@ class GameEngine {
         this.resizeCanvas();
 
         this.turn = 1;
-        this.phase = 'CHAR_SELECT'; // 'CHAR_SELECT' | 'PLANNING' | 'RESOLVING' | 'GAMEOVER'
+        this.phase = 'MAIN_MENU'; // 'MAIN_MENU' | 'CHAR_SELECT' | 'HOW_TO_PLAY' | 'PLANNING' | 'RESOLVING' | 'GAMEOVER'
+        this.previousPhaseBeforeGuide = 'MAIN_MENU';
         this.currentStep = -1;
 
         // Nhân vật được chọn mặc định
@@ -115,6 +116,7 @@ class GameEngine {
         this.particles = [];
 
         this.initCharacterSelectUI();
+        this.initMenuAndGuideUI();
         this.bindEvents();
         this.updateCamera(true);
 
@@ -192,14 +194,108 @@ class GameEngine {
         document.getElementById('btnStartBattle').onclick = () => this.startBattle();
     }
 
+    // --- Khởi tạo Giao diện Màn hình Chính & Hướng dẫn ---
+    initMenuAndGuideUI() {
+        const btnPlay = document.getElementById('btnMenuPlay');
+        if (btnPlay) {
+            btnPlay.addEventListener('click', () => this.showCharSelectScreen());
+        }
+
+        const btnGuide = document.getElementById('btnMenuGuide');
+        if (btnGuide) {
+            btnGuide.addEventListener('click', () => this.showHowToPlayScreen());
+        }
+
+        const btnCloseGuideX = document.getElementById('btnCloseGuideX');
+        if (btnCloseGuideX) {
+            btnCloseGuideX.addEventListener('click', () => this.closeHowToPlayScreen());
+        }
+
+        const btnGuideBack = document.getElementById('btnGuideBack');
+        if (btnGuideBack) {
+            btnGuideBack.addEventListener('click', () => this.closeHowToPlayScreen());
+        }
+
+        const btnGuidePlay = document.getElementById('btnGuidePlay');
+        if (btnGuidePlay) {
+            btnGuidePlay.addEventListener('click', () => this.showCharSelectScreen());
+        }
+
+        const btnCharSelectBack = document.getElementById('btnCharSelectBack');
+        if (btnCharSelectBack) {
+            btnCharSelectBack.addEventListener('click', () => this.showMainMenuScreen());
+        }
+
+        const btnHeaderMenu = document.getElementById('btnHeaderMenu');
+        if (btnHeaderMenu) {
+            btnHeaderMenu.addEventListener('click', () => this.showMainMenuScreen());
+        }
+
+        const btnHeaderGuide = document.getElementById('btnHeaderGuide');
+        if (btnHeaderGuide) {
+            btnHeaderGuide.addEventListener('click', () => this.showHowToPlayScreen());
+        }
+    }
+
+    showMainMenuScreen() {
+        this.cancelPathPlanning();
+        this.phase = 'MAIN_MENU';
+        const menu = document.getElementById('mainMenuScreen');
+        const charSel = document.getElementById('charSelectScreen');
+        const guide = document.getElementById('howToPlayScreen');
+        if (menu) menu.style.display = 'flex';
+        if (charSel) charSel.style.display = 'none';
+        if (guide) guide.style.display = 'none';
+        if (window.soundCtrl) window.soundCtrl.playSelect();
+    }
+
     showCharSelectScreen() {
         this.cancelPathPlanning();
         this.phase = 'CHAR_SELECT';
-        document.getElementById('charSelectScreen').style.display = 'flex';
+        const menu = document.getElementById('mainMenuScreen');
+        const charSel = document.getElementById('charSelectScreen');
+        const guide = document.getElementById('howToPlayScreen');
+        if (menu) menu.style.display = 'none';
+        if (charSel) charSel.style.display = 'flex';
+        if (guide) guide.style.display = 'none';
+        if (window.soundCtrl) window.soundCtrl.playSelect();
+    }
+
+    showHowToPlayScreen() {
+        this.cancelPathPlanning();
+        if (this.phase !== 'HOW_TO_PLAY') {
+            this.previousPhaseBeforeGuide = this.phase;
+        }
+        this.phase = 'HOW_TO_PLAY';
+        const menu = document.getElementById('mainMenuScreen');
+        const charSel = document.getElementById('charSelectScreen');
+        const guide = document.getElementById('howToPlayScreen');
+        if (menu) menu.style.display = 'none';
+        if (charSel) charSel.style.display = 'none';
+        if (guide) guide.style.display = 'flex';
+        if (window.soundCtrl) window.soundCtrl.playSelect();
+    }
+
+    closeHowToPlayScreen() {
+        if (this.previousPhaseBeforeGuide === 'CHAR_SELECT') {
+            this.showCharSelectScreen();
+        } else if (this.previousPhaseBeforeGuide === 'PLANNING') {
+            const guide = document.getElementById('howToPlayScreen');
+            if (guide) guide.style.display = 'none';
+            this.phase = 'PLANNING';
+            if (window.soundCtrl) window.soundCtrl.playSelect();
+        } else {
+            this.showMainMenuScreen();
+        }
     }
 
     startBattle() {
-        document.getElementById('charSelectScreen').style.display = 'none';
+        const menu = document.getElementById('mainMenuScreen');
+        const charSel = document.getElementById('charSelectScreen');
+        const guide = document.getElementById('howToPlayScreen');
+        if (menu) menu.style.display = 'none';
+        if (charSel) charSel.style.display = 'none';
+        if (guide) guide.style.display = 'none';
         this.applySelectedCharacter();
         this.applyCpuCharacter(this.selectedCpuOption);
         this.phase = 'PLANNING';
@@ -550,10 +646,35 @@ class GameEngine {
     }
 
     handleKeyDown(e) {
+        if (this.phase === 'MAIN_MENU') {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                this.showCharSelectScreen();
+            } else if (e.key === 'h' || e.key === 'H') {
+                e.preventDefault();
+                this.showHowToPlayScreen();
+            }
+            return;
+        }
+
+        if (this.phase === 'HOW_TO_PLAY') {
+            if (e.code === 'Escape') {
+                e.preventDefault();
+                this.closeHowToPlayScreen();
+            } else if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                this.showCharSelectScreen();
+            }
+            return;
+        }
+
         if (this.phase === 'CHAR_SELECT') {
             if (e.code === 'Space' || e.code === 'Enter') {
                 e.preventDefault();
                 this.startBattle();
+            } else if (e.code === 'Escape') {
+                e.preventDefault();
+                this.showMainMenuScreen();
             }
             return;
         }

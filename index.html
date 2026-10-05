@@ -13,8 +13,14 @@
             <div class="subtitle">Game Chiến thuật Bàn cờ Lượt đồng thời • Nhập 4 hành động</div>
         </div>
         <div class="header-controls" style="display: flex; gap: 8px;">
+            <button id="btnHeaderMenu" class="btn-change-char" title="Quay về menu chính">
+                🏠 Menu Chính
+            </button>
+            <button id="btnHeaderGuide" class="btn-change-char" title="Xem hướng dẫn chơi">
+                📖 Hướng Dẫn
+            </button>
             <button id="btnOpenCharSelect" class="btn-change-char" title="Mở màn hình chọn tướng">
-                👤 Đổi Nhân Vật
+                👤 Đổi Tướng
             </button>
             <button id="soundToggleBtn" class="key-badge" style="cursor:pointer;" title="Bật/Tắt âm thanh">
                 🔊 Âm thanh: BẬT
@@ -161,8 +167,241 @@
         </div>
     </div>
 
+    <!-- Màn hình Chính / Khởi động (Main Menu Screen) -->
+    <div id="mainMenuScreen" class="main-menu-screen">
+        <div class="menu-backdrop-glow"></div>
+        <div class="menu-content-box">
+            <div class="menu-badge">TACTICAL WEGO PROTOCOL • 20x7</div>
+            <h1 class="menu-title">CHRONO CLASH</h1>
+            <div class="menu-tagline">CHIẾN THUẬT LƯỢT ĐỒNG THỜI • BÀN CỜ 20x7</div>
+            <p class="menu-description">
+                Lập kế hoạch bí mật 4 hành động, dự đoán hướng đi của đối thủ và giải phóng các chiêu thức đặc sắc trên đấu trường lưới.
+            </p>
+
+            <!-- Hai Nút Chính: CHƠI & HƯỚNG DẪN -->
+            <div class="menu-buttons-container">
+                <button id="btnMenuPlay" class="menu-btn menu-btn-play" title="Bắt đầu chọn tướng và vào trận">
+                    <div class="btn-icon">⚔️</div>
+                    <div class="btn-text-group">
+                        <span class="btn-main-text">CHƠI</span>
+                        <span class="btn-sub-text">Chọn Chiến Binh & Tham Chiến</span>
+                    </div>
+                    <div class="btn-arrow">➔</div>
+                </button>
+
+                <button id="btnMenuGuide" class="menu-btn menu-btn-guide" title="Xem cẩm nang hướng dẫn luật chơi">
+                    <div class="btn-icon">📖</div>
+                    <div class="btn-text-group">
+                        <span class="btn-main-text">HƯỚNG DẪN</span>
+                        <span class="btn-sub-text">Luật Chơi WEGO & Tuyệt Kỹ Tướng</span>
+                    </div>
+                    <div class="btn-arrow">➔</div>
+                </button>
+            </div>
+
+            <div class="menu-feature-pills">
+                <div class="pill">⚡ WEGO 4 Lệnh / Lượt</div>
+                <div class="pill">👥 4 Tướng Đặc Sắc</div>
+                <div class="pill">👟 Lập Lộ Trình Tự Do</div>
+                <div class="pill">🤖 Trí Tuệ Nhân Tạo CPU</div>
+            </div>
+
+            <div class="menu-footer-hint">
+                Nhấn <kbd class="kbd-hint">SPACE</kbd> hoặc <kbd class="kbd-hint">ENTER</kbd> để vào Chơi • Nhấn <kbd class="kbd-hint">H</kbd> để xem Hướng dẫn
+            </div>
+        </div>
+    </div>
+
+    <!-- Màn hình Hướng Dẫn Chơi (How To Play Screen) -->
+    <div id="howToPlayScreen" class="how-to-play-screen" style="display: none;">
+        <div class="guide-modal-container">
+            <div class="guide-header">
+                <div class="guide-header-text">
+                    <h2>📖 CẨM NANG CHIẾN THUẬT CHRONO CLASH</h2>
+                    <p>Nắm vững cơ chế WEGO, điều khiển lộ trình và làm chủ 4 chiến binh đặc nhiệm</p>
+                </div>
+                <button id="btnCloseGuideX" class="guide-close-btn" title="Đóng hướng dẫn">✕</button>
+            </div>
+
+            <div class="guide-scroll-body">
+                <!-- Mục 1: Cơ chế WEGO -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">⚡</span>
+                        <span>1. CƠ CHẾ LƯỢT ĐỒNG THỜI (WEGO SYSTEM)</span>
+                    </div>
+                    <div class="section-card-body">
+                        <p>Khác với cờ theo lượt truyền thống, ở <b>Chrono Clash</b> cả 2 bên cùng lúc hành động theo cơ chế thời gian thực đồng thời:</p>
+                        <div class="guide-steps-grid">
+                            <div class="g-step-box">
+                                <span class="g-step-badge">Pha 1</span>
+                                <b>Lập Kế Hoạch Bí Mật</b>
+                                <span>Bạn và CPU cùng nạp đúng <b>4 hành động</b> vào hàng đợi của mình mà đối phương không nhìn thấy.</span>
+                            </div>
+                            <div class="g-step-box">
+                                <span class="g-step-badge">Pha 2</span>
+                                <b>Khóa Lệnh & Thực Thi</b>
+                                <span>Nhấn <b>[SPACE]</b> để chốt. Trận đấu bắt đầu pha phân xử hành động.</span>
+                            </div>
+                            <div class="g-step-box">
+                                <span class="g-step-badge">Pha 3</span>
+                                <b>Phân Xử Đồng Thời</b>
+                                <span>Cả hai bên cùng kích hoạt bước #1, tiếp đến bước #2, #3, và #4. Đạn bay và di chuyển va chạm nhau trên bàn cờ.</span>
+                            </div>
+                        </div>
+                        <div class="guide-callout tip">
+                            💡 <b>Mẹo vàng:</b> Chìa khóa chiến thắng nằm ở việc <i>"dự đoán trước bước đi của CPU"</i> để đón đầu đường đạn hoặc né khỏi vùng nguy hiểm!
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mục 2: Di chuyển & Vẽ lộ trình -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">👟</span>
+                        <span>2. DI CHUYỂN & VẼ LỘ TRÌNH (PATH PLANNING)</span>
+                    </div>
+                    <div class="section-card-body">
+                        <p>Bạn không bị gò bó đi từng ô thẳng đơn điệu, mà có thể tự do uốn lượn đường đi:</p>
+                        <ul class="guide-list">
+                            <li>Bấm phím <b>[1]</b> (Lộ trình di chuyển) để kích hoạt chế độ vẽ đường.</li>
+                            <li>Dùng các phím hướng <b>W, A, S, D</b> (hoặc phím chéo <b>Q, E, Z, C</b>) để nối từng bước chân.</li>
+                            <li>Số bước đi tối đa phụ thuộc vào từng nhân vật (VD: <b>Trooper</b> 2 bước, <b>Hookman</b> 3 bước, <b>Smoke Guy khi hút thuốc</b> tăng thêm 1 bước).</li>
+                            <li>Bấm <b>[Space]</b> hoặc <b>[1]</b> để chốt lộ trình vào hàng đợi. Bấm <b>[⌫ Backspace]</b> nếu muốn lùi lại 1 bước vẽ.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Mục 3: Bảng Phím Tắt & Thao Tác -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">⌨️</span>
+                        <span>3. BẢNG PHÍM TẮT & THAO TÁC TRẬN ĐẤU</span>
+                    </div>
+                    <div class="section-card-body">
+                        <div class="hotkey-table-grid">
+                            <div class="hk-row"><span class="hk-key">[1]</span><span class="hk-desc">Di chuyển / Vẽ lộ trình tự do</span></div>
+                            <div class="hk-row"><span class="hk-key">[2]</span><span class="hk-desc">Vũ khí chính (Bắn súng / Móc kéo / Đòn đánh cơ bản)</span></div>
+                            <div class="hk-row"><span class="hk-key">[3]</span><span class="hk-desc">Kỹ năng phụ (Lựu đạn hẹn giờ / Adrenaline / Thuốc lá / Nhảy lướt)</span></div>
+                            <div class="hk-row"><span class="hk-key">[4]</span><span class="hk-desc">Chiêu cuối tối thượng (Tên lửa 3x3 / Súng bắn bom / Kiếm gắn tay)</span></div>
+                            <div class="hk-row"><span class="hk-key">WASD / QEZC</span><span class="hk-desc">Xoay 8 hướng bắn hoặc hướng di chuyển</span></div>
+                            <div class="hk-row"><span class="hk-key">[Space]</span><span class="hk-desc">Chốt lộ trình di chuyển / THỰC THI 4 LỆNH khi đã đầy</span></div>
+                            <div class="hk-row"><span class="hk-key">[⌫ Backspace]</span><span class="hk-desc">Xóa 1 hành động gần nhất trong hàng đợi</span></div>
+                            <div class="hk-row"><span class="hk-key">[Esc]</span><span class="hk-desc">Hủy toàn bộ 4 hành động để lập kế hoạch lại</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mục 4: Bộ 4 Nhân Vật -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">👥</span>
+                        <span>4. HỒ SƠ 4 CHIẾN BINH ĐẶC NHIỆM</span>
+                    </div>
+                    <div class="section-card-body">
+                        <div class="char-guide-cards">
+                            <!-- Trooper -->
+                            <div class="cg-card">
+                                <div class="cg-header">
+                                    <span class="cg-avatar">🪖</span>
+                                    <div>
+                                        <h4 class="cg-name" style="color: #10b981;">TROOPER</h4>
+                                        <div class="cg-sub">Chiến Binh Toàn Năng • 100 HP</div>
+                                    </div>
+                                </div>
+                                <ul class="cg-skills">
+                                    <li><b>🔫 Assault Rifle:</b> Sát thương 15, tầm bắn 6 ô đường thẳng.</li>
+                                    <li><b>💣 Lựu Đạn:</b> Ném tầm 5 ô, phát nổ sau 2 hiệp gây 50 DMG vùng 3x3.</li>
+                                    <li><b>🚀 Tên Lửa Oanh Tạc:</b> Bay thẳng tầm 8 ô, nổ 3x3 (45 DMG) ngay khi chạm địch hoặc đích.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Hookman -->
+                            <div class="cg-card">
+                                <div class="cg-header">
+                                    <span class="cg-avatar">🪝</span>
+                                    <div>
+                                        <h4 class="cg-name" style="color: #06b6d4;">HOOKMAN</h4>
+                                        <div class="cg-sub">Kẻ Săn Mồi Bóng Đêm • 90 HP</div>
+                                    </div>
+                                </div>
+                                <ul class="cg-skills">
+                                    <li><b>🕶️ Ẩn Thân:</b> Tàng hình hoàn toàn nếu cách xa đối thủ trên 3 ô (chỉ lộ khi trúng đòn).</li>
+                                    <li><b>🪝 Móc Kéo:</b> Tầm 6 ô xuyên vật thể, găm dây và giật địch về 2 ô ở cuối lượt sau.</li>
+                                    <li><b>💉 Adrenaline:</b> Hồi 5 HP mỗi lượt trong 3 lượt và tăng +20% sát thương.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Smoke Guy -->
+                            <div class="cg-card">
+                                <div class="cg-header">
+                                    <span class="cg-avatar">🚬</span>
+                                    <div>
+                                        <h4 class="cg-name" style="color: #f59e0b;">SMOKE GUY</h4>
+                                        <div class="cg-sub">Chuyên Gia Chất Nổ • 100 HP</div>
+                                    </div>
+                                </div>
+                                <ul class="cg-skills">
+                                    <li><b>🚬 Thuốc Lá:</b> Tăng +30% sát thương và +1 bước di chuyển trong 2 lượt tác dụng.</li>
+                                    <li><b>💣 Súng Bắn Bom:</b> 2 viên đạn (30 DMG, vùng nổ 3x3 quanh đích). Tự nổ ngay khi va chạm địch trên đường bay!</li>
+                                    <li><b>🔫 Combat Rifle:</b> Súng chiến đấu uy lực 18 DMG, tầm 5 ô.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Razor -->
+                            <div class="cg-card">
+                                <div class="cg-header">
+                                    <span class="cg-avatar">⚡</span>
+                                    <div>
+                                        <h4 class="cg-name" style="color: #a855f7;">RAZOR</h4>
+                                        <div class="cg-sub">Sát Thủ Cơ Động • 100 HP</div>
+                                    </div>
+                                </div>
+                                <ul class="cg-skills">
+                                    <li><b>🦘 Nhảy Đột Kích:</b> Bay qua mọi vật thể trong tầm 3 ô, giảm 25% sát thương nhận phải. Nếu trúng địch/vật cản sẽ bật thêm 2 ô!</li>
+                                    <li><b>🗡️ Kiếm Gắn Tay:</b> Có 2 lần dùng, chém hình chữ nhật 3x2 trong 4 hướng gây 60 DMG cực khủng.</li>
+                                    <li><b>🔫 High-Caliber Rifle:</b> Bắn súng uy lực lớn (25 DMG, tầm 4 ô).</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mục 5: Mẹo tác chiến -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">🛡️</span>
+                        <span>5. CHIẾN THUẬT SINH TỒN ĐỈNH CAO</span>
+                    </div>
+                    <div class="section-card-body">
+                        <div class="strategy-tips-grid">
+                            <div class="tip-card">
+                                <b>🧱 Tận dụng chướng ngại vật</b>
+                                <span>Đạn súng trường không thể xuyên qua đá hay vật thể. Hãy di chuyển nép sau góc khuất để bảo toàn HP.</span>
+                            </div>
+                            <div class="tip-card">
+                                <b>💥 Tránh bán kính nổ 3x3</b>
+                                <span>Lựu đạn, Tên lửa và Súng bắn bom đều nổ diện rộng 3x3. Quan sát cảnh báo màu đỏ trên bàn cờ để chạy kịp trước khi nổ.</span>
+                            </div>
+                            <div class="tip-card">
+                                <b>⏳ Quản lý Đạn dược & Hồi chiêu</b>
+                                <span>Các chiêu thức lớn đều có số đạn giới hạn hoặc số lượt hồi chiêu. Hãy phối hợp đòn đánh thường xen kẽ.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Hướng Dẫn -->
+            <div class="guide-footer">
+                <button id="btnGuideBack" class="guide-btn-secondary">⬅ QUAY LẠI MENU CHÍNH</button>
+                <button id="btnGuidePlay" class="guide-btn-primary">VÀO CHỌN TƯỚNG & CHIẾN 🚀</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Màn hình Chọn Nhân vật (Character Selection Screen) -->
-    <div id="charSelectScreen" class="char-select-screen">
+    <div id="charSelectScreen" class="char-select-screen" style="display: none;">
         <div class="char-select-header">
             <h2>CHỌN CHIẾN BINH CỦA BẠN</h2>
             <p>Mỗi nhân vật sở hữu phong cách chiến đấu và 4 chiêu thức độc nhất</p>
@@ -184,6 +423,7 @@
         </div>
 
         <div class="char-select-footer">
+            <button id="btnCharSelectBack" class="btn-char-back">⬅ MENU CHÍNH</button>
             <button id="btnStartBattle" class="start-battle-btn">VÀO TRẬN ĐẤU (SPACE / ENTER)</button>
         </div>
     </div>
