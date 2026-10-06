@@ -13,6 +13,9 @@
             <div class="subtitle">Game Chiến thuật Bàn cờ Lượt đồng thời • Nhập 4 hành động</div>
         </div>
         <div class="header-controls" style="display: flex; gap: 8px;">
+            <button id="btnHeaderLang" class="btn-change-char btn-lang-toggle" title="Đổi ngôn ngữ / Switch Language">
+                🌐 English
+            </button>
             <button id="btnHeaderMenu" class="btn-change-char" title="Quay về menu chính">
                 🏠 Menu Chính
             </button>
@@ -167,8 +170,44 @@
         </div>
     </div>
 
+    <!-- Màn hình Chọn Ngôn ngữ (Language Selection Screen) -->
+    <div id="languageSelectScreen" class="lang-select-screen">
+        <div class="lang-backdrop-glow"></div>
+        <div class="lang-modal-box">
+            <div class="lang-badge">LANGUAGE SELECTION • CHỌN NGÔN NGỮ</div>
+            <h1 class="lang-title">CHRONO CLASH</h1>
+            <div class="lang-tagline">WEGO TACTICS 20x7</div>
+            <p class="lang-subtitle">Chọn ngôn ngữ của bạn để bắt đầu • Choose your language to begin</p>
+
+            <div class="lang-cards-grid">
+                <button class="lang-card-btn" id="btnSelectLangVi" data-lang="vi">
+                    <span class="lang-flag">🇻🇳</span>
+                    <div class="lang-card-text">
+                        <span class="lang-card-name">TIẾNG VIỆT</span>
+                        <span class="lang-card-sub">Giao diện, cẩm nang tác chiến & kỹ năng tiếng Việt</span>
+                    </div>
+                    <span class="lang-card-arrow">➔</span>
+                </button>
+
+                <button class="lang-card-btn" id="btnSelectLangEn" data-lang="en">
+                    <span class="lang-flag">🇬🇧</span>
+                    <div class="lang-card-text">
+                        <span class="lang-card-name">ENGLISH</span>
+                        <span class="lang-card-sub">English interface, tactical manual & operative skills</span>
+                    </div>
+                    <span class="lang-card-arrow">➔</span>
+                </button>
+            </div>
+
+            <div class="lang-footer-hint">
+                <span>💡 Bạn có thể đổi lại ngôn ngữ bất kỳ lúc nào bằng nút <b>🌐</b> trên thanh tiêu đề.</span>
+                <span>You can switch languages anytime using the <b>🌐</b> button in the top bar.</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Màn hình Chính / Khởi động (Main Menu Screen) -->
-    <div id="mainMenuScreen" class="main-menu-screen">
+    <div id="mainMenuScreen" class="main-menu-screen" style="display: none;">
         <div class="menu-backdrop-glow"></div>
         <div class="menu-content-box">
             <div class="menu-badge">TACTICAL WEGO PROTOCOL • 20x7</div>
@@ -429,6 +468,7 @@
     </div>
 
     <script src="audio.js"></script>
+    <script src="i18n.js"></script>
     <script src="characters.js"></script>
     <script src="game.js"></script>
 </body>

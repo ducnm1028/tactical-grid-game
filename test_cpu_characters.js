@@ -70,6 +70,9 @@ global.document = {
     querySelectorAll(selector) {
         return [];
     },
+    querySelector(selector) {
+        return { innerText: '', innerHTML: '' };
+    },
     createElement(tag) {
         return {
             className: '',
@@ -84,6 +87,7 @@ global.requestAnimationFrame = (cb) => {};
 global.performance = { now: () => Date.now() };
 
 // Load code
+vm.runInThisContext(fs.readFileSync('i18n.js', 'utf8'));
 vm.runInThisContext(fs.readFileSync('characters.js', 'utf8'));
 vm.runInThisContext(fs.readFileSync('audio.js', 'utf8'));
 global.window.soundCtrl = new SoundController();

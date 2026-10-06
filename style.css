@@ -1432,4 +1432,196 @@ header {
     transform: translateY(-2px);
 }
 
+/* =========================================
+   LANGUAGE SELECT SCREEN
+   ========================================= */
+.lang-select-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(circle at 50% 40%, #0f172a 0%, #030712 70%, #00020a 100%);
+    z-index: 1020;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    user-select: none;
+}
+
+.lang-backdrop-glow {
+    position: absolute;
+    width: 650px;
+    height: 650px;
+    background: radial-gradient(circle, rgba(14, 165, 233, 0.22) 0%, rgba(56, 189, 248, 0.06) 50%, transparent 75%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    filter: blur(50px);
+    z-index: 1;
+}
+
+.lang-modal-box {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 640px;
+    width: 100%;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 20px;
+    padding: 36px 28px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 35px rgba(56, 189, 248, 0.2);
+    backdrop-filter: blur(16px);
+}
+
+.lang-badge {
+    background: rgba(14, 165, 233, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.5);
+    color: #38bdf8;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.25);
+}
+
+.lang-title {
+    font-size: clamp(2.2rem, 5vw, 3.6rem);
+    font-weight: 950;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin: 0 0 4px 0;
+    background: linear-gradient(135deg, #ffffff 0%, #38bdf8 50%, #00f2fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.7));
+}
+
+.lang-tagline {
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #f59e0b;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.lang-subtitle {
+    font-size: 0.95rem;
+    color: #94a3b8;
+    margin: 0 0 28px 0;
+}
+
+.lang-cards-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 24px;
+}
+
+.lang-card-btn {
+    display: flex;
+    align-items: center;
+    background: rgba(30, 41, 59, 0.85);
+    border: 2px solid #334155;
+    border-radius: 14px;
+    padding: 16px 20px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #f8fafc;
+    position: relative;
+    overflow: hidden;
+}
+
+.lang-card-btn:hover {
+    border-color: #00f2fe;
+    background: rgba(15, 23, 42, 0.95);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 30px rgba(0, 242, 254, 0.35);
+}
+
+.lang-card-btn:active {
+    transform: translateY(-1px) scale(1.01);
+}
+
+.lang-flag {
+    font-size: 2.6rem;
+    margin-right: 18px;
+    line-height: 1;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+}
+
+.lang-card-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.lang-card-name {
+    font-size: 1.25rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #f8fafc;
+}
+
+.lang-card-sub {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-top: 3px;
+}
+
+.lang-card-arrow {
+    font-size: 1.3rem;
+    color: #38bdf8;
+    margin-left: 12px;
+    transition: transform 0.2s ease;
+}
+
+.lang-card-btn:hover .lang-card-arrow {
+    transform: translateX(4px);
+    color: #00f2fe;
+}
+
+.lang-footer-hint {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.78rem;
+    color: #64748b;
+    line-height: 1.4;
+    border-top: 1px solid rgba(51, 65, 85, 0.4);
+    padding-top: 16px;
+    width: 100%;
+}
+
+.btn-lang-toggle {
+    background: rgba(14, 165, 233, 0.15) !important;
+    border-color: #38bdf8 !important;
+    color: #38bdf8 !important;
+    font-weight: 800 !important;
+}
+
+.btn-lang-toggle:hover {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.5) !important;
+}
+
+
 

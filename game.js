@@ -10,14 +10,14 @@ const GRID_ROWS = 7;
 const CELL_SIZE = 64; // Kích thước mỗi ô trên Canvas
 
 const DIRECTIONS = {
-    UP:         { name: 'UP',         dx:  0, dy: -1, symbol: '↑', label: 'Lên' },
-    DOWN:       { name: 'DOWN',       dx:  0, dy:  1, symbol: '↓', label: 'Dưới' },
-    LEFT:       { name: 'LEFT',       dx: -1, dy:  0, symbol: '←', label: 'Trái' },
-    RIGHT:      { name: 'RIGHT',      dx:  1, dy:  0, symbol: '→', label: 'Phải' },
-    UP_LEFT:    { name: 'UP_LEFT',    dx: -1, dy: -1, symbol: '↖', label: 'Lên-Trái' },
-    UP_RIGHT:   { name: 'UP_RIGHT',   dx:  1, dy: -1, symbol: '↗', label: 'Lên-Phải' },
-    DOWN_LEFT:  { name: 'DOWN_LEFT',  dx: -1, dy:  1, symbol: '↙', label: 'Dưới-Trái' },
-    DOWN_RIGHT: { name: 'DOWN_RIGHT', dx:  1, dy:  1, symbol: '↘', label: 'Dưới-Phải' }
+    UP:         { name: 'UP',         dx:  0, dy: -1, symbol: '↑', label: 'Lên', label_en: 'Up' },
+    DOWN:       { name: 'DOWN',       dx:  0, dy:  1, symbol: '↓', label: 'Dưới', label_en: 'Down' },
+    LEFT:       { name: 'LEFT',       dx: -1, dy:  0, symbol: '←', label: 'Trái', label_en: 'Left' },
+    RIGHT:      { name: 'RIGHT',      dx:  1, dy:  0, symbol: '→', label: 'Phải', label_en: 'Right' },
+    UP_LEFT:    { name: 'UP_LEFT',    dx: -1, dy: -1, symbol: '↖', label: 'Lên-Trái', label_en: 'Up-Left' },
+    UP_RIGHT:   { name: 'UP_RIGHT',   dx:  1, dy: -1, symbol: '↗', label: 'Lên-Phải', label_en: 'Up-Right' },
+    DOWN_LEFT:  { name: 'DOWN_LEFT',  dx: -1, dy:  1, symbol: '↙', label: 'Dưới-Trái', label_en: 'Down-Left' },
+    DOWN_RIGHT: { name: 'DOWN_RIGHT', dx:  1, dy:  1, symbol: '↘', label: 'Dưới-Phải', label_en: 'Down-Right' }
 };
 
 class GameEngine {
@@ -31,7 +31,8 @@ class GameEngine {
         this.resizeCanvas();
 
         this.turn = 1;
-        this.phase = 'MAIN_MENU'; // 'MAIN_MENU' | 'CHAR_SELECT' | 'HOW_TO_PLAY' | 'PLANNING' | 'RESOLVING' | 'GAMEOVER'
+        this.lang = (typeof getLanguage === 'function') ? getLanguage() : 'vi';
+        this.phase = 'LANG_SELECT'; // 'LANG_SELECT' | 'MAIN_MENU' | 'CHAR_SELECT' | 'HOW_TO_PLAY' | 'PLANNING' | 'RESOLVING' | 'GAMEOVER'
         this.previousPhaseBeforeGuide = 'MAIN_MENU';
         this.currentStep = -1;
 
@@ -118,6 +119,7 @@ class GameEngine {
         this.initCharacterSelectUI();
         this.initMenuAndGuideUI();
         this.bindEvents();
+        this.applyLanguageToUI();
         this.updateCamera(true);
 
         // Vòng lặp vẽ liên tục 60 FPS
@@ -133,16 +135,21 @@ class GameEngine {
     // --- Màn hình Chọn Nhân vật (Character Selection) ---
     initCharacterSelectUI() {
         const container = document.getElementById('charGridContainer');
+        if (!container) return;
         const characters = getAllCharacters();
+        const lang = this.lang || 'vi';
 
         container.innerHTML = characters.map(char => {
             const isUnlocked = char.isUnlocked;
             const isSelected = char.id === this.selectedCharacter.id;
+            const cName = getCharName(char, lang);
+            const cTitle = getCharTitle(char, lang);
+            const cDesc = getCharDesc(char, lang);
 
             const skillsHtml = char.skills.map(s => `
                 <div class="preview-skill-item">
                     <span class="ps-icon">${s.icon}</span>
-                    <span class="ps-name">${s.name}</span>
+                    <span class="ps-name">${getSkillName(s, lang)}</span>
                     <span class="ps-key">${s.hotkey || ''}</span>
                 </div>
             `).join('');
@@ -151,11 +158,11 @@ class GameEngine {
                 <div class="char-card ${isSelected ? 'selected' : ''} ${!isUnlocked ? 'locked' : ''}" 
                      data-char-id="${char.id}">
                     <div class="char-avatar-box">${char.avatar}</div>
-                    <div class="char-name">${char.name}</div>
-                    <div class="char-title">${char.title}</div>
-                    <div class="char-desc">${char.description}</div>
+                    <div class="char-name">${cName}</div>
+                    <div class="char-title">${cTitle}</div>
+                    <div class="char-desc">${cDesc}</div>
                     <div style="font-size:0.75rem; color:#f59e0b; margin-bottom:8px;">
-                        ⚡ Hạn mức di chuyển: <b>${char.moveBudget || 3} bước/lệnh</b>
+                        ${t('moveBudgetLabel', { budget: char.moveBudget || 3 })}
                     </div>
                     <div class="char-skills-preview">
                         ${skillsHtml}
@@ -174,7 +181,7 @@ class GameEngine {
                     card.classList.add('selected');
                     if (window.soundCtrl) window.soundCtrl.playSelect();
                 } else {
-                    this.addCombatLog('Ô nhân vật này đang chờ ý tưởng thiết kế từ bạn!', 'system');
+                    this.addCombatLog(lang === 'en' ? 'This operative slot is pending design!' : 'Ô nhân vật này đang chờ ý tưởng thiết kế từ bạn!', 'system');
                     if (window.soundCtrl) window.soundCtrl.playUndo();
                 }
             });
@@ -191,11 +198,27 @@ class GameEngine {
             });
         });
 
-        document.getElementById('btnStartBattle').onclick = () => this.startBattle();
+        const startBtn = document.getElementById('btnStartBattle');
+        if (startBtn) startBtn.onclick = () => this.startBattle();
     }
 
-    // --- Khởi tạo Giao diện Màn hình Chính & Hướng dẫn ---
+    // --- Khởi tạo Giao diện Màn hình Chính, Hướng dẫn & Ngôn ngữ ---
     initMenuAndGuideUI() {
+        const btnVi = document.getElementById('btnSelectLangVi');
+        if (btnVi) {
+            btnVi.addEventListener('click', () => this.selectLanguage('vi'));
+        }
+
+        const btnEn = document.getElementById('btnSelectLangEn');
+        if (btnEn) {
+            btnEn.addEventListener('click', () => this.selectLanguage('en'));
+        }
+
+        const btnHeaderLang = document.getElementById('btnHeaderLang');
+        if (btnHeaderLang) {
+            btnHeaderLang.addEventListener('click', () => this.toggleLanguage());
+        }
+
         const btnPlay = document.getElementById('btnMenuPlay');
         if (btnPlay) {
             btnPlay.addEventListener('click', () => this.showCharSelectScreen());
@@ -237,12 +260,50 @@ class GameEngine {
         }
     }
 
-    showMainMenuScreen() {
+    showLanguageSelectScreen() {
         this.cancelPathPlanning();
-        this.phase = 'MAIN_MENU';
+        this.phase = 'LANG_SELECT';
+        const langScreen = document.getElementById('languageSelectScreen');
         const menu = document.getElementById('mainMenuScreen');
         const charSel = document.getElementById('charSelectScreen');
         const guide = document.getElementById('howToPlayScreen');
+        if (langScreen) langScreen.style.display = 'flex';
+        if (menu) menu.style.display = 'none';
+        if (charSel) charSel.style.display = 'none';
+        if (guide) guide.style.display = 'none';
+        if (window.soundCtrl) window.soundCtrl.playSelect();
+    }
+
+    selectLanguage(lang) {
+        if (typeof setLanguage === 'function') {
+            setLanguage(lang);
+        }
+        this.lang = lang;
+        const langScreen = document.getElementById('languageSelectScreen');
+        if (langScreen) langScreen.style.display = 'none';
+        this.applyLanguageToUI();
+        if (window.soundCtrl) window.soundCtrl.playSelect();
+        this.showMainMenuScreen();
+    }
+
+    toggleLanguage() {
+        const nextLang = (this.lang === 'vi') ? 'en' : 'vi';
+        if (typeof setLanguage === 'function') {
+            setLanguage(nextLang);
+        }
+        this.lang = nextLang;
+        this.applyLanguageToUI();
+        if (window.soundCtrl) window.soundCtrl.playSelect();
+    }
+
+    showMainMenuScreen() {
+        this.cancelPathPlanning();
+        this.phase = 'MAIN_MENU';
+        const langScreen = document.getElementById('languageSelectScreen');
+        const menu = document.getElementById('mainMenuScreen');
+        const charSel = document.getElementById('charSelectScreen');
+        const guide = document.getElementById('howToPlayScreen');
+        if (langScreen) langScreen.style.display = 'none';
         if (menu) menu.style.display = 'flex';
         if (charSel) charSel.style.display = 'none';
         if (guide) guide.style.display = 'none';
@@ -252,9 +313,11 @@ class GameEngine {
     showCharSelectScreen() {
         this.cancelPathPlanning();
         this.phase = 'CHAR_SELECT';
+        const langScreen = document.getElementById('languageSelectScreen');
         const menu = document.getElementById('mainMenuScreen');
         const charSel = document.getElementById('charSelectScreen');
         const guide = document.getElementById('howToPlayScreen');
+        if (langScreen) langScreen.style.display = 'none';
         if (menu) menu.style.display = 'none';
         if (charSel) charSel.style.display = 'flex';
         if (guide) guide.style.display = 'none';
@@ -267,12 +330,15 @@ class GameEngine {
             this.previousPhaseBeforeGuide = this.phase;
         }
         this.phase = 'HOW_TO_PLAY';
+        const langScreen = document.getElementById('languageSelectScreen');
         const menu = document.getElementById('mainMenuScreen');
         const charSel = document.getElementById('charSelectScreen');
         const guide = document.getElementById('howToPlayScreen');
+        if (langScreen) langScreen.style.display = 'none';
         if (menu) menu.style.display = 'none';
         if (charSel) charSel.style.display = 'none';
         if (guide) guide.style.display = 'flex';
+        this.renderHowToPlayUI();
         if (window.soundCtrl) window.soundCtrl.playSelect();
     }
 
@@ -290,9 +356,11 @@ class GameEngine {
     }
 
     startBattle() {
+        const langScreen = document.getElementById('languageSelectScreen');
         const menu = document.getElementById('mainMenuScreen');
         const charSel = document.getElementById('charSelectScreen');
         const guide = document.getElementById('howToPlayScreen');
+        if (langScreen) langScreen.style.display = 'none';
         if (menu) menu.style.display = 'none';
         if (charSel) charSel.style.display = 'none';
         if (guide) guide.style.display = 'none';
@@ -300,10 +368,301 @@ class GameEngine {
         this.applyCpuCharacter(this.selectedCpuOption);
         this.phase = 'PLANNING';
         if (window.soundCtrl) window.soundCtrl.playCommit();
-        this.addCombatLog(`Chiến binh [${this.selectedCharacter.name}] bước vào đấu trường!`, 'system');
-        this.addCombatLog(`Đối thủ CPU nhập vai [${this.cpuCharacter.name}]!`, 'system');
+        const pName = getCharName(this.selectedCharacter, this.lang);
+        const cName = getCharName(this.cpuCharacter, this.lang);
+        this.addCombatLog(this.lang === 'en' ? `Operative [${pName}] deployed to the arena!` : `Chiến binh [${pName}] bước vào đấu trường!`, 'system');
+        this.addCombatLog(this.lang === 'en' ? `CPU Sentinel took identity of [${cName}]!` : `Đối thủ CPU nhập vai [${cName}]!`, 'system');
         this.updateHUD();
         this.updateQueueDisplay();
+    }
+
+    applyLanguageToUI() {
+        if (typeof document === 'undefined' || !document.querySelector) return;
+        const lang = this.lang || 'vi';
+        document.title = t('appTitle');
+
+        // Header
+        const subElem = document.querySelector('.title-container .subtitle');
+        if (subElem) subElem.innerText = t('headerSubtitle');
+
+        const btnLang = document.getElementById('btnHeaderLang');
+        if (btnLang) btnLang.innerText = lang === 'vi' ? '🌐 English' : '🌐 Tiếng Việt';
+
+        const btnMenu = document.getElementById('btnHeaderMenu');
+        if (btnMenu) btnMenu.innerText = t('btnHeaderMenu');
+
+        const btnGuide = document.getElementById('btnHeaderGuide');
+        if (btnGuide) btnGuide.innerText = t('btnHeaderGuide');
+
+        const btnChar = document.getElementById('btnOpenCharSelect');
+        if (btnChar) btnChar.innerText = t('btnOpenCharSelect');
+
+        const soundBtn = document.getElementById('soundToggleBtn');
+        if (soundBtn) {
+            soundBtn.innerText = (window.soundCtrl && window.soundCtrl.enabled) ? t('soundOn') : t('soundOff');
+        }
+
+        // Main Menu
+        const menuBadge = document.querySelector('.menu-badge');
+        if (menuBadge) menuBadge.innerText = t('menuBadge');
+
+        const menuTitle = document.querySelector('.menu-title');
+        if (menuTitle) menuTitle.innerText = t('menuTitle');
+
+        const menuTag = document.querySelector('.menu-tagline');
+        if (menuTag) menuTag.innerText = t('menuTagline');
+
+        const menuDesc = document.querySelector('.menu-description');
+        if (menuDesc) menuDesc.innerText = t('menuDescription');
+
+        const playMain = document.querySelector('#btnMenuPlay .btn-main-text');
+        if (playMain) playMain.innerText = t('btnMenuPlay');
+        const playSub = document.querySelector('#btnMenuPlay .btn-sub-text');
+        if (playSub) playSub.innerText = t('btnMenuPlaySub');
+
+        const guideMain = document.querySelector('#btnMenuGuide .btn-main-text');
+        if (guideMain) guideMain.innerText = t('btnMenuGuide');
+        const guideSub = document.querySelector('#btnMenuGuide .btn-sub-text');
+        if (guideSub) guideSub.innerText = t('btnMenuGuideSub');
+
+        const pills = document.querySelectorAll('.menu-feature-pills .pill');
+        if (pills && pills.length >= 4) {
+            pills[0].innerText = t('pillWego');
+            pills[1].innerText = t('pillChars');
+            pills[2].innerText = t('pillRoute');
+            pills[3].innerText = t('pillCpu');
+        }
+
+        const menuHint = document.querySelector('.menu-footer-hint');
+        if (menuHint) {
+            menuHint.innerHTML = lang === 'en'
+                ? `Press <kbd class="kbd-hint">SPACE</kbd> or <kbd class="kbd-hint">ENTER</kbd> to Play • Press <kbd class="kbd-hint">H</kbd> for Guide`
+                : `Nhấn <kbd class="kbd-hint">SPACE</kbd> hoặc <kbd class="kbd-hint">ENTER</kbd> để vào Chơi • Nhấn <kbd class="kbd-hint">H</kbd> để xem Hướng dẫn`;
+        }
+
+        // Character Select Screen
+        const csTitle = document.querySelector('.char-select-header h2');
+        if (csTitle) csTitle.innerText = t('charSelectHeaderTitle');
+        const csSub = document.querySelector('.char-select-header p');
+        if (csSub) csSub.innerText = t('charSelectHeaderSub');
+
+        const cpuLabel = document.querySelector('.cpu-select-label');
+        if (cpuLabel) cpuLabel.innerText = t('cpuSelectLabel');
+
+        const randomBtn = document.querySelector('#cpuSelectOptions [data-cpuchar="random"]');
+        if (randomBtn) randomBtn.innerText = t('cpuOptRandom');
+
+        const csBack = document.getElementById('btnCharSelectBack');
+        if (csBack) csBack.innerText = t('btnCharSelectBack');
+
+        const csStart = document.getElementById('btnStartBattle');
+        if (csStart) csStart.innerText = t('btnStartBattle');
+
+        // Minimap
+        const mmTitle = document.querySelector('.minimap-title');
+        if (mmTitle) mmTitle.innerText = t('minimapTitle');
+
+        // Queues & Logs
+        const pQTitle = document.querySelector('.queue-row:first-child .queue-label span:first-child');
+        if (pQTitle) pQTitle.innerText = t('playerQueueTitle');
+
+        const cQTitle = document.querySelector('.queue-row:last-child .queue-label span:first-child');
+        if (cQTitle) cQTitle.innerText = t('cpuQueueTitle');
+
+        const cQSecret = document.querySelector('.queue-row:last-child .queue-label span:last-child');
+        if (cQSecret) cQSecret.innerText = t('secretTag');
+
+        const logTitle = document.querySelector('.log-title');
+        if (logTitle) logTitle.innerText = t('combatLogTitle');
+
+        // Hotkey bar labels
+        const actLabel = document.querySelector('#actionButtonsGroup .hotkey-group-label');
+        if (actLabel) actLabel.innerText = t('actionGroupLabel');
+
+        const dirLabel = document.querySelector('#directionButtonsGroup .hotkey-group-label');
+        if (dirLabel) dirLabel.innerText = t('directionGroupLabel');
+
+        const btnUndo = document.getElementById('btnUndo');
+        if (btnUndo) btnUndo.innerHTML = t('btnUndo');
+
+        const btnClear = document.getElementById('btnClear');
+        if (btnClear) btnClear.innerHTML = t('btnClear');
+
+        const finishPathBtn = document.getElementById('btnFinishPath');
+        if (finishPathBtn) finishPathBtn.innerText = t('btnFinishPath');
+
+        // Re-render dynamic elements
+        this.initCharacterSelectUI();
+        this.renderHowToPlayUI();
+        this.updateHUD();
+        this.updateQueueDisplay();
+        this.updateSkillButtons();
+    }
+
+    renderHowToPlayUI() {
+        const guideModal = document.querySelector('#howToPlayScreen .guide-modal-container');
+        if (!guideModal) return;
+
+        const lang = this.lang || 'vi';
+        const chars = getAllCharacters().filter(c => c.isUnlocked);
+
+        const charCardsHtml = chars.map(c => {
+            const cName = getCharName(c, lang);
+            const cSub = `${getCharTitle(c, lang)} • ${c.maxHp} HP`;
+            const skillsList = c.skills.map(s => {
+                const sName = getSkillName(s, lang);
+                const sDesc = getSkillDesc(s, lang);
+                return `<li><b>${s.icon} ${sName}:</b> ${sDesc}</li>`;
+            }).join('');
+
+            return `
+                <div class="cg-card">
+                    <div class="cg-header">
+                        <span class="cg-avatar">${c.avatar}</span>
+                        <div>
+                            <h4 class="cg-name" style="color: ${c.themeColor};">${cName.toUpperCase()}</h4>
+                            <div class="cg-sub">${cSub}</div>
+                        </div>
+                    </div>
+                    <ul class="cg-skills">
+                        ${skillsList}
+                    </ul>
+                </div>
+            `;
+        }).join('');
+
+        guideModal.innerHTML = `
+            <div class="guide-header">
+                <div class="guide-header-text">
+                    <h2>${t('guideMainTitle')}</h2>
+                    <p>${t('guideMainSub')}</p>
+                </div>
+                <button id="btnCloseGuideX" class="guide-close-btn" title="Close">✕</button>
+            </div>
+
+            <div class="guide-scroll-body">
+                <!-- Section 1 -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">⚡</span>
+                        <span>${t('guideSec1Title')}</span>
+                    </div>
+                    <div class="section-card-body">
+                        <p>${t('guideSec1Desc')}</p>
+                        <div class="guide-steps-grid">
+                            <div class="g-step-box">
+                                <span class="g-step-badge">${lang === 'en' ? 'Phase 1' : 'Pha 1'}</span>
+                                <b>${t('guideSec1Phase1Title')}</b>
+                                <span>${t('guideSec1Phase1Desc')}</span>
+                            </div>
+                            <div class="g-step-box">
+                                <span class="g-step-badge">${lang === 'en' ? 'Phase 2' : 'Pha 2'}</span>
+                                <b>${t('guideSec1Phase2Title')}</b>
+                                <span>${t('guideSec1Phase2Desc')}</span>
+                            </div>
+                            <div class="g-step-box">
+                                <span class="g-step-badge">${lang === 'en' ? 'Phase 3' : 'Pha 3'}</span>
+                                <b>${t('guideSec1Phase3Title')}</b>
+                                <span>${t('guideSec1Phase3Desc')}</span>
+                            </div>
+                        </div>
+                        <div class="guide-callout tip">
+                            ${t('guideSec1Tip')}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2 -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">👟</span>
+                        <span>${t('guideSec2Title')}</span>
+                    </div>
+                    <div class="section-card-body">
+                        <p>${t('guideSec2Desc')}</p>
+                        <ul class="guide-list">
+                            <li>${t('guideSec2Li1')}</li>
+                            <li>${t('guideSec2Li2')}</li>
+                            <li>${t('guideSec2Li3')}</li>
+                            <li>${t('guideSec2Li4')}</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Section 3 -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">⌨️</span>
+                        <span>${t('guideSec3Title')}</span>
+                    </div>
+                    <div class="section-card-body">
+                        <div class="hotkey-table-grid">
+                            <div class="hk-row"><span class="hk-key">[1]</span><span class="hk-desc">${t('hk1Desc')}</span></div>
+                            <div class="hk-row"><span class="hk-key">[2]</span><span class="hk-desc">${t('hk2Desc')}</span></div>
+                            <div class="hk-row"><span class="hk-key">[3]</span><span class="hk-desc">${t('hk3Desc')}</span></div>
+                            <div class="hk-row"><span class="hk-key">[4]</span><span class="hk-desc">${t('hk4Desc')}</span></div>
+                            <div class="hk-row"><span class="hk-key">WASD / QEZC</span><span class="hk-desc">${t('hkDirDesc')}</span></div>
+                            <div class="hk-row"><span class="hk-key">[Space]</span><span class="hk-desc">${t('hkSpaceDesc')}</span></div>
+                            <div class="hk-row"><span class="hk-key">[⌫ Backspace]</span><span class="hk-desc">${t('hkBackDesc')}</span></div>
+                            <div class="hk-row"><span class="hk-key">[Esc]</span><span class="hk-desc">${t('hkEscDesc')}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4 -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">👥</span>
+                        <span>${t('guideSec4Title')}</span>
+                    </div>
+                    <div class="section-card-body">
+                        <div class="char-guide-cards">
+                            ${charCardsHtml}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5 -->
+                <div class="guide-section-card">
+                    <div class="section-card-title">
+                        <span class="sec-icon">🛡️</span>
+                        <span>${t('guideSec5Title')}</span>
+                    </div>
+                    <div class="section-card-body">
+                        <div class="strategy-tips-grid">
+                            <div class="tip-card">
+                                <b>${t('tip1Title')}</b>
+                                <span>${t('tip1Desc')}</span>
+                            </div>
+                            <div class="tip-card">
+                                <b>${t('tip2Title')}</b>
+                                <span>${t('tip2Desc')}</span>
+                            </div>
+                            <div class="tip-card">
+                                <b>${t('tip3Title')}</b>
+                                <span>${t('tip3Desc')}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="guide-footer">
+                <button id="btnGuideBack" class="guide-btn-secondary">${t('btnGuideBack')}</button>
+                <button id="btnGuidePlay" class="guide-btn-primary">${t('btnGuidePlay')}</button>
+            </div>
+        `;
+
+        // Re-bind modal buttons
+        const closeX = document.getElementById('btnCloseGuideX');
+        if (closeX) closeX.addEventListener('click', () => this.closeHowToPlayScreen());
+
+        const guideBack = document.getElementById('btnGuideBack');
+        if (guideBack) guideBack.addEventListener('click', () => this.closeHowToPlayScreen());
+
+        const guidePlay = document.getElementById('btnGuidePlay');
+        if (guidePlay) guidePlay.addEventListener('click', () => this.showCharSelectScreen());
     }
 
     applyCpuCharacter(cpuChoice = 'random') {
@@ -646,6 +1005,20 @@ class GameEngine {
     }
 
     handleKeyDown(e) {
+        if (this.phase === 'LANG_SELECT') {
+            if (e.code === 'Digit1' || e.key === '1' || e.key === 'v' || e.key === 'V') {
+                e.preventDefault();
+                this.selectLanguage('vi');
+            } else if (e.code === 'Digit2' || e.key === '2' || e.key === 'e' || e.key === 'E') {
+                e.preventDefault();
+                this.selectLanguage('en');
+            } else if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                this.selectLanguage('vi');
+            }
+            return;
+        }
+
         if (this.phase === 'MAIN_MENU') {
             if (e.code === 'Space' || e.code === 'Enter') {
                 e.preventDefault();
@@ -933,7 +1306,7 @@ class GameEngine {
                 slot.innerHTML = `
                     <span class="slot-step-num">#${i + 1}</span>
                     <span class="slot-icon">?</span>
-                    <span class="slot-name">Trống</span>
+                    <span class="slot-name">${t('slotEmpty')}</span>
                 `;
             }
         }
@@ -944,11 +1317,11 @@ class GameEngine {
 
         if (this.playerQueue.length === 4 && this.phase === 'PLANNING') {
             commitBtn.disabled = false;
-            commitBtn.innerHTML = `<span><b>[SPACE]</b> THỰC THI (4/4) 🚀</span>`;
+            commitBtn.innerHTML = `<span>${t('btnCommitPrefix')} (4/4) 🚀</span>`;
             commitBtn.style.animation = 'pulse 1s infinite alternate';
         } else {
             commitBtn.disabled = true;
-            commitBtn.innerHTML = `<span><b>[SPACE]</b> THỰC THI (${this.playerQueue.length}/4)</span>`;
+            commitBtn.innerHTML = `<span>${t('btnCommitPrefix')} (${this.playerQueue.length}/4)</span>`;
             commitBtn.style.animation = 'none';
         }
 
@@ -968,29 +1341,39 @@ class GameEngine {
         cFill.style.width = `${cPct}%`;
         cText.innerText = `${Math.round(this.cpu.hp)} / ${this.cpu.maxHp} HP`;
 
+        const playerBadge = document.getElementById('playerNameBadge');
+        if (playerBadge && this.selectedCharacter) {
+            playerBadge.innerText = `${getCharName(this.selectedCharacter, this.lang).toUpperCase()} ${t('playerBadgeSuffix')}`;
+        }
+
         const cpuBadge = document.getElementById('cpuNameBadge');
         if (cpuBadge && this.cpuCharacter) {
-            cpuBadge.innerText = `${this.cpu.avatar} ${this.cpu.name.toUpperCase()} [CPU]`;
+            cpuBadge.innerText = `${this.cpu.avatar} ${getCharName(this.cpuCharacter, this.lang).toUpperCase()} ${t('cpuBadgeSuffix')}`;
             cpuBadge.style.color = this.cpu.color;
         }
 
-        document.getElementById('turnDisplay').innerText = `LƯỢT ${this.turn}`;
+        document.getElementById('turnDisplay').innerText = `${t('turnPrefix')} ${this.turn}`;
         const phaseElem = document.getElementById('phaseDisplay');
         if (this.phase === 'PLANNING') {
-            phaseElem.innerText = 'LẬP KẾ HOẠCH';
+            phaseElem.innerText = t('phasePlanning');
             phaseElem.style.color = '#38bdf8';
         } else if (this.phase === 'RESOLVING') {
-            phaseElem.innerText = `GIẢI QUYẾT: BƯỚC ${this.currentStep + 1}/4`;
+            phaseElem.innerText = this.lang === 'en' ? `RESOLVING: STEP ${this.currentStep + 1}/4` : `GIẢI QUYẾT: BƯỚC ${this.currentStep + 1}/4`;
             phaseElem.style.color = '#f59e0b';
         } else if (this.phase === 'CHAR_SELECT') {
-            phaseElem.innerText = 'CHỌN CHIẾN BINH';
+            phaseElem.innerText = t('charSelectHeaderTitle');
             phaseElem.style.color = '#a855f7';
+        } else if (this.phase === 'LANG_SELECT') {
+            phaseElem.innerText = t('langBadge');
+            phaseElem.style.color = '#38bdf8';
         } else {
-            phaseElem.innerText = 'KẾT THÚC';
+            phaseElem.innerText = this.lang === 'en' ? 'GAME OVER' : 'KẾT THÚC';
             phaseElem.style.color = '#f43f5e';
         }
 
-        document.getElementById('currentDirText').innerText = `${DIRECTIONS[this.currentSelectedDir].label} (${DIRECTIONS[this.currentSelectedDir].symbol})`;
+        const d = DIRECTIONS[this.currentSelectedDir];
+        const dLabel = this.lang === 'en' ? (d.label_en || d.label) : d.label;
+        document.getElementById('currentDirText').innerText = `${dLabel} (${d.symbol})`;
     }
 
     addCombatLog(msg, type = 'normal') {
@@ -2951,19 +3334,26 @@ class GameEngine {
         const title = document.getElementById('modalTitle');
         const desc = document.getElementById('modalDesc');
 
+        const pName = getCharName(this.selectedCharacter, this.lang);
+        const cName = getCharName(this.cpuCharacter, this.lang);
+
         if (this.player.hp <= 0 && this.cpu.hp <= 0) {
-            title.innerText = 'HÒA NHAU!';
+            title.innerText = t('modalDrawTitle');
             title.className = 'modal-title clash';
-            desc.innerText = 'Cả hai chiến binh đều ngã xuống cùng lúc trong loạt hỏa lực!';
+            desc.innerText = t('modalDrawDesc');
         } else if (this.cpu.hp <= 0) {
-            title.innerText = 'CHIẾN THẮNG!';
+            title.innerText = t('modalVictoryTitle');
             title.className = 'modal-title victory';
-            desc.innerText = `Xuất sắc! [${this.player.name}] đã đánh bại ${this.cpu.name} của CPU ở Lượt ${this.turn}!`;
+            desc.innerText = this.lang === 'en'
+                ? `Outstanding! [${pName}] eliminated the CPU Sentinel [${cName}] on Turn ${this.turn}!`
+                : `Xuất sắc! [${pName}] đã đánh bại ${cName} của CPU ở Lượt ${this.turn}!`;
             if (window.soundCtrl) window.soundCtrl.playVictory();
         } else {
-            title.innerText = 'THẤT BẠI!';
+            title.innerText = t('modalDefeatTitle');
             title.className = 'modal-title defeat';
-            desc.innerText = `Bạn đã bị ${this.cpu.name} của CPU hạ gục. Hãy thử điều chỉnh chiến thuật ở ván sau!`;
+            desc.innerText = this.lang === 'en'
+                ? `Your operative was eliminated by CPU Sentinel [${cName}]. Adjust your tactics for the next match!`
+                : `Bạn đã bị ${cName} của CPU hạ gục. Hãy thử điều chỉnh chiến thuật ở ván sau!`;
             if (window.soundCtrl) window.soundCtrl.playDefeat();
         }
 
