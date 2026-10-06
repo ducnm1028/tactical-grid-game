@@ -60,7 +60,14 @@ class GameEngine {
         };
         this.activeHookTethers = []; // [{ source, target, turnsUntilPull, pullDist, skillId, cdAfterPull }]
 
-        // Nhân vật Người chơi
+        // Quản lý Chế độ Đội hình & Bổ sung CPU (Tối đa 5 người mỗi đội)
+        this.blueTeamSize = 1;
+        this.redTeamSize = 1;
+        this.currentTeamPreset = '1v1';
+        this.blueTeam = [];
+        this.redTeam = [];
+
+        // Nhân vật Người chơi (Được gán tham chiếu tới blueTeam[0])
         this.player = {
             x: 2,
             y: 3,
@@ -76,7 +83,7 @@ class GameEngine {
             avatar: '🪖'
         };
 
-        // Nhân vật CPU
+        // Nhân vật CPU (Được gán tham chiếu tới redTeam[0])
         this.cpu = {
             x: 17,
             y: 3,
@@ -116,7 +123,9 @@ class GameEngine {
         this.floatingTexts = [];
         this.particles = [];
 
+        this.setupTeams();
         this.initCharacterSelectUI();
+        this.initTeamModeUI();
         this.initMenuAndGuideUI();
         this.bindEvents();
         this.applyLanguageToUI();
@@ -179,6 +188,7 @@ class GameEngine {
                     this.selectedCharacter = char;
                     container.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
                     card.classList.add('selected');
+                    this.updateTeamRosterPreviews();
                     if (window.soundCtrl) window.soundCtrl.playSelect();
                 } else {
                     this.addCombatLog(lang === 'en' ? 'This operative slot is pending design!' : 'Ô nhân vật này đang chờ ý tưởng thiết kế từ bạn!', 'system');
@@ -194,12 +204,280 @@ class GameEngine {
                 this.selectedCpuOption = cpuChar;
                 cpuOptBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
+                this.updateTeamRosterPreviews();
                 if (window.soundCtrl) window.soundCtrl.playSelect();
             });
         });
 
         const startBtn = document.getElementById('btnStartBattle');
         if (startBtn) startBtn.onclick = () => this.startBattle();
+    }
+
+    // --- Khởi tạo Giao diện Chế độ Đội hình (Tối đa 5 người mỗi đội) ---
+    initTeamModeUI() {
+        const presets = ['1v1', '2v2', '3v3', '4v4', '5v5'];
+        presets.forEach(p => {
+            const btn = document.getElementById(`btnPreset${p}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    this.applyTeamPreset(p);
+                    if (window.soundCtrl) window.soundCtrl.playSelect();
+                });
+            }
+        });
+
+        const blueBtns = document.querySelectorAll('#blueTeamSizeSelectors .team-size-btn');
+        blueBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sz = parseInt(btn.getAttribute('data-size'), 10) || 1;
+                this.setBlueTeamSize(sz);
+                if (window.soundCtrl) window.soundCtrl.playSelect();
+            });
+        });
+
+        const redBtns = document.querySelectorAll('#redTeamSizeSelectors .team-size-btn');
+        redBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sz = parseInt(btn.getAttribute('data-size'), 10) || 1;
+                this.setRedTeamSize(sz);
+                if (window.soundCtrl) window.soundCtrl.playSelect();
+            });
+        });
+
+        this.updateTeamModeUI();
+    }
+
+    applyTeamPreset(preset) {
+        this.currentTeamPreset = preset;
+        const num = parseInt(preset[0], 10) || 1;
+        this.blueTeamSize = num;
+        this.redTeamSize = num;
+        this.setupTeams();
+        this.updateTeamModeUI();
+    }
+
+    setBlueTeamSize(size) {
+        this.blueTeamSize = Math.max(1, Math.min(5, size));
+        if (this.blueTeamSize === this.redTeamSize) {
+            this.currentTeamPreset = `${this.blueTeamSize}v${this.blueTeamSize}`;
+        } else {
+            this.currentTeamPreset = 'custom';
+        }
+        this.setupTeams();
+        this.updateTeamModeUI();
+    }
+
+    setRedTeamSize(size) {
+        this.redTeamSize = Math.max(1, Math.min(5, size));
+        if (this.blueTeamSize === this.redTeamSize) {
+            this.currentTeamPreset = `${this.blueTeamSize}v${this.blueTeamSize}`;
+        } else {
+            this.currentTeamPreset = 'custom';
+        }
+        this.setupTeams();
+        this.updateTeamModeUI();
+    }
+
+    updateTeamModeUI() {
+        if (typeof document === 'undefined' || !document.getElementById) return;
+
+        const presets = ['1v1', '2v2', '3v3', '4v4', '5v5'];
+        presets.forEach(p => {
+            const btn = document.getElementById(`btnPreset${p}`);
+            if (btn) btn.classList.toggle('active', this.currentTeamPreset === p);
+        });
+
+        const blueBtns = document.querySelectorAll('#blueTeamSizeSelectors .team-size-btn');
+        blueBtns.forEach(btn => {
+            const sz = parseInt(btn.getAttribute('data-size'), 10);
+            btn.classList.toggle('active', sz === this.blueTeamSize);
+        });
+
+        const redBtns = document.querySelectorAll('#redTeamSizeSelectors .team-size-btn');
+        redBtns.forEach(btn => {
+            const sz = parseInt(btn.getAttribute('data-size'), 10);
+            btn.classList.toggle('active', sz === this.redTeamSize);
+        });
+
+        const blueCount = document.getElementById('blueTeamCountPill');
+        if (blueCount) {
+            blueCount.innerText = t('teamCountFormat', { count: this.blueTeamSize });
+        }
+        const redCount = document.getElementById('redTeamCountPill');
+        if (redCount) {
+            redCount.innerText = t('teamCountFormat', { count: this.redTeamSize });
+        }
+
+        this.updateTeamRosterPreviews();
+    }
+
+    updateTeamRosterPreviews() {
+        if (typeof document === 'undefined' || !document.getElementById) return;
+
+        const blueList = document.getElementById('blueRosterList');
+        const redList = document.getElementById('redRosterList');
+        if (!blueList || !redList) return;
+
+        const unlockedChars = CHARACTERS_DATABASE.filter(c => c.isUnlocked);
+        const pChar = this.selectedCharacter || getCharacterById('trooper');
+        const otherChars = unlockedChars.filter(c => c.id !== pChar.id);
+        const allyPool = otherChars.length > 0 ? otherChars : unlockedChars;
+
+        // Blue Team Roster
+        let blueHtml = `
+            <div class="team-roster-chip is-player" title="${getCharName(pChar, this.lang)} (100 HP)">
+                <span>👑 ${pChar.avatar}</span>
+                <span>${getCharName(pChar, this.lang)}</span>
+                <span style="color: #34d399; font-size: 0.68rem;">[${this.lang === 'en' ? 'YOU' : 'BẠN'}]</span>
+            </div>
+        `;
+        for (let i = 1; i < this.blueTeamSize; i++) {
+            const allyChar = allyPool[(i - 1) % allyPool.length];
+            blueHtml += `
+                <div class="team-roster-chip is-ally" title="${getCharName(allyChar, this.lang)} (${allyChar.maxHp} HP)">
+                    <span>🤖 ${allyChar.avatar}</span>
+                    <span>${getCharName(allyChar, this.lang)}</span>
+                    <span style="color: #38bdf8; font-size: 0.65rem;">+CPU</span>
+                </div>
+            `;
+        }
+        blueList.innerHTML = blueHtml;
+
+        // Red Team Roster
+        let cLeaderChar = getCharacterById(this.selectedCpuOption);
+        if (!cLeaderChar) cLeaderChar = unlockedChars[0];
+
+        let redHtml = `
+            <div class="team-roster-chip is-enemy" title="${getCharName(cLeaderChar, this.lang)} (${cLeaderChar.maxHp} HP)">
+                <span>🎯 ${cLeaderChar.avatar}</span>
+                <span>${getCharName(cLeaderChar, this.lang)}</span>
+                <span style="color: #fb7185; font-size: 0.65rem;">${this.lang === 'en' ? 'LEADER' : 'CHỦ LỰC'}</span>
+            </div>
+        `;
+        for (let j = 1; j < this.redTeamSize; j++) {
+            const enemyChar = unlockedChars[j % unlockedChars.length];
+            redHtml += `
+                <div class="team-roster-chip is-enemy" title="${getCharName(enemyChar, this.lang)} (${enemyChar.maxHp} HP)">
+                    <span>🤖 ${enemyChar.avatar}</span>
+                    <span>${getCharName(enemyChar, this.lang)}</span>
+                    <span style="color: #fb7185; font-size: 0.65rem;">CPU ${j + 1}</span>
+                </div>
+            `;
+        }
+        redList.innerHTML = redHtml;
+    }
+
+    // --- Tọa độ Xuất phát 20x7 cho Đội hình Tối đa 5 người ---
+    getTeamSpawnPosition(team, index) {
+        const blueSpawns = [
+            { x: 2, y: 3 }, // Vị trí trung tâm
+            { x: 2, y: 1 }, // Cánh trên
+            { x: 2, y: 5 }, // Cánh dưới
+            { x: 1, y: 2 }, // Hậu quân trên
+            { x: 1, y: 4 }  // Hậu quân dưới
+        ];
+        const redSpawns = [
+            { x: 17, y: 3 }, // Vị trí trung tâm
+            { x: 17, y: 1 }, // Cánh trên
+            { x: 17, y: 5 }, // Cánh dưới
+            { x: 18, y: 2 }, // Hậu quân trên
+            { x: 18, y: 4 }  // Hậu quân dưới
+        ];
+        return team === 'BLUE' ? blueSpawns[index % 5] : redSpawns[index % 5];
+    }
+
+    createUnit(id, team, index, charObj, isPlayer = false, customName = null) {
+        const spawn = this.getTeamSpawnPosition(team, index);
+        const unit = {
+            id,
+            team,
+            index,
+            isPlayer,
+            isCpu: !isPlayer,
+            charId: charObj.id,
+            character: charObj,
+            name: customName || (isPlayer ? getCharName(charObj, this.lang) : `${team === 'BLUE' ? (this.lang === 'en' ? 'Ally' : 'Đồng minh') : (this.lang === 'en' ? 'Enemy' : 'Kẻ địch')} ${getCharName(charObj, this.lang)}`),
+            avatar: charObj.avatar,
+            color: isPlayer ? charObj.themeColor : (team === 'BLUE' ? '#38bdf8' : '#f43f5e'),
+            charThemeColor: charObj.themeColor,
+            hp: charObj.maxHp,
+            maxHp: charObj.maxHp,
+            x: spawn.x,
+            y: spawn.y,
+            renderX: spawn.x,
+            renderY: spawn.y,
+            dir: team === 'BLUE' ? 'RIGHT' : 'LEFT',
+            shieldDir: null,
+            state: 'IDLE',
+            moveBudget: charObj.moveBudget || 2,
+            stealthRadius: charObj.stealthRadius || 0,
+            revealedTurns: 0,
+            cooldowns: {},
+            skillAmmo: {},
+            buffs: {
+                adrenaline: { turnsLeft: 0, healPerTurn: 5, dmgBonusPercent: 20 },
+                cigarette: { turnsLeft: 0, dmgBonusPercent: 30, moveBonus: 1 }
+            },
+            queue: [],
+            alive: true
+        };
+        charObj.skills.forEach(s => {
+            if (s.maxAmmo) unit.skillAmmo[s.id] = s.maxAmmo;
+        });
+        return unit;
+    }
+
+    setupTeams() {
+        const unlockedChars = CHARACTERS_DATABASE.filter(c => c.isUnlocked);
+        const blueSize = Math.max(1, Math.min(5, this.blueTeamSize || 1));
+        const redSize = Math.max(1, Math.min(5, this.redTeamSize || 1));
+
+        // 1. Blue Team
+        this.blueTeam = [];
+        const pChar = this.selectedCharacter || getCharacterById('trooper');
+        const pUnit = this.createUnit('blue_0', 'BLUE', 0, pChar, true, getCharName(pChar, this.lang));
+        this.blueTeam.push(pUnit);
+
+        const otherChars = unlockedChars.filter(c => c.id !== pChar.id);
+        const allyPool = otherChars.length > 0 ? otherChars : unlockedChars;
+        for (let i = 1; i < blueSize; i++) {
+            const allyChar = allyPool[(i - 1) % allyPool.length];
+            const allyUnit = this.createUnit(`blue_${i}`, 'BLUE', i, allyChar, false);
+            this.blueTeam.push(allyUnit);
+        }
+
+        // 2. Red Team
+        this.redTeam = [];
+        let cLeaderChar = this.cpuCharacter;
+        if (!cLeaderChar) {
+            if (this.selectedCpuOption && this.selectedCpuOption !== 'random') {
+                cLeaderChar = getCharacterById(this.selectedCpuOption);
+            }
+            if (!cLeaderChar) cLeaderChar = unlockedChars[0];
+            this.cpuCharacter = cLeaderChar;
+        }
+
+        const cLeaderUnit = this.createUnit('red_0', 'RED', 0, cLeaderChar, false, `${this.lang === 'en' ? 'Sentinel' : 'Thủ lĩnh'} [${getCharName(cLeaderChar, this.lang)}]`);
+        this.redTeam.push(cLeaderUnit);
+
+        for (let j = 1; j < redSize; j++) {
+            const enemyChar = unlockedChars[j % unlockedChars.length];
+            const enemyUnit = this.createUnit(`red_${j}`, 'RED', j, enemyChar, false);
+            this.redTeam.push(enemyUnit);
+        }
+
+        // Đồng bộ các tham chiếu tương thích ngược (Backward compatibility)
+        this.player = this.blueTeam[0];
+        this.cpu = this.redTeam[0];
+        this.cooldowns = this.player.cooldowns;
+        this.skillAmmo = this.player.skillAmmo;
+        this.playerBuffs = this.player.buffs;
+        this.cpuCooldowns = this.cpu.cooldowns;
+        this.cpuSkillAmmo = this.cpu.skillAmmo;
+        this.cpuBuffs = this.cpu.buffs;
+        this.playerRevealedTurns = this.player.revealedTurns;
+        this.cpuRevealedTurns = this.cpu.revealedTurns;
+        this.activePathMaxSteps = this.player.moveBudget;
     }
 
     // --- Khởi tạo Giao diện Màn hình Chính, Hướng dẫn & Ngôn ngữ ---
@@ -366,12 +644,14 @@ class GameEngine {
         if (guide) guide.style.display = 'none';
         this.applySelectedCharacter();
         this.applyCpuCharacter(this.selectedCpuOption);
+        this.setupTeams();
         this.phase = 'PLANNING';
         if (window.soundCtrl) window.soundCtrl.playCommit();
         const pName = getCharName(this.selectedCharacter, this.lang);
         const cName = getCharName(this.cpuCharacter, this.lang);
-        this.addCombatLog(this.lang === 'en' ? `Operative [${pName}] deployed to the arena!` : `Chiến binh [${pName}] bước vào đấu trường!`, 'system');
-        this.addCombatLog(this.lang === 'en' ? `CPU Sentinel took identity of [${cName}]!` : `Đối thủ CPU nhập vai [${cName}]!`, 'system');
+        this.addCombatLog(this.lang === 'en'
+            ? `Squad Battle started! Your squad (${this.blueTeamSize} units) vs Enemy CPU squad (${this.redTeamSize} units)!`
+            : `Đại chiến Đội hình bắt đầu! Đội bạn (${this.blueTeamSize} người) vs Đội CPU (${this.redTeamSize} người)!`, 'system');
         this.updateHUD();
         this.updateQueueDisplay();
     }
@@ -457,6 +737,37 @@ class GameEngine {
 
         const csStart = document.getElementById('btnStartBattle');
         if (csStart) csStart.innerText = t('btnStartBattle');
+
+        // Team Battle Mode Section
+        const tSecTitle = document.getElementById('teamModeSectionTitle');
+        if (tSecTitle) tSecTitle.innerText = t('teamModeTitle');
+        const tSecSub = document.getElementById('teamModeSectionSub');
+        if (tSecSub) tSecSub.innerText = t('teamModeSub');
+
+        const tBlueTitle = document.getElementById('teamBlueBoxTitle');
+        if (tBlueTitle) tBlueTitle.innerText = t('labelTeamBlue');
+        const tRedTitle = document.getElementById('teamRedBoxTitle');
+        if (tRedTitle) tRedTitle.innerText = t('labelTeamRed');
+
+        const p1 = document.getElementById('btnPreset1v1'); if (p1) p1.innerText = t('preset1v1');
+        const p2 = document.getElementById('btnPreset2v2'); if (p2) p2.innerText = t('preset2v2');
+        const p3 = document.getElementById('btnPreset3v3'); if (p3) p3.innerText = t('preset3v3');
+        const p4 = document.getElementById('btnPreset4v4'); if (p4) p4.innerText = t('preset4v4');
+        const p5 = document.getElementById('btnPreset5v5'); if (p5) p5.innerText = t('preset5v5');
+
+        const bBtns = document.querySelectorAll('#blueTeamSizeSelectors .team-size-btn');
+        bBtns.forEach(b => {
+            const sz = parseInt(b.getAttribute('data-size'), 10);
+            if (sz === 1) b.innerText = t('sizeBtnSolo');
+            else b.innerText = t('sizeBtnPlusCpu', { size: sz, cpu: sz - 1 });
+        });
+        const rBtns = document.querySelectorAll('#redTeamSizeSelectors .team-size-btn');
+        rBtns.forEach(b => {
+            const sz = parseInt(b.getAttribute('data-size'), 10);
+            b.innerText = t('sizeBtnCpuOnly', { size: sz });
+        });
+
+        this.updateTeamModeUI();
 
         // Minimap
         const mmTitle = document.querySelector('.minimap-title');
@@ -675,59 +986,29 @@ class GameEngine {
             chosenChar = unlockedChars[Math.floor(Math.random() * unlockedChars.length)];
         }
         this.cpuCharacter = chosenChar;
-        this.cpu.charId = chosenChar.id;
-        this.cpu.name = chosenChar.name.split(' (')[0];
-        this.cpu.avatar = chosenChar.avatar;
-        this.cpu.color = chosenChar.themeColor;
-        this.cpu.maxHp = chosenChar.maxHp;
-        this.cpu.hp = chosenChar.maxHp;
-        this.cpu.moveBudget = chosenChar.moveBudget || 2;
-        this.cpu.stealthRadius = chosenChar.stealthRadius || 0;
-        this.cpuCooldowns = {};
-        this.cpuSkillAmmo = {};
-        chosenChar.skills.forEach(s => {
-            if (s.maxAmmo) this.cpuSkillAmmo[s.id] = s.maxAmmo;
-        });
-        this.cpuRevealedTurns = 0;
-        this.cpuBuffs = {
-            adrenaline: { turnsLeft: 0, healPerTurn: 5, dmgBonusPercent: 20 },
-            cigarette: { turnsLeft: 0, dmgBonusPercent: 30, moveBonus: 1 }
-        };
+        this.setupTeams();
 
         const cpuBadge = document.getElementById('cpuNameBadge');
         if (cpuBadge) {
             cpuBadge.innerText = `${chosenChar.avatar} ${this.cpu.name.toUpperCase()} [CPU]`;
             cpuBadge.style.color = chosenChar.themeColor;
         }
+        this.updateTeamRosterPreviews();
     }
 
     applySelectedCharacter() {
-        const char = this.selectedCharacter;
-        this.player.charId = char.id;
-        this.player.name = char.name;
-        this.player.avatar = char.avatar;
-        this.player.color = char.themeColor;
-        this.player.maxHp = char.maxHp;
-        this.player.hp = char.maxHp;
-        this.player.moveBudget = char.moveBudget || 2;
-        this.player.stealthRadius = char.stealthRadius || 0;
-        this.activePathMaxSteps = char.moveBudget || 2;
-        this.cooldowns = {};
-        this.skillAmmo = {};
-        char.skills.forEach(s => {
-            if (s.maxAmmo) this.skillAmmo[s.id] = s.maxAmmo;
-        });
+        const char = this.selectedCharacter || getCharacterById('trooper');
+        this.selectedCharacter = char;
+        this.setupTeams();
         this.groundHazards = [];
-        this.playerRevealedTurns = 0;
-        this.cpuRevealedTurns = 0;
-        this.playerBuffs = {
-            adrenaline: { turnsLeft: 0, healPerTurn: 5, dmgBonusPercent: 20 },
-            cigarette: { turnsLeft: 0, dmgBonusPercent: 30, moveBonus: 1 }
-        };
         this.activeHookTethers = [];
 
-        document.getElementById('playerNameBadge').innerText = `${char.name.toUpperCase()} [BẠN]`;
+        const pBadge = document.getElementById('playerNameBadge');
+        if (pBadge) {
+            pBadge.innerText = `${char.name.toUpperCase()} [${this.lang === 'en' ? 'YOU' : 'BẠN'}]`;
+        }
         this.updateSkillButtons();
+        this.updateTeamRosterPreviews();
     }
 
     updateSkillButtons() {
@@ -1352,6 +1633,36 @@ class GameEngine {
             cpuBadge.style.color = this.cpu.color;
         }
 
+        // Render Roster Bars & Score
+        const pRoster = document.getElementById('playerTeamRosterBar');
+        if (pRoster && this.blueTeam && this.blueTeam.length > 0) {
+            pRoster.innerHTML = this.blueTeam.map(u => `
+                <div class="team-hud-chip ${u.hp > 0 ? 'alive' : 'dead'}" title="${u.name}: ${Math.round(u.hp)}/${u.maxHp} HP">
+                    <span>${u.avatar}</span>
+                    <span>${u.isPlayer ? (this.lang === 'en' ? 'You' : 'Bạn') : (u.character ? u.character.name.split(' (')[0] : u.name)}</span>
+                    <span style="color: ${u.hp > 0 ? '#34d399' : '#f87171'}; font-weight:800;">${u.hp > 0 ? Math.round(u.hp) + ' HP' : (this.lang === 'en' ? 'K.O' : 'HẠ')}</span>
+                </div>
+            `).join('');
+        }
+
+        const cRoster = document.getElementById('cpuTeamRosterBar');
+        if (cRoster && this.redTeam && this.redTeam.length > 0) {
+            cRoster.innerHTML = this.redTeam.map(u => `
+                <div class="team-hud-chip ${u.hp > 0 ? 'alive' : 'dead'}" title="${u.name}: ${Math.round(u.hp)}/${u.maxHp} HP">
+                    <span>${u.avatar}</span>
+                    <span>${u.character ? u.character.name.split(' (')[0] : u.name}</span>
+                    <span style="color: ${u.hp > 0 ? '#fb7185' : '#f87171'}; font-weight:800;">${u.hp > 0 ? Math.round(u.hp) + ' HP' : (this.lang === 'en' ? 'K.O' : 'HẠ')}</span>
+                </div>
+            `).join('');
+        }
+
+        const scoreElem = document.getElementById('teamScoreDisplay');
+        if (scoreElem && this.blueTeam && this.redTeam) {
+            const blueAlive = this.blueTeam.filter(u => u.hp > 0).length;
+            const redAlive = this.redTeam.filter(u => u.hp > 0).length;
+            scoreElem.innerText = `🔵 ${blueAlive} ${this.lang === 'en' ? 'Alive' : 'Sống'} vs 🔴 ${redAlive} ${this.lang === 'en' ? 'Alive' : 'Sống'}`;
+        }
+
         document.getElementById('turnDisplay').innerText = `${t('turnPrefix')} ${this.turn}`;
         const phaseElem = document.getElementById('phaseDisplay');
         if (this.phase === 'PLANNING') {
@@ -1468,26 +1779,50 @@ class GameEngine {
     }
 
     generateCpuQueue() {
+        return this.generateCpuQueueForUnit(this.cpu);
+    }
+
+    generateCpuQueueForUnit(unit) {
         const queue = [];
-        let simX = this.cpu.x;
-        let simY = this.cpu.y;
+        let simX = unit.x;
+        let simY = unit.y;
 
-        const charId = (this.cpuCharacter && this.cpuCharacter.id) || this.cpu.charId || 'trooper';
-        const playerInvisible = this.isPlayerStealthed();
-
-        const simCooldowns = { ...this.cpuCooldowns };
-        const simSkillAmmo = { ...this.cpuSkillAmmo };
+        const charId = (unit.character && unit.character.id) || unit.charId || 'trooper';
+        const simCooldowns = { ...unit.cooldowns };
+        const simSkillAmmo = { ...unit.skillAmmo };
         const simBuffs = {
-            adrenaline: { turnsLeft: (this.cpuBuffs && this.cpuBuffs.adrenaline) ? this.cpuBuffs.adrenaline.turnsLeft : 0 },
-            cigarette: { turnsLeft: (this.cpuBuffs && this.cpuBuffs.cigarette) ? this.cpuBuffs.cigarette.turnsLeft : 0 }
+            adrenaline: { turnsLeft: (unit.buffs && unit.buffs.adrenaline) ? unit.buffs.adrenaline.turnsLeft : 0 },
+            cigarette: { turnsLeft: (unit.buffs && unit.buffs.cigarette) ? unit.buffs.cigarette.turnsLeft : 0 }
         };
 
+        const opposingTeam = unit.team === 'BLUE' ? this.redTeam : this.blueTeam;
+        const livingOpponents = opposingTeam.filter(e => e.hp > 0);
+
         for (let i = 0; i < 4; i++) {
-            let targetX = this.player.x;
-            let targetY = this.player.y;
-            if (playerInvisible) {
-                targetX = 10;
-                targetY = 3;
+            let target = null;
+            let minDist = 999;
+            for (const opp of livingOpponents) {
+                const d = Math.abs(opp.x - simX) + Math.abs(opp.y - simY);
+                if (d < minDist) {
+                    minDist = d;
+                    target = opp;
+                }
+            }
+
+            let targetX = (unit.team === 'BLUE' ? 15 : 4);
+            let targetY = 3;
+            let targetInvisible = false;
+
+            if (target) {
+                targetX = target.x;
+                targetY = target.y;
+                if (target.charId === 'hookman' && target.stealthRadius > 0 && target.revealedTurns <= 0) {
+                    if (this.isOutside7x7(simX, simY, target.x, target.y)) {
+                        targetInvisible = true;
+                        targetX = 10;
+                        targetY = 3;
+                    }
+                }
             }
 
             const dx = targetX - simX;
@@ -1496,15 +1831,15 @@ class GameEngine {
 
             let action = null;
             if (charId === 'trooper') {
-                action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs);
+                action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else if (charId === 'hookman') {
-                action = this.generateCpuActionHookman(i, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs);
+                action = this.generateCpuActionHookman(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else if (charId === 'smoke_guy') {
-                action = this.generateCpuActionSmokeGuy(i, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs);
+                action = this.generateCpuActionSmokeGuy(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else if (charId === 'razor') {
-                action = this.generateCpuActionRazor(i, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs);
+                action = this.generateCpuActionRazor(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else {
-                action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs);
+                action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             }
 
             // Cập nhật vị trí mô phỏng
@@ -1516,7 +1851,7 @@ class GameEngine {
                 const lD = DIRECTIONS[action.dir];
                 let destX = Math.max(0, Math.min(GRID_COLS - 1, simX + lD.dx * (action.range || 3)));
                 let destY = Math.max(0, Math.min(GRID_ROWS - 1, simY + lD.dy * (action.range || 3)));
-                const hasObstacle = (this.player.x === destX && this.player.y === destY) || this.groundHazards.some(h => h.x === destX && h.y === destY);
+                const hasObstacle = livingOpponents.some(e => e.x === destX && e.y === destY) || this.groundHazards.some(h => h.x === destX && h.y === destY);
                 if (hasObstacle) {
                     destX = Math.max(0, Math.min(GRID_COLS - 1, destX + lD.dx * 2));
                     destY = Math.max(0, Math.min(GRID_ROWS - 1, destY + lD.dy * 2));
@@ -1965,28 +2300,54 @@ class GameEngine {
         this.cancelPathPlanning();
         this.phase = 'RESOLVING';
         if (window.soundCtrl) window.soundCtrl.playCommit();
-        this.addCombatLog(`--- [LƯỢT ${this.turn}] KHÓA LỆNH THỰC THI ---`, 'system');
+        this.addCombatLog(`--- [${this.lang === 'en' ? 'TURN' : 'LƯỢT'} ${this.turn}] ${this.lang === 'en' ? 'EXECUTION LOCKED' : 'KHÓA LỆNH THỰC THI'} ---`, 'system');
 
-        // Đặt hồi chiêu cho các kỹ năng được chọn (ngoại trừ HOOK_PULL, BUFF_SMOKE, BOMB_LAUNCHER và RECT_SLASH có quy tắc hồi chiêu riêng)
+        // 1. Đặt hồi chiêu cho các kỹ năng được chọn của Người chơi
         for (const act of this.playerQueue) {
             if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
                 this.cooldowns[act.skillId] = act.cooldown;
             }
         }
+        this.player.queue = [...this.playerQueue];
 
-        this.cpuQueue = this.generateCpuQueue();
-
-        // Đặt hồi chiêu cho các kỹ năng CPU được chọn (ngoại trừ HOOK_PULL, BUFF_SMOKE, BOMB_LAUNCHER và RECT_SLASH)
-        for (const act of this.cpuQueue) {
-            if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
-                this.cpuCooldowns[act.skillId] = act.cooldown;
+        // 2. Sinh hàng đợi hành động cho toàn bộ Đồng minh CPU Đội Xanh
+        for (let i = 1; i < this.blueTeam.length; i++) {
+            const ally = this.blueTeam[i];
+            if (ally.hp > 0) {
+                ally.queue = this.generateCpuQueueForUnit(ally);
+                for (const act of ally.queue) {
+                    if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
+                        ally.cooldowns[act.skillId] = act.cooldown;
+                    }
+                }
+            } else {
+                ally.queue = [];
             }
         }
 
+        // 3. Sinh hàng đợi hành động cho toàn bộ Kẻ địch CPU Đội Đỏ
+        for (let j = 0; j < this.redTeam.length; j++) {
+            const enemy = this.redTeam[j];
+            if (enemy.hp > 0) {
+                enemy.queue = this.generateCpuQueueForUnit(enemy);
+                for (const act of enemy.queue) {
+                    if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
+                        enemy.cooldowns[act.skillId] = act.cooldown;
+                    }
+                }
+            } else {
+                enemy.queue = [];
+            }
+        }
+
+        this.cpuQueue = (this.cpu && this.cpu.queue) ? this.cpu.queue : [];
+
         for (let i = 0; i < 4; i++) {
             const slot = document.getElementById(`c-slot-${i}`);
-            slot.className = 'queue-slot';
-            slot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">Bí mật</span>`;
+            if (slot) {
+                slot.className = 'queue-slot';
+                slot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">${this.lang === 'en' ? 'Secret' : 'Bí mật'}</span>`;
+            }
         }
 
         this.updateHUD();
@@ -2000,1119 +2361,223 @@ class GameEngine {
             return;
         }
 
+        // Đồng bộ hàng đợi với playerQueue và cpuQueue
+        if (this.player && this.playerQueue && (!this.player.queue || this.player.queue.length === 0 || this.player.queue !== this.playerQueue)) {
+            this.player.queue = this.playerQueue;
+        }
+        if (this.cpu && this.cpuQueue && (!this.cpu.queue || this.cpu.queue.length === 0 || this.cpu.queue !== this.cpuQueue)) {
+            this.cpu.queue = this.cpuQueue;
+        }
+
         this.currentStep = stepIndex;
         this.updateHUD();
 
         for (let i = 0; i < 4; i++) {
-            document.getElementById(`p-slot-${i}`).classList.toggle('active-step', i === stepIndex);
-            document.getElementById(`c-slot-${i}`).classList.toggle('active-step', i === stepIndex);
+            const pSlot = document.getElementById(`p-slot-${i}`);
+            const cSlot = document.getElementById(`c-slot-${i}`);
+            if (pSlot) pSlot.classList.toggle('active-step', i === stepIndex);
+            if (cSlot) cSlot.classList.toggle('active-step', i === stepIndex);
         }
 
         const pAct = this.playerQueue[stepIndex];
-        const cAct = this.cpuQueue[stepIndex];
+        const cAct = (this.cpu && this.cpu.queue && this.cpu.queue[stepIndex]) ? this.cpu.queue[stepIndex] : null;
 
-        // Giải mã lệnh CPU
+        // Giải mã lệnh CPU chủ lực cho giao diện
         const cSlot = document.getElementById(`c-slot-${stepIndex}`);
-        cSlot.className = 'queue-slot filled active-step';
-        cSlot.innerHTML = `
-            <span class="slot-step-num">#${stepIndex + 1}</span>
-            <span class="slot-icon">${cAct.icon}</span>
-            <span class="slot-name">${cAct.name}</span>
-            <span class="slot-dir" style="letter-spacing: 2px;">${cAct.dirSymbol}</span>
-        `;
-
-        this.player.dir = pAct.dir || this.player.dir;
-        this.cpu.dir = cAct.dir || this.cpu.dir;
-
-        this.player.shieldDir = null;
-        this.cpu.shieldDir = null;
-
-        // BƯỚC 1: Xử lý Khiên
-        if (pAct.type === 'SHIELD') {
-            this.player.shieldDir = pAct.dir;
-            this.createShieldSpark(this.player.x, this.player.y, this.player.color);
-            if (window.soundCtrl) window.soundCtrl.playShield();
-            this.addFloatingText('KHIÊN!', this.player.x, this.player.y, '#38bdf8');
+        if (cSlot && cAct) {
+            cSlot.className = 'queue-slot filled active-step';
+            cSlot.innerHTML = `
+                <span class="slot-step-num">#${stepIndex + 1}</span>
+                <span class="slot-icon">${cAct.icon}</span>
+                <span class="slot-name">${cAct.name}</span>
+                <span class="slot-dir" style="letter-spacing: 2px;">${cAct.dirSymbol || ''}</span>
+            `;
         }
-        if (cAct.type === 'SHIELD') {
-            this.cpu.shieldDir = cAct.dir;
-            this.createShieldSpark(this.cpu.x, this.cpu.y, '#ff3366');
-            this.addFloatingText('KHIÊN!', this.cpu.x, this.cpu.y, '#ff3366');
+
+        // Lấy danh sách toàn bộ chiến binh còn sống
+        const allAlive = [...this.blueTeam, ...this.redTeam].filter(u => u.hp > 0);
+
+        // Đặt lại trạng thái Khiên và hướng nhìn
+        for (const unit of allAlive) {
+            unit.shieldDir = null;
+            const act = unit.queue ? unit.queue[stepIndex] : null;
+            if (act && act.dir) {
+                unit.dir = act.dir;
+            }
+        }
+
+        // --- BƯỚC 1: Xử lý Khiên chắn (Shield Resolution) ---
+        for (const unit of allAlive) {
+            const act = unit.queue ? unit.queue[stepIndex] : null;
+            if (act && act.type === 'SHIELD') {
+                unit.shieldDir = act.dir;
+                this.createShieldSpark(unit.x, unit.y, unit.color);
+                this.addFloatingText(this.lang === 'en' ? 'SHIELD!' : 'KHIÊN!', unit.x, unit.y, unit.team === 'BLUE' ? '#38bdf8' : '#f43f5e');
+                if (unit.isPlayer && window.soundCtrl) window.soundCtrl.playShield();
+            }
         }
 
         await this.delay(180);
 
-        // BƯỚC 2: Di chuyển (Sub-tick Simultaneous Movement hoặc LEAP)
-        if (pAct.type === 'LEAP') {
-            const pD = DIRECTIONS[pAct.dir];
-            const startX = this.player.x;
-            const startY = this.player.y;
-            let destX = startX + pD.dx * (pAct.range || 3);
-            let destY = startY + pD.dy * (pAct.range || 3);
-            destX = Math.max(0, Math.min(GRID_COLS - 1, destX));
-            destY = Math.max(0, Math.min(GRID_ROWS - 1, destY));
+        // --- BƯỚC 2: Xử lý Nhảy Đột Kích (Leap Resolution) ---
+        for (const unit of allAlive) {
+            if (unit.hp <= 0) continue;
+            const act = unit.queue ? unit.queue[stepIndex] : null;
+            if (act && act.type === 'LEAP') {
+                const uD = DIRECTIONS[act.dir];
+                const startX = unit.x;
+                const startY = unit.y;
+                let destX = Math.max(0, Math.min(GRID_COLS - 1, startX + uD.dx * (act.range || 3)));
+                let destY = Math.max(0, Math.min(GRID_ROWS - 1, startY + uD.dy * (act.range || 3)));
 
-            const hasEnemy = (this.cpu.x === destX && this.cpu.y === destY);
-            const hasHazard = this.groundHazards.some(h => h.x === destX && h.y === destY);
-            let extraJump = false;
-            if (hasEnemy || hasHazard) {
-                extraJump = true;
-                destX = Math.max(0, Math.min(GRID_COLS - 1, destX + pD.dx * (pAct.leapExtra || 2)));
-                destY = Math.max(0, Math.min(GRID_ROWS - 1, destY + pD.dy * (pAct.leapExtra || 2)));
-            }
+                const hasObstacle = allAlive.some(o => o !== unit && o.hp > 0 && o.x === destX && o.y === destY) ||
+                                    this.groundHazards.some(h => h.x === destX && h.y === destY);
+                let extraJump = false;
+                if (hasObstacle) {
+                    extraJump = true;
+                    destX = Math.max(0, Math.min(GRID_COLS - 1, destX + uD.dx * (act.leapExtra || 2)));
+                    destY = Math.max(0, Math.min(GRID_ROWS - 1, destY + uD.dy * (act.leapExtra || 2)));
+                }
 
-            if (window.soundCtrl) window.soundCtrl.playLeap();
-            this.createLeapArc(startX, startY, destX, destY, '#06b6d4');
-            this.player.x = destX;
-            this.player.y = destY;
+                if (window.soundCtrl && (unit.isPlayer || allAlive.length <= 4)) window.soundCtrl.playLeap();
+                this.createLeapArc(startX, startY, destX, destY, unit.charThemeColor || unit.color);
+                unit.x = destX;
+                unit.y = destY;
 
-            if (extraJump) {
-                this.addFloatingText('🦘 ĐÍCH CÓ VẬT THỂ/ĐỊCH! NHẢY THÊM 2 BƯỚC!', destX, destY, '#06b6d4');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Razor [Nhảy Đột Kích] phát hiện vật thể/kẻ thù tại ô đích, lập tức nhảy tiếp 2 bước tới (${destX}, ${destY})!`, 'buff');
-            } else {
-                this.addFloatingText('🦘 NHẢY 3 Ô!', destX, destY, '#06b6d4');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Razor [Nhảy Đột Kích] 3 ô vượt địa hình an toàn tới (${destX}, ${destY})!`, 'system');
+                if (extraJump) {
+                    this.addFloatingText(this.lang === 'en' ? '🦘 OBSTACLE! EXTRA 2 STEPS!' : '🦘 ĐÍCH CÓ VẬT THỂ/ĐỊCH! NHẢY THÊM 2 BƯỚC!', destX, destY, '#06b6d4');
+                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${unit.name} [${act.name}] phát hiện vật thể/địch, nhảy tiếp 2 bước tới (${destX}, ${destY})!`, 'buff');
+                } else {
+                    this.addFloatingText(this.lang === 'en' ? '🦘 LEAP 3 TILES!' : '🦘 NHẢY 3 Ô!', destX, destY, '#06b6d4');
+                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${unit.name} [${act.name}] vượt địa hình tới (${destX}, ${destY})!`, 'system');
+                }
             }
         }
 
-        if (cAct.type === 'LEAP') {
-            const cD = DIRECTIONS[cAct.dir];
-            const startX = this.cpu.x;
-            const startY = this.cpu.y;
-            let destX = startX + cD.dx * (cAct.range || 3);
-            let destY = startY + cD.dy * (cAct.range || 3);
-            destX = Math.max(0, Math.min(GRID_COLS - 1, destX));
-            destY = Math.max(0, Math.min(GRID_ROWS - 1, destY));
+        // --- BƯỚC 3: Di chuyển Vi mô Đồng thời (Sub-tick Simultaneous Movement: PATH_MOVE & DASH) ---
+        const movers = [];
+        for (const unit of allAlive) {
+            if (unit.hp <= 0) continue;
+            const act = unit.queue ? unit.queue[stepIndex] : null;
+            if (!act) continue;
 
-            const hasPlayer = (this.player.x === destX && this.player.y === destY);
-            const hasHazard = this.groundHazards.some(h => h.x === destX && h.y === destY);
-            let extraJump = false;
-            if (hasPlayer || hasHazard) {
-                extraJump = true;
-                destX = Math.max(0, Math.min(GRID_COLS - 1, destX + cD.dx * (cAct.leapExtra || 2)));
-                destY = Math.max(0, Math.min(GRID_ROWS - 1, destY + cD.dy * (cAct.leapExtra || 2)));
+            let subSteps = [];
+            if (act.type === 'PATH_MOVE' && act.path) {
+                subSteps = act.path;
+            } else if (act.type === 'DASH') {
+                const d = DIRECTIONS[act.dir];
+                subSteps = [{ x: unit.x + d.dx * 2, y: unit.y + d.dy * 2, dir: act.dir }];
             }
 
-            if (window.soundCtrl) window.soundCtrl.playLeap();
-            this.createLeapArc(startX, startY, destX, destY, '#ff3366');
-            this.cpu.x = destX;
-            this.cpu.y = destY;
+            if (subSteps.length > 0) {
+                movers.push({ unit, subSteps, act });
+            }
         }
 
-        const pSubSteps = pAct.type === 'PATH_MOVE' && pAct.path ? pAct.path : 
-                         (pAct.type === 'DASH' ? [{ x: this.player.x + DIRECTIONS[pAct.dir].dx * 2, y: this.player.y + DIRECTIONS[pAct.dir].dy * 2, dir: pAct.dir }] : []);
-        
-        const cSubSteps = cAct.type === 'PATH_MOVE' && cAct.path ? cAct.path :
-                         (cAct.type === 'DASH' ? [{ x: this.cpu.x + DIRECTIONS[cAct.dir].dx * 2, y: this.cpu.y + DIRECTIONS[cAct.dir].dy * 2, dir: cAct.dir }] : []);
-
-        const maxSubSteps = Math.max(pSubSteps.length, cSubSteps.length);
+        const maxSubSteps = movers.reduce((max, m) => Math.max(max, m.subSteps.length), 0);
 
         for (let sub = 0; sub < maxSubSteps; sub++) {
-            let pNextX = this.player.x;
-            let pNextY = this.player.y;
-            let cNextX = this.cpu.x;
-            let cNextY = this.cpu.y;
-
-            let pMoving = false;
-            let cMoving = false;
-
-            if (sub < pSubSteps.length) {
-                pNextX = Math.max(0, Math.min(GRID_COLS - 1, pSubSteps[sub].x));
-                pNextY = Math.max(0, Math.min(GRID_ROWS - 1, pSubSteps[sub].y));
-                this.player.dir = pSubSteps[sub].dir || this.player.dir;
-                pMoving = true;
+            const nextPositions = new Map();
+            for (const m of movers) {
+                if (m.unit.hp <= 0) continue;
+                if (sub < m.subSteps.length) {
+                    const step = m.subSteps[sub];
+                    const nx = Math.max(0, Math.min(GRID_COLS - 1, step.x));
+                    const ny = Math.max(0, Math.min(GRID_ROWS - 1, step.y));
+                    nextPositions.set(m.unit, { nx, ny, dir: step.dir || m.unit.dir, moving: true });
+                } else {
+                    nextPositions.set(m.unit, { nx: m.unit.x, ny: m.unit.y, dir: m.unit.dir, moving: false });
+                }
             }
 
-            if (sub < cSubSteps.length) {
-                cNextX = Math.max(0, Math.min(GRID_COLS - 1, cSubSteps[sub].x));
-                cNextY = Math.max(0, Math.min(GRID_ROWS - 1, cSubSteps[sub].y));
-                this.cpu.dir = cSubSteps[sub].dir || this.cpu.dir;
-                cMoving = true;
-            }
-
-            if (pMoving && cMoving && pNextX === cNextX && pNextY === cNextY) {
-                if (window.soundCtrl) window.soundCtrl.playClash();
-                this.createClashBurst(pNextX, pNextY);
-                this.addFloatingText('VA CHẠM!', pNextX, pNextY, '#fbbf24');
-                this.addCombatLog(`Nhịp #${stepIndex + 1} (Bước ${sub + 1}): Va chạm cùng lao vào ô (${pNextX}, ${pNextY}) -> DỘI LÙI!`, 'clash');
-                this.applyDamage(this.player, 5);
-                this.applyDamage(this.cpu, 5);
-                break;
-            } else if (pMoving && cMoving && pNextX === this.cpu.x && pNextY === this.cpu.y && cNextX === this.player.x && cNextY === this.player.y) {
-                if (window.soundCtrl) window.soundCtrl.playClash();
-                const midX = (this.player.x + this.cpu.x) / 2;
-                const midY = (this.player.y + this.cpu.y) / 2;
-                this.createClashBurst(midX, midY);
-                this.addFloatingText('ĐÂM NHAU!', midX, midY, '#fbbf24');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Cắt ngang đâm trực diện! Cả hai dội lùi.`, 'clash');
-                this.applyDamage(this.player, 5);
-                this.applyDamage(this.cpu, 5);
-                break;
-            } else {
-                if (pMoving) {
-                    if (pNextX === this.cpu.x && pNextY === this.cpu.y && !cMoving) {
-                        this.addFloatingText('BỊ CHẶN!', this.player.x, this.player.y, '#cbd5e1');
-                    } else {
-                        this.player.x = pNextX;
-                        this.player.y = pNextY;
-                        if (window.soundCtrl) window.soundCtrl.playMove();
+            // Kiểm tra va chạm đối đầu trực diện (Head-on collision: đổi chỗ cho nhau)
+            for (let i = 0; i < movers.length; i++) {
+                for (let j = i + 1; j < movers.length; j++) {
+                    const uA = movers[i].unit;
+                    const uB = movers[j].unit;
+                    if (uA.team === uB.team) continue;
+                    const pA = nextPositions.get(uA);
+                    const pB = nextPositions.get(uB);
+                    if (pA && pB && pA.moving && pB.moving && pA.nx === uB.x && pA.ny === uB.y && pB.nx === uA.x && pB.ny === uA.y) {
+                        if (window.soundCtrl) window.soundCtrl.playClash();
+                        const midX = (uA.x + uB.x) / 2;
+                        const midY = (uA.y + uB.y) / 2;
+                        this.createClashBurst(midX, midY);
+                        this.addFloatingText(this.lang === 'en' ? 'HEAD-ON CLASH!' : 'ĐÂM NHAU!', midX, midY, '#fbbf24');
+                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${uA.name} và ${uB.name} đâm trực diện! Dội lùi và mất 5 HP!`, 'clash');
+                        this.applyDamage(uA, 5);
+                        this.applyDamage(uB, 5);
+                        pA.nx = uA.x; pA.ny = uA.y; pA.moving = false;
+                        pB.nx = uB.x; pB.ny = uB.y; pB.moving = false;
                     }
                 }
-                if (cMoving) {
-                    if (cNextX === this.player.x && cNextY === this.player.y && !pMoving) {
-                        this.addFloatingText('BỊ CHẶN!', this.cpu.x, this.cpu.y, '#cbd5e1');
-                    } else {
-                        this.cpu.x = cNextX;
-                        this.cpu.y = cNextY;
+            }
+
+            // Kiểm tra tranh chấp ô (Tile Contention: nhiều đơn vị cùng bước vào 1 ô)
+            const tileClaims = new Map();
+            for (const [unit, pos] of nextPositions.entries()) {
+                if (!pos.moving) continue;
+                const key = `${pos.nx},${pos.ny}`;
+                if (!tileClaims.has(key)) tileClaims.set(key, []);
+                tileClaims.get(key).push(unit);
+            }
+
+            for (const [key, claimants] of tileClaims.entries()) {
+                if (claimants.length > 1) {
+                    const [cx, cy] = key.split(',').map(Number);
+                    if (window.soundCtrl) window.soundCtrl.playClash();
+                    this.createClashBurst(cx, cy);
+                    this.addFloatingText(this.lang === 'en' ? 'CLASH!' : 'VA CHẠM!', cx, cy, '#fbbf24');
+                    this.addCombatLog(`Nhịp #${stepIndex + 1}: Nhiều đơn vị cùng lao vào ô (${cx}, ${cy}) -> DỘI LÙI!`, 'clash');
+                    for (const u of claimants) {
+                        this.applyDamage(u, 5);
+                        const pos = nextPositions.get(u);
+                        pos.nx = u.x; pos.ny = u.y; pos.moving = false;
                     }
+                }
+            }
+
+            // Áp dụng di chuyển thực tế
+            for (const [unit, pos] of nextPositions.entries()) {
+                if (!pos.moving) continue;
+                const isBlockedByStationary = allAlive.some(other => {
+                    if (other === unit || other.hp <= 0) return false;
+                    const otherPos = nextPositions.get(other);
+                    const destX = otherPos ? otherPos.nx : other.x;
+                    const destY = otherPos ? otherPos.ny : other.y;
+                    return destX === pos.nx && destY === pos.ny && otherPos && !otherPos.moving;
+                });
+
+                if (isBlockedByStationary) {
+                    this.addFloatingText(this.lang === 'en' ? 'BLOCKED!' : 'BỊ CHẶN!', unit.x, unit.y, '#cbd5e1');
+                } else {
+                    unit.x = pos.nx;
+                    unit.y = pos.ny;
+                    unit.dir = pos.dir;
+                    if (unit.isPlayer && window.soundCtrl) window.soundCtrl.playMove();
                 }
             }
 
             await this.delay(200);
         }
 
-        if (this.player.x === this.cpu.x && this.player.y === this.cpu.y) {
-            if (window.soundCtrl) window.soundCtrl.playClash();
-            this.createClashBurst(this.player.x, this.player.y);
-            this.addFloatingText('VA CHẠM ĐÈ Ô!', this.player.x, this.player.y, '#fbbf24');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: Hai đấu thủ đè cùng ô (${this.player.x}, ${this.player.y}) -> dội lùi!`, 'clash');
-            const fallbackDir = pAct.type === 'LEAP' ? DIRECTIONS[pAct.dir] : DIRECTIONS['LEFT'];
-            this.player.x = Math.max(0, Math.min(GRID_COLS - 1, this.player.x - fallbackDir.dx));
-            this.player.y = Math.max(0, Math.min(GRID_ROWS - 1, this.player.y - fallbackDir.dy));
-            this.applyDamage(this.player, 5);
-            this.applyDamage(this.cpu, 5);
-        }
-
         await this.delay(120);
 
-        // BƯỚC 3: Tấn công (Attack / Ranged / Rocket / Grenade Resolution)
-        let playerHitTarget = false;
-        let cpuHitTarget = false;
-
-        // --- 3.1 Player Actions ---
-        const hasAdrenaline = (this.playerBuffs && this.playerBuffs.adrenaline && this.playerBuffs.adrenaline.turnsLeft > 0);
-        const hasCigarette = (this.playerBuffs && this.playerBuffs.cigarette && this.playerBuffs.cigarette.turnsLeft > 0);
-        let pDmgMult = 1.0;
-        let buffTag = '';
-        if (hasAdrenaline) {
-            pDmgMult *= 1.2;
-            buffTag += ' (+20% Adrenaline)';
-        }
-        if (hasCigarette) {
-            pDmgMult *= 1.3;
-            buffTag += ' (+30% Thuốc Lá)';
-        }
-        const hasBuffDmg = hasAdrenaline || hasCigarette;
-
-        if (pAct.type === 'ATTACK') {
-            const pD = DIRECTIONS[pAct.dir];
-            const attackRange = pAct.range || 1;
-            const targetX = this.player.x + pD.dx * attackRange;
-            const targetY = this.player.y + pD.dy * attackRange;
-            this.createSlashEffect(targetX, targetY, this.player.color);
-
-            if (this.cpu.x === targetX && this.cpu.y === targetY) {
-                playerHitTarget = true;
-                if (this.cpu.shieldDir) {
-                    if (window.soundCtrl) window.soundCtrl.playShield();
-                    this.addFloatingText('CHẶN ĐƯỢC!', this.cpu.x, this.cpu.y, '#60a5fa');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${pAct.name} bị Khiên CPU chặn đứng! (0 DMG)`, 'block');
-                } else {
-                    if (window.soundCtrl) window.soundCtrl.playHit();
-                    let dmg = pAct.power || 25;
-                    if (hasBuffDmg) dmg = Math.round(dmg * pDmgMult);
-                    this.applyDamage(this.cpu, dmg);
-                    this.createHitSparks(this.cpu.x, this.cpu.y, '#ff3366');
-                    this.addFloatingText(`-${dmg} HP!`, this.cpu.x, this.cpu.y, '#f87171');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: [${pAct.name}] TRÚNG CPU! (-${dmg} HP${buffTag})`, 'hit');
-                }
-            } else {
-                if (window.soundCtrl) window.soundCtrl.playAttack();
-                this.addFloatingText('HỤT!', targetX, targetY, '#94a3b8');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: ${pAct.name} vào ô trống (${targetX}, ${targetY}) -> Hụt!`, 'miss');
-            }
-        } 
-        else if (pAct.type === 'RANGED_LINE') {
-            // Súng trường (Assault Rifle / Combat Rifle / Pulse Rifle): Bắn thẳng/chéo tới 4-5 ô
-            const pD = DIRECTIONS[pAct.dir];
-            const maxRange = pAct.range || 5;
-            if (pAct.skillId === 'RAZOR_PULSE_RIFLE') {
-                if (window.soundCtrl) window.soundCtrl.playPulseRifle();
-            } else {
-                if (window.soundCtrl) window.soundCtrl.playRifleShot();
-            }
-
-            let hit = false;
-            let endX = this.player.x + pD.dx * maxRange;
-            let endY = this.player.y + pD.dy * maxRange;
-
-            for (let r = 1; r <= maxRange; r++) {
-                const checkX = this.player.x + pD.dx * r;
-                const checkY = this.player.y + pD.dy * r;
-                if (checkX < 0 || checkX >= GRID_COLS || checkY < 0 || checkY >= GRID_ROWS) break;
-
-                endX = checkX;
-                endY = checkY;
-
-                if (this.cpu.x === checkX && this.cpu.y === checkY) {
-                    hit = true;
-                    if (this.cpu.shieldDir) {
-                        if (window.soundCtrl) window.soundCtrl.playShield();
-                        this.addFloatingText('CHẶN ĐƯỢC ĐẠN!', this.cpu.x, this.cpu.y, '#60a5fa');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU giương Khiên chặn loạt đạn ${pAct.name}!`, 'block');
-                    } else {
-                        if (window.soundCtrl) window.soundCtrl.playHit();
-                        let dmg = pAct.power || 20;
-                        if (hasBuffDmg) dmg = Math.round(dmg * pDmgMult);
-                        if (cAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
-                        this.applyDamage(this.cpu, dmg);
-                        this.createHitSparks(this.cpu.x, this.cpu.y, '#ff3366');
-                        this.addFloatingText(`-${dmg} HP!`, this.cpu.x, this.cpu.y, '#f87171');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: [${pAct.name}] BẮN TRÚNG CPU! Gây ${dmg} sát thương${buffTag}!`, 'hit');
-                    }
-                    break;
-                }
-            }
-
-            let tracerColor = '#34d399';
-            if (pAct.skillId === 'SMOKE_RIFLE') tracerColor = '#fb923c';
-            else if (pAct.skillId === 'RAZOR_PULSE_RIFLE') tracerColor = '#06b6d4';
-            this.createBulletTracer(this.player.x, this.player.y, endX, endY, tracerColor);
-            if (!hit) {
-                this.addFloatingText('ĐẠN TRƯỢT!', endX, endY, '#94a3b8');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Đạn [${pAct.name}] bắn qua không gian!`, 'miss');
-            }
-        }
-        else if (pAct.type === 'RANGED_VARIABLE') {
-            // Súng giảm thanh Silence Pistol: Bắn thẳng/chéo tới 5 ô, sát thương ngẫu nhiên 15 - 20 DMG
-            const pD = DIRECTIONS[pAct.dir];
-            const maxRange = pAct.range || 5;
-            if (window.soundCtrl) window.soundCtrl.playSilencedPistol();
-
-            let hit = false;
-            let endX = this.player.x + pD.dx * maxRange;
-            let endY = this.player.y + pD.dy * maxRange;
-
-            for (let r = 1; r <= maxRange; r++) {
-                const checkX = this.player.x + pD.dx * r;
-                const checkY = this.player.y + pD.dy * r;
-                if (checkX < 0 || checkX >= GRID_COLS || checkY < 0 || checkY >= GRID_ROWS) break;
-
-                endX = checkX;
-                endY = checkY;
-
-                if (this.cpu.x === checkX && this.cpu.y === checkY) {
-                    hit = true;
-                    playerHitTarget = true;
-                    if (this.cpu.shieldDir) {
-                        if (window.soundCtrl) window.soundCtrl.playShield();
-                        this.addFloatingText('CHẶN ĐƯỢC!', this.cpu.x, this.cpu.y, '#60a5fa');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU giương Khiên chặn đạn Silence Pistol!`, 'block');
-                    } else {
-                        if (window.soundCtrl) window.soundCtrl.playHit();
-                        const minD = pAct.minPower !== undefined ? pAct.minPower : 15;
-                        const maxD = pAct.maxPower !== undefined ? pAct.maxPower : 20;
-                        let dmg = Math.floor(Math.random() * (maxD - minD + 1)) + minD;
-                        if (hasBuffDmg) dmg = Math.round(dmg * pDmgMult);
-                        this.applyDamage(this.cpu, dmg);
-                        this.createHitSparks(this.cpu.x, this.cpu.y, '#a78bfa');
-                        this.addFloatingText(`-${dmg} HP! (LÉN)`, this.cpu.x, this.cpu.y, '#c084fc');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: Silence Pistol BẮN LÉN TRÚNG CPU! Gây ${dmg} sát thương${buffTag}!`, 'hit');
-                    }
-                    break;
-                }
-            }
-
-            this.createBulletTracer(this.player.x, this.player.y, endX, endY, '#a78bfa');
-            if (!hit) {
-                this.addFloatingText('ĐẠN LƯỚT QUA!', endX, endY, '#94a3b8');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Tiếng súng giảm thanh rít nhẹ trong không gian!`, 'miss');
-            }
-        }
-        else if (pAct.type === 'BUFF_HEAL') {
-            // Ống tiêm Adrenaline: Hồi 15 HP trong 3 lượt (5 HP/lượt), Sát thương +20%, Cooldown 3 lượt
-            if (window.soundCtrl) window.soundCtrl.playAdrenaline();
-            this.playerBuffs.adrenaline.turnsLeft = pAct.duration || 3;
-            this.createBuffSparks(this.player.x, this.player.y, '#10b981');
-            this.addFloatingText('💉 TIÊM ADRENALINE! (+20% DMG)', this.player.x, this.player.y, '#10b981');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: Bạn tiêm [Ống Tiêm Adrenaline]! Tăng +20% Sát thương và hồi 5 HP/lượt trong 3 lượt!`, 'hit');
-            this.cooldowns[pAct.skillId] = pAct.cooldown || 3;
-        }
-        else if (pAct.type === 'BUFF_SMOKE') {
-            // Thuốc Lá: Tăng +30% DMG, +1 Bước di chuyển trong 2 lượt (lượt hiện tại và lượt sau)
-            if (window.soundCtrl) window.soundCtrl.playCigarette();
-            this.playerBuffs.cigarette.turnsLeft = pAct.duration || 2;
-            this.createBuffSparks(this.player.x, this.player.y, '#f97316');
-            this.addFloatingText('🚬 HÚT THUỐC! (+30% DMG & +1 BƯỚC)', this.player.x, this.player.y, '#f97316');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: Bạn châm [Thuốc Lá]! Tăng +30% Sát thương và +1 Tốc độ di chuyển trong 2 lượt!`, 'hit');
-        }
-        else if (pAct.type === 'HOOK_PULL') {
-            // Móc Kéo: Sát thương 15, kéo 1 ô ngay. Hết lượt sau kéo 2 ô rồi mới hồi chiêu 4 lượt!
-            const pD = DIRECTIONS[pAct.dir];
-            const maxRange = pAct.range || 5;
-            if (window.soundCtrl) window.soundCtrl.playHookThrow();
-
-            let hit = false;
-            let endX = this.player.x + pD.dx * maxRange;
-            let endY = this.player.y + pD.dy * maxRange;
-
-            for (let r = 1; r <= maxRange; r++) {
-                const checkX = this.player.x + pD.dx * r;
-                const checkY = this.player.y + pD.dy * r;
-                if (checkX < 0 || checkX >= GRID_COLS || checkY < 0 || checkY >= GRID_ROWS) break;
-
-                endX = checkX;
-                endY = checkY;
-
-                if (this.cpu.x === checkX && this.cpu.y === checkY) {
-                    hit = true;
-                    playerHitTarget = true;
-                    if (this.cpu.shieldDir) {
-                        if (window.soundCtrl) window.soundCtrl.playShield();
-                        this.addFloatingText('KHIÊN CHẶN MÓC!', this.cpu.x, this.cpu.y, '#60a5fa');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU giương Khiên chặn đứng lưỡi Móc Kéo! (0 DMG & Không bị kéo)`, 'block');
-                    } else {
-                        if (window.soundCtrl) window.soundCtrl.playHit();
-                        let dmg = pAct.power || 15;
-                        if (hasBuffDmg) dmg = Math.round(dmg * pDmgMult);
-
-                        this.applyDamage(this.cpu, dmg);
-                        this.createHitSparks(this.cpu.x, this.cpu.y, '#ef4444');
-
-                        // Kéo CPU lại gần Hookman 1 ô
-                        const pullX = Math.max(0, Math.min(GRID_COLS - 1, this.cpu.x - pD.dx));
-                        const pullY = Math.max(0, Math.min(GRID_ROWS - 1, this.cpu.y - pD.dy));
-                        if (pullX !== this.player.x || pullY !== this.player.y) {
-                            this.cpu.x = pullX;
-                            this.cpu.y = pullY;
-                            if (window.soundCtrl) window.soundCtrl.playHookPull();
-                        }
-
-                        this.addFloatingText(`-${dmg} HP & KÉO 1 Ô!`, this.cpu.x, this.cpu.y, '#ef4444');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: [Móc Kéo] GĂM TRÚNG CPU! Gây ${dmg} DMG${buffTag} và kéo CPU lại gần 1 ô!`, 'hit');
-
-                        // Găm dây móc: Hết lượt sau kéo 2 ô rồi mới kích hoạt hồi chiêu 4 lượt
-                        this.activeHookTethers = this.activeHookTethers.filter(t => t.source !== 'PLAYER');
-                        this.activeHookTethers.push({
-                            source: 'PLAYER',
-                            target: 'CPU',
-                            turnsUntilPull: 1,
-                            pullDist: 2,
-                            skillId: pAct.skillId,
-                            cdAfterPull: pAct.cooldown || 4
-                        });
-                        this.addCombatLog(`🪝 Dây móc đã găm chặt vào CPU! Hết lượt sau sẽ bị giật kéo thêm 2 ô trước khi hồi chiêu!`, 'clash');
-                    }
-                    break;
-                }
-            }
-
-            this.createHookChainEffect(this.player.x, this.player.y, endX, endY);
-            if (!hit) {
-                this.addFloatingText('MÓC HỤT!', endX, endY, '#94a3b8');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Lưỡi Móc Kéo phóng vào không trung!`, 'miss');
-                this.cooldowns[pAct.skillId] = pAct.cooldown || 4;
-            }
-        }
-        else if (pAct.type === 'ROCKET') {
-            // Tên lửa diện rộng: Bay tới 6 ô và nổ ngay khu vực 3x3 quanh đích, NỔ SỚM TẠI CHỖ nếu va chạm địch trên đường bay
-            const pD = DIRECTIONS[pAct.dir];
-            const maxRange = pAct.range || 6;
-            if (window.soundCtrl) window.soundCtrl.playRocketLaunch();
-
-            let targetX = this.player.x + pD.dx * maxRange;
-            let targetY = this.player.y + pD.dy * maxRange;
-            let earlyImpact = false;
-
-            // Kiểm tra va chạm đối thủ trên đường bay từ ô 1 đến maxRange
-            for (let r = 1; r <= maxRange; r++) {
-                const cx = this.player.x + pD.dx * r;
-                const cy = this.player.y + pD.dy * r;
-                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
-
-                targetX = cx;
-                targetY = cy;
-
-                if (this.cpu.x === cx && this.cpu.y === cy) {
-                    earlyImpact = true;
-                    break;
-                }
-            }
-
-            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
-            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
-
-            this.createRocketTrail(this.player.x, this.player.y, targetX, targetY, '#ef4444');
-            await this.delay(180);
-
-            if (window.soundCtrl) window.soundCtrl.playExplosion();
-            this.createExplosionBurst(targetX, targetY, 40);
-
-            if (earlyImpact) {
-                this.addFloatingText('💥 VA CHẠM NỔ 3x3!', targetX, targetY, '#ef4444');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: 💥 VA CHẠM TRỰC DIỆN! Tên lửa đâm sầm vào CPU trên đường bay, phát nổ 3x3 ngay tại chỗ!`, 'clash');
-            } else {
-                this.addFloatingText('💥 TÊN LỬA NỔ 3x3!', targetX, targetY, '#ef4444');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Tên lửa bay đến điểm đích và phát nổ 3x3!`, 'system');
-            }
-
-            let dmg = pAct.power || 30;
-            if (hasBuffDmg) dmg = Math.round(dmg * pDmgMult);
-
-            // Gây sát thương diện rộng 3x3
-            if (Math.abs(this.cpu.x - targetX) <= 1 && Math.abs(this.cpu.y - targetY) <= 1) {
-                this.applyDamage(this.cpu, dmg);
-                this.createHitSparks(this.cpu.x, this.cpu.y, '#ff3366');
-                this.addFloatingText(`-${dmg} HP!`, this.cpu.x, this.cpu.y, '#f87171');
-                this.addCombatLog(`💥 Vụ nổ Tên lửa trúng CPU! (-${dmg} HP${buffTag})`, 'hit');
-            }
-            if (Math.abs(this.player.x - targetX) <= 1 && Math.abs(this.player.y - targetY) <= 1) {
-                this.applyDamage(this.player, pAct.power || 30);
-                this.createHitSparks(this.player.x, this.player.y, '#00f2fe');
-                this.addFloatingText(`-${pAct.power || 30} HP! (DÍNH TÊN LỬA)`, this.player.x, this.player.y, '#f87171');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Bạn tự dính vụ nổ Tên lửa của mình! Mất ${pAct.power || 30} HP!`, 'hit');
-            }
-        }
-        else if (pAct.type === 'BOMB_LAUNCHER') {
-            // Súng bắn bom: 2 viên đạn lưu trữ, tầm 6 ô nổ 3x3 quanh đích, NỔ SỚM TẠI CHỖ nếu chạm địch trên đường bay
-            const pD = DIRECTIONS[pAct.dir];
-            const maxRange = pAct.range || 6;
-            if (window.soundCtrl) window.soundCtrl.playBombLauncher();
-
-            // Tiêu hao 1 viên đạn
-            const currentAmmo = this.skillAmmo[pAct.skillId] !== undefined ? this.skillAmmo[pAct.skillId] : 2;
-            const remainingAmmo = Math.max(0, currentAmmo - 1);
-            this.skillAmmo[pAct.skillId] = remainingAmmo;
-
-            if (remainingAmmo === 0) {
-                this.cooldowns[pAct.skillId] = pAct.cooldown || 4;
-                this.addCombatLog(`⚠️ Súng Bắn Bom đã bắn hết cả 2 viên! Bắt đầu hồi chiêu 4 lượt để nạp đạn!`, 'system');
-            } else {
-                this.addCombatLog(`[Súng Bắn Bom] còn lại ${remainingAmmo}/2 viên trong nòng!`, 'system');
-            }
-
-            let targetX = this.player.x + pD.dx * maxRange;
-            let targetY = this.player.y + pD.dy * maxRange;
-            let earlyImpact = false;
-
-            // Kiểm tra va chạm địch trên đường bay từ ô 1 đến maxRange
-            for (let r = 1; r <= maxRange; r++) {
-                const cx = this.player.x + pD.dx * r;
-                const cy = this.player.y + pD.dy * r;
-                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
-
-                targetX = cx;
-                targetY = cy;
-
-                if (this.cpu.x === cx && this.cpu.y === cy) {
-                    earlyImpact = true;
-                    break;
-                }
-            }
-
-            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
-            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
-
-            this.createRocketTrail(this.player.x, this.player.y, targetX, targetY, '#f97316');
-            await this.delay(180);
-
-            if (window.soundCtrl) window.soundCtrl.playExplosion();
-            this.createExplosionBurst(targetX, targetY, 40);
-
-            if (earlyImpact) {
-                this.addFloatingText('💥 VA CHẠM NỔ 3x3!', targetX, targetY, '#f97316');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: 💥 VA CHẠM TRỰC DIỆN! Quả bom đâm sầm vào CPU trên đường bay, phát nổ 3x3 ngay tại chỗ!`, 'clash');
-            } else {
-                this.addFloatingText('💥 BOM PHÓNG NỔ 3x3!', targetX, targetY, '#f97316');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Quả bom bay đến điểm đích và phát nổ 3x3!`, 'system');
-            }
-
-            let dmg = pAct.power || 30;
-            if (hasBuffDmg) dmg = Math.round(dmg * pDmgMult);
-
-            // Gây sát thương diện rộng 3x3
-            if (Math.abs(this.cpu.x - targetX) <= 1 && Math.abs(this.cpu.y - targetY) <= 1) {
-                this.applyDamage(this.cpu, dmg);
-                this.createHitSparks(this.cpu.x, this.cpu.y, '#ff3366');
-                this.addFloatingText(`-${dmg} HP!`, this.cpu.x, this.cpu.y, '#f87171');
-                this.addCombatLog(`💥 Vụ nổ Súng Bắn Bom trúng CPU! (-${dmg} HP${buffTag})`, 'hit');
-            }
-            if (Math.abs(this.player.x - targetX) <= 1 && Math.abs(this.player.y - targetY) <= 1) {
-                this.applyDamage(this.player, pAct.power || 30);
-                this.createHitSparks(this.player.x, this.player.y, '#f97316');
-                this.addFloatingText(`-${pAct.power || 30} HP! (DÍNH BOM)`, this.player.x, this.player.y, '#f87171');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Bạn tự dính vụ nổ bom của mình! Mất ${pAct.power || 30} HP!`, 'hit');
-            }
-        }
-        else if (pAct.type === 'GRENADE') {
-            // Lựu đạn hẹn giờ 2 lượt, nổ 3x3
-            const pD = DIRECTIONS[pAct.dir];
-            const maxRange = pAct.range || 5;
-
-            let targetX = this.player.x + pD.dx * maxRange;
-            let targetY = this.player.y + pD.dy * maxRange;
-
-            for (let r = 1; r <= maxRange; r++) {
-                const cx = this.player.x + pD.dx * r;
-                const cy = this.player.y + pD.dy * r;
-                if (this.cpu.x === cx && this.cpu.y === cy) {
-                    targetX = cx; targetY = cy;
-                    break;
-                }
-            }
-
-            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
-            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
-
-            this.createGrenadeArc(this.player.x, this.player.y, targetX, targetY);
-            if (window.soundCtrl) window.soundCtrl.playGrenadeTick();
-
-            this.groundHazards.push({
-                id: Date.now() + Math.random(),
-                type: 'GRENADE',
-                x: targetX,
-                y: targetY,
-                turnsLeft: 2,
-                power: pAct.power || 50,
-                aoeRadius: 1,
-                owner: 'PLAYER'
-            });
-
-            this.addFloatingText('💣 LỰU ĐẠN (ĐẾM 2 LƯỢT)!', targetX, targetY, '#f59e0b');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: Ném lựu đạn tới (${targetX}, ${targetY})! Sẽ phát nổ 3x3 sau 2 lượt!`, 'clash');
-        }
-        else if (pAct.type === 'RECT_SLASH') {
-            // Kiếm Gắn Tay: Chém quét hình chữ nhật 3x2 trong 4 hướng chính (Trái, Phải, Trên, Dưới), 60 DMG
-            if (window.soundCtrl) window.soundCtrl.playCyberBladeSlash();
-
-            // Quản lý cơ số 2 lượt dùng (Ammo)
-            const currentAmmo = this.skillAmmo[pAct.skillId] !== undefined ? this.skillAmmo[pAct.skillId] : 2;
-            const remainingAmmo = Math.max(0, currentAmmo - 1);
-            this.skillAmmo[pAct.skillId] = remainingAmmo;
-
-            if (remainingAmmo === 0) {
-                this.cooldowns[pAct.skillId] = pAct.cooldown || 4;
-                this.addCombatLog(`⚠️ [Kiếm Gắn Tay] đã dùng hết cả 2 lượt! Bắt đầu hồi chiêu 4 lượt để tích tụ năng lượng!`, 'system');
-            } else {
-                this.addCombatLog(`[Kiếm Gắn Tay] còn lại ${remainingAmmo}/2 lượt sử dụng trong nòng năng lượng!`, 'system');
-            }
-
-            // Tính 6 ô hình chữ nhật 3x2
-            const slashTiles = this.getRectSlashTiles(this.player.x, this.player.y, pAct.dir);
-            this.createRectSlashEffect(slashTiles, '#06b6d4');
-            await this.delay(220);
-
-            // Kiểm tra trúng CPU
-            const isCpuHit = slashTiles.some(t => t.x === this.cpu.x && t.y === this.cpu.y);
-
-            if (isCpuHit) {
-                playerHitTarget = true;
-                if (this.cpu.shieldDir) {
-                    if (window.soundCtrl) window.soundCtrl.playShield();
-                    this.addFloatingText('CHẶN ĐỨNG KIẾM!', this.cpu.x, this.cpu.y, '#60a5fa');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU giương Khiên chặn đứng đường kiếm 3x2 của Razor! (0 DMG)`, 'block');
-                } else {
-                    if (window.soundCtrl) window.soundCtrl.playHit();
-                    let dmg = pAct.power || 60;
-                    if (hasBuffDmg) dmg = Math.round(dmg * pDmgMult);
-                    if (cAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
-
-                    this.applyDamage(this.cpu, dmg);
-                    this.createHitSparks(this.cpu.x, this.cpu.y, '#06b6d4');
-                    this.addFloatingText(`-${dmg} HP!`, this.cpu.x, this.cpu.y, '#f87171');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: 🗡️ [Kiếm Gắn Tay] CHÉM QUÉT HÌNH CHỮ NHẬT 3x2 TRÚNG CPU! Gây ${dmg} DMG${buffTag}!`, 'hit');
-                }
-            } else {
-                this.addFloatingText('CHÉM HỤT!', this.player.x, this.player.y, '#94a3b8');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: [Kiếm Gắn Tay] quét qua 6 ô không khí (${DIRECTIONS[pAct.dir].label})!`, 'miss');
-            }
-        }
-
-        // --- 3.2 CPU Actions ---
-        const cpuHasAdrenaline = (this.cpuBuffs && this.cpuBuffs.adrenaline && this.cpuBuffs.adrenaline.turnsLeft > 0);
-        const cpuHasCigarette = (this.cpuBuffs && this.cpuBuffs.cigarette && this.cpuBuffs.cigarette.turnsLeft > 0);
-        let cDmgMult = 1.0;
-        let cpuBuffTag = '';
-        if (cpuHasAdrenaline) {
-            cDmgMult *= 1.2;
-            cpuBuffTag += ' (+20% Adrenaline)';
-        }
-        if (cpuHasCigarette) {
-            cDmgMult *= 1.3;
-            cpuBuffTag += ' (+30% Thuốc Lá)';
-        }
-        const cpuHasBuffDmg = cpuHasAdrenaline || cpuHasCigarette;
-
-        if (cAct.type === 'ATTACK') {
-            const cD = DIRECTIONS[cAct.dir];
-            const attackRange = cAct.range || 1;
-            const targetX = this.cpu.x + cD.dx * attackRange;
-            const targetY = this.cpu.y + cD.dy * attackRange;
-            this.createSlashEffect(targetX, targetY, '#ff3366');
-
-            if (this.player.x === targetX && this.player.y === targetY) {
-                cpuHitTarget = true;
-                if (this.player.shieldDir) {
-                    if (window.soundCtrl) window.soundCtrl.playShield();
-                    this.addFloatingText('CHẶN ĐỨNG!', this.player.x, this.player.y, '#38bdf8');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU tấn công nhưng bạn giương Khiên chặn thành công!`, 'block');
-                } else {
-                    if (window.soundCtrl) window.soundCtrl.playHit();
-                    let dmg = cAct.power || 25;
-                    if (cpuHasBuffDmg) dmg = Math.round(dmg * cDmgMult);
-                    if (pAct.type === 'LEAP') {
-                        dmg = Math.round(dmg * 0.75);
-                        this.addFloatingText(`-${dmg} HP! (GIẢM 25%)`, this.player.x, this.player.y, '#f87171');
-                        this.addCombatLog(`🛡️ [Nhảy Đột Kích] Giảm 25% sát thương nhận phải trên đường đi! (Chỉ nhận ${dmg} DMG)`, 'buff');
-                    } else {
-                        this.addFloatingText(`-${dmg} HP!`, this.player.x, this.player.y, '#f87171');
-                    }
-                    this.applyDamage(this.player, dmg);
-                    this.createHitSparks(this.player.x, this.player.y, this.player.color);
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU ĐÁNH TRÚNG BẠN! Mất ${dmg} HP${cpuBuffTag}!`, 'hit');
-
-                    const playerIsHookman = this.player.charId === 'hookman' || (this.selectedCharacter && this.selectedCharacter.id === 'hookman');
-                    if (playerIsHookman) {
-                        this.playerRevealedTurns = 2;
-                        this.addFloatingText('HIỆN HÌNH!', this.player.x, this.player.y, '#f43f5e');
-                        this.addCombatLog(`💥 Hookman bị đánh trúng! Hiện nguyên hình và không thể tàng hình tới hết lượt sau!`, 'clash');
-                    }
-                }
-            } else {
-                this.addFloatingText('CPU HỤT!', targetX, targetY, '#94a3b8');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU đánh hụt vì bạn đã né tránh!`, 'miss');
-            }
-        }
-        else if (cAct.type === 'RANGED_LINE' || cAct.type === 'RANGED_VARIABLE') {
-            const cD = DIRECTIONS[cAct.dir];
-            const maxRange = cAct.range || 5;
-            if (cAct.skillId === 'RAZOR_PULSE_RIFLE') {
-                if (window.soundCtrl) window.soundCtrl.playPulseRifle();
-            } else if (cAct.type === 'RANGED_VARIABLE') {
-                if (window.soundCtrl) window.soundCtrl.playSilencedPistol();
-            } else {
-                if (window.soundCtrl) window.soundCtrl.playRifleShot();
-            }
-
-            let hit = false;
-            let endX = this.cpu.x + cD.dx * maxRange;
-            let endY = this.cpu.y + cD.dy * maxRange;
-
-            for (let r = 1; r <= maxRange; r++) {
-                const checkX = this.cpu.x + cD.dx * r;
-                const checkY = this.cpu.y + cD.dy * r;
-                if (checkX < 0 || checkX >= GRID_COLS || checkY < 0 || checkY >= GRID_ROWS) break;
-
-                endX = checkX;
-                endY = checkY;
-
-                if (this.player.x === checkX && this.player.y === checkY) {
-                    hit = true;
-                    cpuHitTarget = true;
-                    if (this.player.shieldDir) {
-                        if (window.soundCtrl) window.soundCtrl.playShield();
-                        this.addFloatingText('CHẶN ĐƯỢC!', this.player.x, this.player.y, '#38bdf8');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: Bạn giương Khiên chặn loạt đạn tầm xa của CPU!`, 'block');
-                        const playerIsHookman = this.player.charId === 'hookman' || (this.selectedCharacter && this.selectedCharacter.id === 'hookman');
-                        if (playerIsHookman) {
-                            this.playerRevealedTurns = 2;
-                            this.addFloatingText('HIỆN HÌNH!', this.player.x, this.player.y, '#f43f5e');
-                            this.addCombatLog(`💥 Hookman giương Khiên chặn đạn nhưng vị trí đã bị lộ! Không thể tàng hình tới hết lượt sau!`, 'clash');
-                        }
-                    } else {
-                        if (window.soundCtrl) window.soundCtrl.playHit();
-                        let dmg = cAct.power || 20;
-                        if (cAct.type === 'RANGED_VARIABLE') {
-                            const minD = cAct.minPower !== undefined ? cAct.minPower : 15;
-                            const maxD = cAct.maxPower !== undefined ? cAct.maxPower : 20;
-                            dmg = Math.floor(Math.random() * (maxD - minD + 1)) + minD;
-                        }
-                        if (cpuHasBuffDmg) dmg = Math.round(dmg * cDmgMult);
-                        if (pAct.type === 'LEAP') {
-                            dmg = Math.round(dmg * 0.75);
-                            this.addFloatingText(`-${dmg} HP! (GIẢM 25%)`, this.player.x, this.player.y, '#f87171');
-                            this.addCombatLog(`🛡️ [Nhảy Đột Kích] Giảm 25% sát thương nhận phải trên đường đi! (Chỉ nhận ${dmg} DMG)`, 'buff');
-                        } else {
-                            this.addFloatingText(`-${dmg} HP!`, this.player.x, this.player.y, '#f87171');
-                        }
-                        this.applyDamage(this.player, dmg);
-                        this.createHitSparks(this.player.x, this.player.y, this.player.color);
-
-                        const playerIsHookman = this.player.charId === 'hookman' || (this.selectedCharacter && this.selectedCharacter.id === 'hookman');
-                        if (playerIsHookman) {
-                            this.playerRevealedTurns = 2;
-                            this.addFloatingText('HIỆN HÌNH!', this.player.x, this.player.y, '#f43f5e');
-                            if (cAct.isBlindFire) {
-                                this.addCombatLog(`🎯 ĐẠN BẮN BỪA VÔ TÌNH TRÚNG HOOKMAN! Gây ${dmg} DMG${cpuBuffTag}! Hookman hiện nguyên hình và không thể tàng hình tới hết lượt sau!`, 'clash');
-                            } else {
-                                this.addCombatLog(`💥 Nhịp #${stepIndex + 1}: Hookman trúng đạn (-${dmg} HP${cpuBuffTag})! Hiện nguyên hình và không thể tàng hình tới hết lượt sau!`, 'clash');
-                            }
-                        } else {
-                            this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU bắn tầm xa TRÚNG BẠN! Mất ${dmg} HP${cpuBuffTag}!`, 'hit');
-                        }
-                    }
-                    break;
-                }
-            }
-
-            let tracerColor = '#ff3366';
-            if (cAct.skillId === 'RAZOR_PULSE_RIFLE') tracerColor = '#06b6d4';
-            else if (cAct.skillId === 'SMOKE_RIFLE') tracerColor = '#fb923c';
-            else if (cAct.skillId === 'TROOPER_RIFLE') tracerColor = '#34d399';
-            else if (cAct.type === 'RANGED_VARIABLE') tracerColor = '#a78bfa';
-
-            this.createBulletTracer(this.cpu.x, this.cpu.y, endX, endY, tracerColor);
-            if (!hit) {
-                this.addFloatingText('ĐẠN TRƯỢT!', endX, endY, '#94a3b8');
-                if (cAct.isBlindFire) {
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU bắn bừa bãi thăm dò bóng tối nhưng đạn không trúng ai!`, 'miss');
-                } else {
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: Đạn tầm xa của CPU bắn trượt!`, 'miss');
-                }
-            }
-        }
-        else if (cAct.type === 'BUFF_HEAL') {
-            // Hookman: Ống Tiêm Adrenaline
-            if (window.soundCtrl) window.soundCtrl.playAdrenaline();
-            this.cpuBuffs.adrenaline.turnsLeft = cAct.duration || 3;
-            this.createBuffSparks(this.cpu.x, this.cpu.y, '#10b981');
-            this.addFloatingText('💉 TIÊM ADRENALINE! (+20% DMG)', this.cpu.x, this.cpu.y, '#10b981');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU [${this.cpu.name}] tiêm [Adrenaline]! Tăng +20% Sát thương và hồi 5 HP/lượt trong 3 lượt!`, 'hit');
-            this.cpuCooldowns[cAct.skillId] = cAct.cooldown || 3;
-        }
-        else if (cAct.type === 'BUFF_SMOKE') {
-            // Smoke Guy: Thuốc Lá
-            if (window.soundCtrl) window.soundCtrl.playCigarette();
-            this.cpuBuffs.cigarette.turnsLeft = cAct.duration || 2;
-            this.createBuffSparks(this.cpu.x, this.cpu.y, '#f97316');
-            this.addFloatingText('🚬 HÚT THUỐC! (+30% DMG & +1 BƯỚC)', this.cpu.x, this.cpu.y, '#f97316');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU [${this.cpu.name}] châm [Thuốc Lá]! Tăng +30% Sát thương và +1 Bước di chuyển trong 2 lượt!`, 'hit');
-        }
-        else if (cAct.type === 'HOOK_PULL') {
-            // Hookman: Móc Kéo
-            const cD = DIRECTIONS[cAct.dir];
-            const maxRange = cAct.range || 6;
-            if (window.soundCtrl) window.soundCtrl.playHookThrow();
-
-            let hit = false;
-            let endX = this.cpu.x + cD.dx * maxRange;
-            let endY = this.cpu.y + cD.dy * maxRange;
-
-            for (let r = 1; r <= maxRange; r++) {
-                const checkX = this.cpu.x + cD.dx * r;
-                const checkY = this.cpu.y + cD.dy * r;
-                if (checkX < 0 || checkX >= GRID_COLS || checkY < 0 || checkY >= GRID_ROWS) break;
-
-                endX = checkX;
-                endY = checkY;
-
-                if (this.player.x === checkX && this.player.y === checkY) {
-                    hit = true;
-                    cpuHitTarget = true;
-                    if (this.player.shieldDir) {
-                        if (window.soundCtrl) window.soundCtrl.playShield();
-                        this.addFloatingText('KHIÊN CHẶN MÓC!', this.player.x, this.player.y, '#38bdf8');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: Bạn giương Khiên chặn đứng lưỡi Móc Kéo của CPU!`, 'block');
-                    } else {
-                        if (window.soundCtrl) window.soundCtrl.playHit();
-                        let dmg = cAct.power || 15;
-                        if (cpuHasBuffDmg) dmg = Math.round(dmg * cDmgMult);
-                        if (pAct.type === 'LEAP') {
-                            dmg = Math.round(dmg * 0.75);
-                            this.addFloatingText(`-${dmg} HP! (GIẢM 25%)`, this.player.x, this.player.y, '#f87171');
-                            this.addCombatLog(`🛡️ [Nhảy Đột Kích] Giảm 25% sát thương nhận phải! (Chỉ nhận ${dmg} DMG)`, 'buff');
-                        } else {
-                            this.addFloatingText(`-${dmg} HP & BỊ KÉO!`, this.player.x, this.player.y, '#ef4444');
-                        }
-
-                        this.applyDamage(this.player, dmg);
-                        this.createHitSparks(this.player.x, this.player.y, this.player.color);
-
-                        // Kéo Người chơi lại gần CPU 1 ô
-                        const pullX = Math.max(0, Math.min(GRID_COLS - 1, this.player.x - cD.dx));
-                        const pullY = Math.max(0, Math.min(GRID_ROWS - 1, this.player.y - cD.dy));
-                        if (pullX !== this.cpu.x || pullY !== this.cpu.y) {
-                            this.player.x = pullX;
-                            this.player.y = pullY;
-                            if (window.soundCtrl) window.soundCtrl.playHookPull();
-                        }
-
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU [Móc Kéo] GĂM TRÚNG BẠN! Gây ${dmg} DMG${cpuBuffTag} và kéo bạn lại gần 1 ô!`, 'hit');
-
-                        const playerIsHookman = this.player.charId === 'hookman' || (this.selectedCharacter && this.selectedCharacter.id === 'hookman');
-                        if (playerIsHookman) {
-                            this.playerRevealedTurns = 2;
-                            this.addFloatingText('HIỆN HÌNH!', this.player.x, this.player.y, '#f43f5e');
-                            this.addCombatLog(`💥 Hookman bị móc trúng! Hiện nguyên hình và không thể tàng hình tới hết lượt sau!`, 'clash');
-                        }
-
-                        // Găm dây móc: Hết lượt sau kéo 2 ô rồi mới kích hoạt hồi chiêu 4 lượt
-                        this.activeHookTethers = this.activeHookTethers.filter(t => t.source !== 'CPU');
-                        this.activeHookTethers.push({
-                            source: 'CPU',
-                            target: 'PLAYER',
-                            turnsUntilPull: 1,
-                            pullDist: 2,
-                            skillId: cAct.skillId,
-                            cdAfterPull: cAct.cooldown || 4
-                        });
-                        this.addCombatLog(`🪝 Dây móc của CPU đã găm chặt vào bạn! Hết lượt sau bạn sẽ bị giật kéo thêm 2 ô!`, 'clash');
-                    }
-                    break;
-                }
-            }
-
-            this.createHookChainEffect(this.cpu.x, this.cpu.y, endX, endY);
-            if (!hit) {
-                this.addFloatingText('MÓC HỤT!', endX, endY, '#94a3b8');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Móc Kéo của CPU bắn hụt!`, 'miss');
-                this.cpuCooldowns[cAct.skillId] = cAct.cooldown || 4;
-            }
-        }
-        else if (cAct.type === 'ROCKET') {
-            // Trooper: Tên Lửa (tầm 6, nổ 3x3 quanh đích hoặc nổ sớm tại chỗ nếu va chạm)
-            const cD = DIRECTIONS[cAct.dir];
-            const maxRange = cAct.range || 6;
-            if (window.soundCtrl) window.soundCtrl.playRocketLaunch();
-
-            let targetX = this.cpu.x + cD.dx * maxRange;
-            let targetY = this.cpu.y + cD.dy * maxRange;
-            let earlyImpact = false;
-
-            for (let r = 1; r <= maxRange; r++) {
-                const cx = this.cpu.x + cD.dx * r;
-                const cy = this.cpu.y + cD.dy * r;
-                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
-
-                targetX = cx;
-                targetY = cy;
-
-                if (this.player.x === cx && this.player.y === cy) {
-                    earlyImpact = true;
-                    break;
-                }
-            }
-
-            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
-            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
-
-            this.createRocketTrail(this.cpu.x, this.cpu.y, targetX, targetY, '#ef4444');
-            await this.delay(180);
-
-            if (window.soundCtrl) window.soundCtrl.playExplosion();
-            this.createExplosionBurst(targetX, targetY, 40);
-
-            if (earlyImpact) {
-                this.addFloatingText('💥 VA CHẠM NỔ 3x3!', targetX, targetY, '#ef4444');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: 💥 VA CHẠM TRỰC DIỆN! Tên lửa CPU đâm sầm vào bạn trên đường bay, phát nổ 3x3 ngay tại chỗ!`, 'clash');
-            } else {
-                this.addFloatingText('💥 TÊN LỬA NỔ 3x3!', targetX, targetY, '#ef4444');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Tên lửa của CPU bay đến điểm đích và phát nổ 3x3!`, 'system');
-            }
-
-            let dmg = cAct.power || 30;
-            if (cpuHasBuffDmg) dmg = Math.round(dmg * cDmgMult);
-
-            if (Math.abs(this.player.x - targetX) <= 1 && Math.abs(this.player.y - targetY) <= 1) {
-                cpuHitTarget = true;
-                let finalDmg = dmg;
-                if (pAct.type === 'LEAP') {
-                    finalDmg = Math.round(finalDmg * 0.75);
-                    this.addFloatingText(`-${finalDmg} HP! (GIẢM 25%)`, this.player.x, this.player.y, '#f87171');
-                    this.addCombatLog(`🛡️ [Nhảy Đột Kích] Giảm 25% sát thương nhận phải! (Chỉ nhận ${finalDmg} DMG)`, 'buff');
-                } else {
-                    this.addFloatingText(`-${finalDmg} HP!`, this.player.x, this.player.y, '#f87171');
-                }
-                this.applyDamage(this.player, finalDmg);
-                this.createHitSparks(this.player.x, this.player.y, this.player.color);
-                this.addCombatLog(`💥 Vụ nổ Tên lửa của CPU trúng BẠN! (-${finalDmg} HP${cpuBuffTag})`, 'hit');
-
-                const playerIsHookman = this.player.charId === 'hookman' || (this.selectedCharacter && this.selectedCharacter.id === 'hookman');
-                if (playerIsHookman) {
-                    this.playerRevealedTurns = 2;
-                    this.addFloatingText('HIỆN HÌNH!', this.player.x, this.player.y, '#f43f5e');
-                    this.addCombatLog(`💥 Hookman bị trúng vụ nổ! Hiện nguyên hình và không thể tàng hình tới hết lượt sau!`, 'clash');
-                }
-            }
-            if (Math.abs(this.cpu.x - targetX) <= 1 && Math.abs(this.cpu.y - targetY) <= 1) {
-                this.applyDamage(this.cpu, cAct.power || 30);
-                this.createHitSparks(this.cpu.x, this.cpu.y, '#ff3366');
-                this.addFloatingText(`-${cAct.power || 30} HP! (TỰ DÍNH ĐÒN)`, this.cpu.x, this.cpu.y, '#f87171');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU tự dính vụ nổ Tên lửa của mình! Mất ${cAct.power || 30} HP!`, 'hit');
-            }
-        }
-        else if (cAct.type === 'BOMB_LAUNCHER') {
-            // Smoke Guy: Súng Bắn Bom (2 viên đạn)
-            const cD = DIRECTIONS[cAct.dir];
-            const maxRange = cAct.range || 6;
-            if (window.soundCtrl) window.soundCtrl.playBombLauncher();
-
-            const currentAmmo = this.cpuSkillAmmo[cAct.skillId] !== undefined ? this.cpuSkillAmmo[cAct.skillId] : 2;
-            const remainingAmmo = Math.max(0, currentAmmo - 1);
-            this.cpuSkillAmmo[cAct.skillId] = remainingAmmo;
-
-            if (remainingAmmo === 0) {
-                this.cpuCooldowns[cAct.skillId] = cAct.cooldown || 4;
-                this.addCombatLog(`⚠️ Súng Bắn Bom của CPU đã bắn hết cả 2 viên! Bắt đầu hồi chiêu 4 lượt!`, 'system');
-            } else {
-                this.addCombatLog(`[Súng Bắn Bom] của CPU còn lại ${remainingAmmo}/2 viên!`, 'system');
-            }
-
-            let targetX = this.cpu.x + cD.dx * maxRange;
-            let targetY = this.cpu.y + cD.dy * maxRange;
-            let earlyImpact = false;
-
-            for (let r = 1; r <= maxRange; r++) {
-                const cx = this.cpu.x + cD.dx * r;
-                const cy = this.cpu.y + cD.dy * r;
-                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
-
-                targetX = cx;
-                targetY = cy;
-
-                if (this.player.x === cx && this.player.y === cy) {
-                    earlyImpact = true;
-                    break;
-                }
-            }
-
-            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
-            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
-
-            this.createRocketTrail(this.cpu.x, this.cpu.y, targetX, targetY, '#f97316');
-            await this.delay(180);
-
-            if (window.soundCtrl) window.soundCtrl.playExplosion();
-            this.createExplosionBurst(targetX, targetY, 40);
-
-            if (earlyImpact) {
-                this.addFloatingText('💥 VA CHẠM NỔ 3x3!', targetX, targetY, '#f97316');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: 💥 VA CHẠM TRỰC DIỆN! Bom CPU đâm sầm vào bạn trên đường bay, phát nổ 3x3!`, 'clash');
-            } else {
-                this.addFloatingText('💥 BOM PHÓNG NỔ 3x3!', targetX, targetY, '#f97316');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: Quả bom của CPU bay đến điểm đích và phát nổ 3x3!`, 'system');
-            }
-
-            let dmg = cAct.power || 30;
-            if (cpuHasBuffDmg) dmg = Math.round(dmg * cDmgMult);
-
-            if (Math.abs(this.player.x - targetX) <= 1 && Math.abs(this.player.y - targetY) <= 1) {
-                cpuHitTarget = true;
-                let finalDmg = dmg;
-                if (pAct.type === 'LEAP') {
-                    finalDmg = Math.round(finalDmg * 0.75);
-                    this.addFloatingText(`-${finalDmg} HP! (GIẢM 25%)`, this.player.x, this.player.y, '#f87171');
-                    this.addCombatLog(`🛡️ [Nhảy Đột Kích] Giảm 25% sát thương nhận phải! (Chỉ nhận ${finalDmg} DMG)`, 'buff');
-                } else {
-                    this.addFloatingText(`-${finalDmg} HP!`, this.player.x, this.player.y, '#f87171');
-                }
-                this.applyDamage(this.player, finalDmg);
-                this.createHitSparks(this.player.x, this.player.y, this.player.color);
-                this.addCombatLog(`💥 Vụ nổ bom của CPU trúng BẠN! (-${finalDmg} HP${cpuBuffTag})`, 'hit');
-
-                const playerIsHookman = this.player.charId === 'hookman' || (this.selectedCharacter && this.selectedCharacter.id === 'hookman');
-                if (playerIsHookman) {
-                    this.playerRevealedTurns = 2;
-                    this.addFloatingText('HIỆN HÌNH!', this.player.x, this.player.y, '#f43f5e');
-                    this.addCombatLog(`💥 Hookman bị trúng bom! Hiện nguyên hình và không thể tàng hình tới hết lượt sau!`, 'clash');
-                }
-            }
-            if (Math.abs(this.cpu.x - targetX) <= 1 && Math.abs(this.cpu.y - targetY) <= 1) {
-                this.applyDamage(this.cpu, cAct.power || 30);
-                this.createHitSparks(this.cpu.x, this.cpu.y, '#ff3366');
-                this.addFloatingText(`-${cAct.power || 30} HP! (TỰ DÍNH BOM)`, this.cpu.x, this.cpu.y, '#f87171');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU tự dính vụ nổ bom của mình! Mất ${cAct.power || 30} HP!`, 'hit');
-            }
-        }
-        else if (cAct.type === 'GRENADE') {
-            // Trooper: Lựu Đạn hẹn giờ 2 lượt
-            const cD = DIRECTIONS[cAct.dir];
-            const maxRange = cAct.range || 5;
-
-            let targetX = cAct.targetX !== undefined ? cAct.targetX : (this.cpu.x + cD.dx * maxRange);
-            let targetY = cAct.targetY !== undefined ? cAct.targetY : (this.cpu.y + cD.dy * maxRange);
-
-            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
-            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
-
-            this.createGrenadeArc(this.cpu.x, this.cpu.y, targetX, targetY);
-            if (window.soundCtrl) window.soundCtrl.playGrenadeTick();
-
-            this.groundHazards.push({
-                id: Date.now() + Math.random(),
-                type: 'GRENADE',
-                x: targetX,
-                y: targetY,
-                turnsLeft: 2,
-                power: cAct.power || 50,
-                aoeRadius: 1,
-                owner: 'CPU'
-            });
-
-            this.addFloatingText('💣 LỰU ĐẠN CPU (2 LƯỢT)!', targetX, targetY, '#f59e0b');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU ném lựu đạn hẹn giờ tới (${targetX}, ${targetY})! Sẽ phát nổ 3x3 sau 2 lượt!`, 'clash');
-        }
-        else if (cAct.type === 'RECT_SLASH') {
-            // Razor: Kiếm Gắn Tay (3x2 trong 4 hướng chính, 2 lượt dùng)
-            if (window.soundCtrl) window.soundCtrl.playCyberBladeSlash();
-
-            const currentAmmo = this.cpuSkillAmmo[cAct.skillId] !== undefined ? this.cpuSkillAmmo[cAct.skillId] : 2;
-            const remainingAmmo = Math.max(0, currentAmmo - 1);
-            this.cpuSkillAmmo[cAct.skillId] = remainingAmmo;
-
-            if (remainingAmmo === 0) {
-                this.cpuCooldowns[cAct.skillId] = cAct.cooldown || 4;
-                this.addCombatLog(`⚠️ [Kiếm Gắn Tay] của CPU đã dùng hết cả 2 lượt! Bắt đầu hồi chiêu 4 lượt!`, 'system');
-            } else {
-                this.addCombatLog(`[Kiếm Gắn Tay] của CPU còn lại ${remainingAmmo}/2 lượt sử dụng!`, 'system');
-            }
-
-            const slashTiles = this.getRectSlashTiles(this.cpu.x, this.cpu.y, cAct.dir);
-            this.createRectSlashEffect(slashTiles, '#ff3366');
-            await this.delay(220);
-
-            const isPlayerHit = slashTiles.some(t => t.x === this.player.x && t.y === this.player.y);
-            if (isPlayerHit) {
-                cpuHitTarget = true;
-                if (this.player.shieldDir) {
-                    if (window.soundCtrl) window.soundCtrl.playShield();
-                    this.addFloatingText('CHẶN ĐỨNG!', this.player.x, this.player.y, '#38bdf8');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: Bạn giương Khiên chặn đứng đường kiếm 3x2 của CPU!`, 'block');
-                } else {
-                    if (window.soundCtrl) window.soundCtrl.playHit();
-                    let dmg = cAct.power || 60;
-                    if (cpuHasBuffDmg) dmg = Math.round(dmg * cDmgMult);
-                    if (pAct.type === 'LEAP') {
-                        dmg = Math.round(dmg * 0.75);
-                        this.addFloatingText(`-${dmg} HP! (GIẢM 25%)`, this.player.x, this.player.y, '#f87171');
-                        this.addCombatLog(`🛡️ [Nhảy Đột Kích] Giảm 25% sát thương nhận phải trên đường đi! (Chỉ nhận ${dmg} DMG)`, 'buff');
-                    } else {
-                        this.addFloatingText(`-${dmg} HP!`, this.player.x, this.player.y, '#f87171');
-                    }
-                    this.applyDamage(this.player, dmg);
-                    this.createHitSparks(this.player.x, this.player.y, this.player.color);
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: CPU chém Kiếm Gắn Tay TRÚNG BẠN! Mất ${dmg} HP${cpuBuffTag}!`, 'hit');
-
-                    const playerIsHookman = this.player.charId === 'hookman' || (this.selectedCharacter && this.selectedCharacter.id === 'hookman');
-                    if (playerIsHookman) {
-                        this.playerRevealedTurns = 2;
-                        this.addFloatingText('HIỆN HÌNH!', this.player.x, this.player.y, '#f43f5e');
-                        this.addCombatLog(`💥 Hookman bị chém trúng! Hiện nguyên hình và không thể tàng hình tới hết lượt sau!`, 'clash');
-                    }
-                }
-            } else {
-                this.addFloatingText('CPU CHÉM HỤT!', this.cpu.x, this.cpu.y, '#94a3b8');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: [Kiếm Gắn Tay] của CPU chém hụt vào không khí!`, 'miss');
-            }
-        }
-
-        if (playerHitTarget && cpuHitTarget && !this.player.shieldDir && !this.cpu.shieldDir) {
-            this.addCombatLog(`⚡ ĐÔI CÔNG (CROSS COUNTER)! Cả 2 cùng trúng đòn!`, 'clash');
+        // --- BƯỚC 4: Thực thi Tấn công & Kỹ năng (Attacks & Abilities) ---
+        for (const actor of allAlive) {
+            if (actor.hp <= 0) continue;
+            const act = actor.queue ? actor.queue[stepIndex] : null;
+            if (!act || act.type === 'SHIELD' || act.type === 'PATH_MOVE' || act.type === 'DASH' || act.type === 'LEAP') continue;
+
+            await this.resolveUnitAttack(actor, act, stepIndex);
         }
 
         this.updateHUD();
 
-        if (this.player.hp <= 0 || this.cpu.hp <= 0) {
+        const blueAliveCount = this.blueTeam.filter(u => u.hp > 0).length;
+        const redAliveCount = this.redTeam.filter(u => u.hp > 0).length;
+
+        if (blueAliveCount === 0 || redAliveCount === 0) {
             this.handleGameOver();
             return;
         }
@@ -3121,139 +2586,476 @@ class GameEngine {
         this.executeResolutionStep(stepIndex + 1);
     }
 
+    async resolveUnitAttack(actor, act, stepIndex) {
+        const opposingTeam = (actor.team === 'BLUE') ? this.redTeam : this.blueTeam;
+        const livingOpponents = opposingTeam.filter(u => u.hp > 0);
+        const allLivingUnits = [...this.blueTeam, ...this.redTeam].filter(u => u.hp > 0);
+
+        // Tính Buff sát thương của actor
+        const hasAdrenaline = (actor.buffs && actor.buffs.adrenaline && actor.buffs.adrenaline.turnsLeft > 0);
+        const hasCigarette = (actor.buffs && actor.buffs.cigarette && actor.buffs.cigarette.turnsLeft > 0);
+        let dmgMult = 1.0;
+        let buffTag = '';
+        if (hasAdrenaline) {
+            dmgMult *= 1.2;
+            buffTag += ' (+20% Adrenaline)';
+        }
+        if (hasCigarette) {
+            dmgMult *= 1.3;
+            buffTag += ' (+30% Thuốc Lá)';
+        }
+        const hasBuffDmg = hasAdrenaline || hasCigarette;
+
+        if (act.type === 'ATTACK') {
+            const uD = DIRECTIONS[act.dir];
+            const attackRange = act.range || 1;
+            const targetX = actor.x + uD.dx * attackRange;
+            const targetY = actor.y + uD.dy * attackRange;
+            this.createSlashEffect(targetX, targetY, actor.charThemeColor || actor.color);
+
+            const target = livingOpponents.find(u => u.x === targetX && u.y === targetY);
+            if (target) {
+                if (target.shieldDir) {
+                    if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
+                    this.addFloatingText(this.lang === 'en' ? 'BLOCKED!' : 'CHẶN ĐƯỢC!', target.x, target.y, '#60a5fa');
+                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} chém ${target.name} bị Khiên chặn đứng! (0 DMG)`, 'block');
+                } else {
+                    if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
+                    let dmg = act.power || 25;
+                    if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
+                    const targetAct = target.queue ? target.queue[stepIndex] : null;
+                    if (targetAct && targetAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
+
+                    this.applyDamage(target, dmg);
+                    this.createHitSparks(target.x, target.y, target.color);
+                    this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
+                    this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} ĐÁNH TRÚNG ${target.name}! (-${dmg} HP${buffTag})`, 'hit');
+
+                    if (target.charId === 'hookman') {
+                        target.revealedTurns = 2;
+                        if (target.isPlayer) this.playerRevealedTurns = 2;
+                        this.addFloatingText(this.lang === 'en' ? 'REVEALED!' : 'HIỆN HÌNH!', target.x, target.y, '#f43f5e');
+                    }
+                }
+            } else {
+                if (window.soundCtrl && actor.isPlayer) window.soundCtrl.playAttack();
+                this.addFloatingText(this.lang === 'en' ? 'MISS!' : 'HỤT!', targetX, targetY, '#94a3b8');
+            }
+        }
+        else if (act.type === 'RANGED_LINE' || act.type === 'RANGED_VARIABLE') {
+            const uD = DIRECTIONS[act.dir];
+            const maxRange = act.range || 5;
+            if (act.skillId === 'RAZOR_PULSE_RIFLE') {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playPulseRifle();
+            } else if (act.type === 'RANGED_VARIABLE') {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playSilencedPistol();
+            } else {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playRifleShot();
+            }
+
+            let hit = false;
+            let endX = actor.x + uD.dx * maxRange;
+            let endY = actor.y + uD.dy * maxRange;
+
+            for (let r = 1; r <= maxRange; r++) {
+                const cx = actor.x + uD.dx * r;
+                const cy = actor.y + uD.dy * r;
+                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
+
+                endX = cx;
+                endY = cy;
+
+                const target = livingOpponents.find(u => u.x === cx && u.y === cy);
+                if (target) {
+                    hit = true;
+                    if (target.shieldDir) {
+                        if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
+                        this.addFloatingText(this.lang === 'en' ? 'BLOCKED BULLET!' : 'CHẶN ĐƯỢC ĐẠN!', target.x, target.y, '#60a5fa');
+                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn loạt đạn ${act.name} từ ${actor.name}!`, 'block');
+                    } else {
+                        if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
+                        let dmg = (act.type === 'RANGED_VARIABLE') 
+                            ? Math.floor(Math.random() * ((act.maxPower || 20) - (act.minPower || 15) + 1)) + (act.minPower || 15)
+                            : (act.power || 20);
+                        if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
+                        const targetAct = target.queue ? target.queue[stepIndex] : null;
+                        if (targetAct && targetAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
+
+                        this.applyDamage(target, dmg);
+                        this.createHitSparks(target.x, target.y, target.color);
+                        this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
+                        this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} BẮN TRÚNG ${target.name}! Gây ${dmg} sát thương${buffTag}!`, 'hit');
+
+                        if (target.charId === 'hookman') {
+                            target.revealedTurns = 2;
+                            if (target.isPlayer) this.playerRevealedTurns = 2;
+                            this.addFloatingText(this.lang === 'en' ? 'REVEALED!' : 'HIỆN HÌNH!', target.x, target.y, '#f43f5e');
+                        }
+                    }
+                    break;
+                }
+            }
+
+            let tracerColor = '#34d399';
+            if (act.skillId === 'SMOKE_RIFLE') tracerColor = '#fb923c';
+            else if (act.skillId === 'RAZOR_PULSE_RIFLE') tracerColor = '#06b6d4';
+            else if (act.type === 'RANGED_VARIABLE') tracerColor = '#a78bfa';
+            this.createBulletTracer(actor.x, actor.y, endX, endY, tracerColor);
+
+            if (!hit) {
+                this.addFloatingText(this.lang === 'en' ? 'MISS!' : 'ĐẠN TRƯỢT!', endX, endY, '#94a3b8');
+            }
+        }
+        else if (act.type === 'BUFF_HEAL') {
+            if (window.soundCtrl && actor.isPlayer) window.soundCtrl.playAdrenaline();
+            if (!actor.buffs) actor.buffs = {};
+            if (!actor.buffs.adrenaline) actor.buffs.adrenaline = { turnsLeft: 0, healPerTurn: 5, dmgBonusPercent: 20 };
+            actor.buffs.adrenaline.turnsLeft = act.duration || 3;
+            if (actor.isPlayer && this.playerBuffs) this.playerBuffs.adrenaline.turnsLeft = act.duration || 3;
+
+            this.createBuffSparks(actor.x, actor.y, '#10b981');
+            this.addFloatingText(this.lang === 'en' ? '💉 ADRENALINE! (+20% DMG)' : '💉 TIÊM ADRENALINE! (+20% DMG)', actor.x, actor.y, '#10b981');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} tiêm [Adrenaline]! Tăng +20% Sát thương và hồi 5 HP/lượt!`, 'hit');
+            actor.cooldowns[act.skillId] = act.cooldown || 3;
+        }
+        else if (act.type === 'BUFF_SMOKE') {
+            if (window.soundCtrl && actor.isPlayer) window.soundCtrl.playCigarette();
+            if (!actor.buffs) actor.buffs = {};
+            if (!actor.buffs.cigarette) actor.buffs.cigarette = { turnsLeft: 0, dmgBonusPercent: 30, moveBonus: 1 };
+            actor.buffs.cigarette.turnsLeft = act.duration || 2;
+            if (actor.isPlayer && this.playerBuffs) this.playerBuffs.cigarette.turnsLeft = act.duration || 2;
+
+            this.createBuffSparks(actor.x, actor.y, '#f97316');
+            this.addFloatingText(this.lang === 'en' ? '🚬 SMOKING! (+30% DMG & +1 SPEED)' : '🚬 HÚT THUỐC! (+30% DMG & +1 BƯỚC)', actor.x, actor.y, '#f97316');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} châm [Thuốc Lá]! Tăng +30% Sát thương và +1 Tốc độ di chuyển!`, 'hit');
+        }
+        else if (act.type === 'HOOK_PULL') {
+            const uD = DIRECTIONS[act.dir];
+            const maxRange = act.range || 5;
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playHookThrow();
+
+            let hit = false;
+            let endX = actor.x + uD.dx * maxRange;
+            let endY = actor.y + uD.dy * maxRange;
+
+            for (let r = 1; r <= maxRange; r++) {
+                const cx = actor.x + uD.dx * r;
+                const cy = actor.y + uD.dy * r;
+                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
+
+                endX = cx;
+                endY = cy;
+
+                const target = livingOpponents.find(u => u.x === cx && u.y === cy);
+                if (target) {
+                    hit = true;
+                    if (target.shieldDir) {
+                        if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
+                        this.addFloatingText(this.lang === 'en' ? 'BLOCKED HOOK!' : 'KHIÊN CHẶN MÓC!', target.x, target.y, '#60a5fa');
+                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn đứng Móc Kéo từ ${actor.name}!`, 'block');
+                    } else {
+                        if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
+                        let dmg = act.power || 15;
+                        if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
+                        this.applyDamage(target, dmg);
+                        this.createHitSparks(target.x, target.y, '#ef4444');
+
+                        const pullX = Math.max(0, Math.min(GRID_COLS - 1, target.x - uD.dx));
+                        const pullY = Math.max(0, Math.min(GRID_ROWS - 1, target.y - uD.dy));
+                        if (pullX !== actor.x || pullY !== actor.y) {
+                            target.x = pullX;
+                            target.y = pullY;
+                            if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHookPull();
+                        }
+
+                        this.addFloatingText(`-${dmg} HP & KÉO 1 Ô!`, target.x, target.y, '#ef4444');
+                        this.addCombatLog(`Nhịp #${stepIndex + 1}: [Móc Kéo] ${actor.name} GĂM TRÚNG ${target.name}! (-${dmg} HP${buffTag}) và kéo lại gần 1 ô!`, 'hit');
+
+                        this.activeHookTethers = this.activeHookTethers.filter(t => t.sourceId !== actor.id);
+                        this.activeHookTethers.push({
+                            sourceId: actor.id,
+                            targetId: target.id,
+                            source: actor.isPlayer ? 'PLAYER' : 'CPU',
+                            target: target.isPlayer ? 'PLAYER' : 'CPU',
+                            sourceUnit: actor,
+                            targetUnit: target,
+                            turnsUntilPull: 1,
+                            pullDist: 2,
+                            skillId: act.skillId,
+                            cdAfterPull: act.cooldown || 4
+                        });
+                        this.addCombatLog(`🪝 Dây móc đã găm chặt vào ${target.name}! Hết lượt sau sẽ bị giật kéo thêm 2 ô!`, 'clash');
+                    }
+                    break;
+                }
+            }
+
+            this.createHookChainEffect(actor.x, actor.y, endX, endY);
+            if (!hit) {
+                this.addFloatingText(this.lang === 'en' ? 'HOOK MISSED!' : 'MÓC HỤT!', endX, endY, '#94a3b8');
+                actor.cooldowns[act.skillId] = act.cooldown || 4;
+            }
+        }
+        else if (act.type === 'ROCKET' || act.type === 'BOMB_LAUNCHER') {
+            const isBombLauncher = (act.type === 'BOMB_LAUNCHER');
+            const uD = DIRECTIONS[act.dir];
+            const maxRange = act.range || 6;
+
+            if (isBombLauncher) {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playBombLauncher();
+                const curAmmo = actor.skillAmmo[act.skillId] !== undefined ? actor.skillAmmo[act.skillId] : 2;
+                const remAmmo = Math.max(0, curAmmo - 1);
+                actor.skillAmmo[act.skillId] = remAmmo;
+                if (actor.isPlayer && this.skillAmmo) this.skillAmmo[act.skillId] = remAmmo;
+                if (actor === this.cpu && this.cpuSkillAmmo) this.cpuSkillAmmo[act.skillId] = remAmmo;
+                if (remAmmo === 0) {
+                    actor.cooldowns[act.skillId] = act.cooldown || 4;
+                    if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 4;
+                    if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 4;
+                    this.addCombatLog(`⚠️ ${actor.name} [Súng Bắn Bom] hết đạn! Hồi chiêu 4 lượt để nạp đạn!`, 'system');
+                }
+            } else {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playRocketLaunch();
+            }
+
+            let targetX = actor.x + uD.dx * maxRange;
+            let targetY = actor.y + uD.dy * maxRange;
+
+            for (let r = 1; r <= maxRange; r++) {
+                const cx = actor.x + uD.dx * r;
+                const cy = actor.y + uD.dy * r;
+                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
+
+                targetX = cx;
+                targetY = cy;
+
+                const hitUnit = livingOpponents.find(u => u.x === cx && u.y === cy);
+                if (hitUnit) break;
+            }
+
+            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
+            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
+
+            this.createRocketTrail(actor.x, actor.y, targetX, targetY, isBombLauncher ? '#f97316' : '#ef4444');
+            await this.delay(180);
+
+            if (window.soundCtrl) window.soundCtrl.playExplosion();
+            this.createExplosionBurst(targetX, targetY, 40);
+
+            this.addFloatingText('💥 NỔ 3x3!', targetX, targetY, isBombLauncher ? '#f97316' : '#ef4444');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} bắn [${act.name}] phát nổ 3x3 tại (${targetX}, ${targetY})!`, 'clash');
+
+            let baseDmg = act.power || 30;
+            if (hasBuffDmg) baseDmg = Math.round(baseDmg * dmgMult);
+
+            for (const u of allLivingUnits) {
+                if (Math.abs(u.x - targetX) <= 1 && Math.abs(u.y - targetY) <= 1) {
+                    const uAct = u.queue ? u.queue[stepIndex] : null;
+                    let uDmg = (u === actor) ? (act.power || 30) : baseDmg;
+                    if (uAct && uAct.type === 'LEAP') uDmg = Math.round(uDmg * 0.75);
+
+                    this.applyDamage(u, uDmg);
+                    this.createHitSparks(u.x, u.y, u.color);
+                    this.addFloatingText(`-${uDmg} HP!`, u.x, u.y, '#f87171');
+                    this.addCombatLog(`💥 Vụ nổ ${act.name} trúng ${u.name}! (-${uDmg} HP)!`, 'hit');
+
+                    if (u.charId === 'hookman') {
+                        u.revealedTurns = 2;
+                        if (u.isPlayer) this.playerRevealedTurns = 2;
+                    }
+                }
+            }
+        }
+        else if (act.type === 'GRENADE') {
+            const uD = DIRECTIONS[act.dir];
+            const maxRange = act.range || 5;
+            let targetX = (act.targetX !== undefined) ? act.targetX : actor.x + uD.dx * maxRange;
+            let targetY = (act.targetY !== undefined) ? act.targetY : actor.y + uD.dy * maxRange;
+
+            if (act.targetX === undefined) {
+                for (let r = 1; r <= maxRange; r++) {
+                    const cx = actor.x + uD.dx * r;
+                    const cy = actor.y + uD.dy * r;
+                    if (livingOpponents.some(u => u.x === cx && u.y === cy)) {
+                        targetX = cx; targetY = cy;
+                        break;
+                    }
+                }
+            }
+
+            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
+            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
+
+            this.createGrenadeArc(actor.x, actor.y, targetX, targetY);
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playGrenadeTick();
+
+            this.groundHazards.push({
+                id: Date.now() + Math.random(),
+                type: 'GRENADE',
+                x: targetX,
+                y: targetY,
+                turnsLeft: 2,
+                power: act.power || 50,
+                aoeRadius: 1,
+                owner: actor.isPlayer ? 'PLAYER' : 'CPU',
+                ownerId: actor.id,
+                ownerName: actor.name
+            });
+
+            this.addFloatingText('💣 LỰU ĐẠN (ĐẾM 2 LƯỢT)!', targetX, targetY, '#f59e0b');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} ném lựu đạn tới (${targetX}, ${targetY})! Sẽ nổ 3x3 sau 2 lượt!`, 'clash');
+        }
+        else if (act.type === 'RECT_SLASH') {
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playCyberBladeSlash();
+
+            const curAmmo = actor.skillAmmo[act.skillId] !== undefined ? actor.skillAmmo[act.skillId] : 2;
+            const remAmmo = Math.max(0, curAmmo - 1);
+            actor.skillAmmo[act.skillId] = remAmmo;
+            if (actor.isPlayer && this.skillAmmo) this.skillAmmo[act.skillId] = remAmmo;
+            if (actor === this.cpu && this.cpuSkillAmmo) this.cpuSkillAmmo[act.skillId] = remAmmo;
+
+            if (remAmmo === 0) {
+                actor.cooldowns[act.skillId] = act.cooldown || 4;
+                if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 4;
+                if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 4;
+                this.addCombatLog(`⚠️ ${actor.name} [Kiếm Gắn Tay] dùng hết 2 lượt! Bắt đầu hồi chiêu 4 lượt!`, 'system');
+            }
+
+            const slashTiles = this.getRectSlashTiles(actor.x, actor.y, act.dir);
+            this.createRectSlashEffect(slashTiles, actor.charThemeColor || '#06b6d4');
+            await this.delay(220);
+
+            let hitAny = false;
+            for (const target of livingOpponents) {
+                if (slashTiles.some(t => t.x === target.x && t.y === target.y)) {
+                    hitAny = true;
+                    if (target.shieldDir) {
+                        if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
+                        this.addFloatingText(this.lang === 'en' ? 'BLOCKED BLADE!' : 'CHẶN ĐỨNG KIẾM!', target.x, target.y, '#60a5fa');
+                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn đứng Kiếm Gắn Tay từ ${actor.name}! (0 DMG)`, 'block');
+                    } else {
+                        if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
+                        let dmg = act.power || 60;
+                        if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
+                        const targetAct = target.queue ? target.queue[stepIndex] : null;
+                        if (targetAct && targetAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
+
+                        this.applyDamage(target, dmg);
+                        this.createHitSparks(target.x, target.y, '#06b6d4');
+                        this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
+                        this.addCombatLog(`Nhịp #${stepIndex + 1}: 🗡️ [Kiếm Gắn Tay] ${actor.name} CHÉM QUÉT 3x2 TRÚNG ${target.name}! (-${dmg} HP${buffTag})!`, 'hit');
+
+                        if (target.charId === 'hookman') {
+                            target.revealedTurns = 2;
+                            if (target.isPlayer) this.playerRevealedTurns = 2;
+                            this.addFloatingText(this.lang === 'en' ? 'REVEALED!' : 'HIỆN HÌNH!', target.x, target.y, '#f43f5e');
+                        }
+                    }
+                }
+            }
+
+            if (!hitAny) {
+                this.addFloatingText(this.lang === 'en' ? 'MISS!' : 'CHÉM HỤT!', actor.x, actor.y, '#94a3b8');
+            }
+        }
+    }
+
     finishTurn() {
-        this.addCombatLog(`Hoàn thành Lượt ${this.turn}!`, 'system');
+        this.addCombatLog(`${this.lang === 'en' ? 'Completed Turn' : 'Hoàn thành Lượt'} ${this.turn}!`, 'system');
 
-        // 0. Giảm thời gian Hookman bị lộ diện (Revealed Turns)
-        if (this.playerRevealedTurns > 0) {
-            this.playerRevealedTurns--;
-            if (this.playerRevealedTurns === 0) {
-                this.addCombatLog(`👁️ Hookman đã xóa sạch dấu vết, có thể tàng hình lại nếu ở ngoài 7x7!`, 'system');
-            }
-        }
-        if (this.cpuRevealedTurns > 0) {
-            this.cpuRevealedTurns--;
-        }
+        const allUnits = [...this.blueTeam, ...this.redTeam];
 
-        // 1. Hồi phục máu Adrenaline cuối mỗi lượt (+5 HP, kéo dài 3 lượt)
-        if (this.playerBuffs && this.playerBuffs.adrenaline && this.playerBuffs.adrenaline.turnsLeft > 0) {
-            const healAmount = Math.min(5, this.player.maxHp - this.player.hp);
-            this.player.hp += healAmount;
-            this.playerBuffs.adrenaline.turnsLeft--;
-            if (window.soundCtrl) window.soundCtrl.playSelect();
-            this.createBuffSparks(this.player.x, this.player.y, '#10b981');
-            this.addFloatingText(`+${healAmount} HP (ADRENALINE)`, this.player.x, this.player.y, '#10b981');
-            this.addCombatLog(`💉 Cuối lượt: Adrenaline hồi phục +${healAmount} HP! (Còn ${this.playerBuffs.adrenaline.turnsLeft} lượt hiệu lực)`, 'hit');
-            if (this.playerBuffs.adrenaline.turnsLeft === 0) {
-                this.addCombatLog(`💉 Hiệu ứng tăng lực Adrenaline (+20% Sát thương) đã kết thúc!`, 'system');
-            }
-        }
-        if (this.cpuBuffs && this.cpuBuffs.adrenaline && this.cpuBuffs.adrenaline.turnsLeft > 0) {
-            const healAmount = Math.min(5, this.cpu.maxHp - this.cpu.hp);
-            this.cpu.hp += healAmount;
-            this.cpuBuffs.adrenaline.turnsLeft--;
-            this.createBuffSparks(this.cpu.x, this.cpu.y, '#10b981');
-            this.addFloatingText(`+${healAmount} HP (ADRENALINE)`, this.cpu.x, this.cpu.y, '#10b981');
-            this.addCombatLog(`💉 Cuối lượt: CPU [${this.cpu.name}] Adrenaline hồi phục +${healAmount} HP! (Còn ${this.cpuBuffs.adrenaline.turnsLeft} lượt hiệu lực)`, 'hit');
-            if (this.cpuBuffs.adrenaline.turnsLeft === 0) {
-                this.addCombatLog(`💉 Hiệu ứng tăng lực Adrenaline của CPU [${this.cpu.name}] đã kết thúc!`, 'system');
-            }
-        }
+        // 0 & 1 & 2 & 3. Cập nhật trạng thái từng đấu thủ còn sống
+        for (const unit of allUnits) {
+            if (unit.hp <= 0) continue;
 
-        // 2. Giảm thời gian hồi chiêu
-        for (const skillId in this.cooldowns) {
-            if (this.cooldowns[skillId] > 0) {
-                this.cooldowns[skillId]--;
-                if (this.cooldowns[skillId] === 0) {
-                    if (skillId === 'SMOKE_BOMB_LAUNCHER') {
-                        this.skillAmmo['SMOKE_BOMB_LAUNCHER'] = 2;
-                        this.addCombatLog(`🔄 Súng Bắn Bom đã hoàn tất hồi chiêu, nạp lại đầy đủ 2/2 viên đạn!`, 'system');
-                    } else if (skillId === 'RAZOR_BLADE') {
-                        this.skillAmmo['RAZOR_BLADE'] = 2;
-                        this.addCombatLog(`🔄 Kiếm Gắn Tay đã hoàn tất hồi chiêu, nạp lại đầy đủ 2/2 lượt sử dụng!`, 'system');
-                    } else {
-                        this.addCombatLog(`✨ Kỹ năng [${skillId}] đã hồi chiêu xong, sẵn sàng sử dụng!`, 'system');
+            // 0. Giảm thời gian lộ diện của Hookman
+            if (unit.revealedTurns > 0) {
+                unit.revealedTurns--;
+                if (unit.isPlayer) this.playerRevealedTurns = unit.revealedTurns;
+                if (unit.revealedTurns === 0) {
+                    this.addCombatLog(`👁️ ${unit.name} đã xóa sạch dấu vết, có thể tàng hình trở lại nếu ngoài 7x7!`, 'system');
+                }
+            }
+
+            // 1. Hồi phục máu Adrenaline cuối mỗi lượt (+5 HP, kéo dài 3 lượt)
+            if (unit.buffs && unit.buffs.adrenaline && unit.buffs.adrenaline.turnsLeft > 0) {
+                const healAmount = Math.min(5, unit.maxHp - unit.hp);
+                unit.hp += healAmount;
+                unit.buffs.adrenaline.turnsLeft--;
+                if (unit.isPlayer && this.playerBuffs) this.playerBuffs.adrenaline.turnsLeft = unit.buffs.adrenaline.turnsLeft;
+
+                if (unit.isPlayer && window.soundCtrl) window.soundCtrl.playSelect();
+                this.createBuffSparks(unit.x, unit.y, '#10b981');
+                this.addFloatingText(`+${healAmount} HP (ADRENALINE)`, unit.x, unit.y, '#10b981');
+                this.addCombatLog(`💉 Cuối lượt: ${unit.name} Adrenaline hồi phục +${healAmount} HP! (Còn ${unit.buffs.adrenaline.turnsLeft}L)`, 'hit');
+            }
+
+            // 2. Giảm thời gian hồi chiêu
+            for (const skillId in unit.cooldowns) {
+                if (unit.cooldowns[skillId] > 0) {
+                    unit.cooldowns[skillId]--;
+                    if (unit.cooldowns[skillId] === 0) {
+                        if (skillId === 'SMOKE_BOMB_LAUNCHER') {
+                            unit.skillAmmo['SMOKE_BOMB_LAUNCHER'] = 2;
+                            if (unit.isPlayer && this.skillAmmo) this.skillAmmo['SMOKE_BOMB_LAUNCHER'] = 2;
+                            this.addCombatLog(`🔄 ${unit.name} [Súng Bắn Bom] nạp lại đầy đủ 2/2 viên đạn!`, 'system');
+                        } else if (skillId === 'RAZOR_BLADE') {
+                            unit.skillAmmo['RAZOR_BLADE'] = 2;
+                            if (unit.isPlayer && this.skillAmmo) this.skillAmmo['RAZOR_BLADE'] = 2;
+                            this.addCombatLog(`🔄 ${unit.name} [Kiếm Gắn Tay] nạp lại đầy đủ 2/2 lượt chém!`, 'system');
+                        } else {
+                            this.addCombatLog(`✨ ${unit.name} Kỹ năng [${skillId}] đã hồi chiêu xong!`, 'system');
+                        }
                     }
                 }
             }
-        }
-        for (const skillId in this.cpuCooldowns) {
-            if (this.cpuCooldowns[skillId] > 0) {
-                this.cpuCooldowns[skillId]--;
-                if (this.cpuCooldowns[skillId] === 0) {
-                    if (skillId === 'SMOKE_BOMB_LAUNCHER') {
-                        this.cpuSkillAmmo['SMOKE_BOMB_LAUNCHER'] = 2;
-                        this.addCombatLog(`🔄 CPU [${this.cpu.name}] Súng Bắn Bom đã hồi chiêu xong, nạp lại 2/2 viên!`, 'system');
-                    } else if (skillId === 'RAZOR_BLADE') {
-                        this.cpuSkillAmmo['RAZOR_BLADE'] = 2;
-                        this.addCombatLog(`🔄 CPU [${this.cpu.name}] Kiếm Gắn Tay đã hồi chiêu xong, nạp lại 2/2 lượt dùng!`, 'system');
-                    } else {
-                        this.addCombatLog(`✨ Kỹ năng [${skillId}] của CPU [${this.cpu.name}] đã hồi chiêu xong!`, 'system');
-                    }
+
+            // 3. Giảm thời gian Buff Thuốc Lá (Smoke guy: +30% DMG, +1 Bước trong 2 lượt)
+            if (unit.buffs && unit.buffs.cigarette && unit.buffs.cigarette.turnsLeft > 0) {
+                unit.buffs.cigarette.turnsLeft--;
+                if (unit.isPlayer && this.playerBuffs) this.playerBuffs.cigarette.turnsLeft = unit.buffs.cigarette.turnsLeft;
+                if (unit.buffs.cigarette.turnsLeft === 0) {
+                    unit.cooldowns['SMOKE_CIGARETTE'] = 3;
+                    this.addCombatLog(`⏳ Khói [Thuốc Lá] của ${unit.name} đã tàn, bắt đầu hồi chiêu 3 lượt!`, 'system');
                 }
             }
         }
 
-        // 3. Giảm thời gian Buff Thuốc Lá (Smoke guy: +30% DMG, +1 Bước trong 2 lượt)
-        if (this.playerBuffs && this.playerBuffs.cigarette && this.playerBuffs.cigarette.turnsLeft > 0) {
-            this.playerBuffs.cigarette.turnsLeft--;
-            if (this.playerBuffs.cigarette.turnsLeft === 0) {
-                this.cooldowns['SMOKE_CIGARETTE'] = 3;
-                this.addCombatLog(`⏳ Khói [Thuốc Lá] đã tàn, bắt đầu hồi chiêu 3 lượt!`, 'system');
-            } else {
-                this.addCombatLog(`🚬 Thuốc lá vẫn đang cháy rực, còn ${this.playerBuffs.cigarette.turnsLeft} lượt hiệu lực (+30% DMG, +1 Bước)!`, 'system');
-            }
-        }
-        if (this.cpuBuffs && this.cpuBuffs.cigarette && this.cpuBuffs.cigarette.turnsLeft > 0) {
-            this.cpuBuffs.cigarette.turnsLeft--;
-            if (this.cpuBuffs.cigarette.turnsLeft === 0) {
-                this.cpuCooldowns['SMOKE_CIGARETTE'] = 3;
-                this.addCombatLog(`⏳ Khói [Thuốc Lá] của CPU [${this.cpu.name}] đã tàn, bắt đầu hồi chiêu 3 lượt!`, 'system');
-            } else {
-                this.addCombatLog(`🚬 Thuốc lá của CPU [${this.cpu.name}] vẫn đang cháy, còn ${this.cpuBuffs.cigarette.turnsLeft} lượt hiệu lực!`, 'system');
-            }
-        }
-
-        // 4. Kích hoạt kéo Dây Móc Hookman (Hết lượt sau kéo 2 ô rồi mới kích hoạt hồi chiêu 4L)
+        // 4. Kích hoạt kéo Dây Móc Hookman (Hết lượt sau kéo 2 ô)
         const remainingTethers = [];
         for (const tether of this.activeHookTethers) {
+            const hooker = tether.sourceUnit || (tether.source === 'PLAYER' ? this.player : this.cpu);
+            const victim = tether.targetUnit || (tether.target === 'CPU' ? this.cpu : this.player);
+
             if (tether.turnsUntilPull <= 0) {
-                // Kích hoạt kéo 2 ô về phía người tung móc
-                let victim = tether.target === 'CPU' ? this.cpu : this.player;
-                let hooker = tether.source === 'PLAYER' ? this.player : this.cpu;
+                if (hooker && victim && hooker.hp > 0 && victim.hp > 0) {
+                    let pulledSteps = 0;
+                    for (let s = 0; s < (tether.pullDist || 2); s++) {
+                        const stepDx = Math.sign(hooker.x - victim.x);
+                        const stepDy = Math.sign(hooker.y - victim.y);
+                        if (stepDx === 0 && stepDy === 0) break;
 
-                let pulledSteps = 0;
-                for (let s = 0; s < (tether.pullDist || 2); s++) {
-                    const stepDx = Math.sign(hooker.x - victim.x);
-                    const stepDy = Math.sign(hooker.y - victim.y);
-                    if (stepDx === 0 && stepDy === 0) break;
+                        const nextVx = Math.max(0, Math.min(GRID_COLS - 1, victim.x + stepDx));
+                        const nextVy = Math.max(0, Math.min(GRID_ROWS - 1, victim.y + stepDy));
+                        if (nextVx === hooker.x && nextVy === hooker.y) break;
 
-                    const nextVx = Math.max(0, Math.min(GRID_COLS - 1, victim.x + stepDx));
-                    const nextVy = Math.max(0, Math.min(GRID_ROWS - 1, victim.y + stepDy));
+                        victim.x = nextVx;
+                        victim.y = nextVy;
+                        pulledSteps++;
+                    }
 
-                    // Không kéo đè lên ô của người tung móc
-                    if (nextVx === hooker.x && nextVy === hooker.y) break;
+                    if (window.soundCtrl) window.soundCtrl.playHookPull();
+                    this.createHitSparks(victim.x, victim.y, '#ef4444');
+                    this.addFloatingText(`🪝 GIẬT MÓC ${pulledSteps} Ô!`, victim.x, victim.y, '#ef4444');
+                    this.addCombatLog(`💥 HẾT LƯỢT SAU: Dây xích siết mạnh, giật ${victim.name} lại gần ${pulledSteps} ô!`, 'clash');
 
-                    victim.x = nextVx;
-                    victim.y = nextVy;
-                    pulledSteps++;
+                    hooker.cooldowns[tether.skillId] = tether.cdAfterPull || 4;
+                    this.addCombatLog(`⏳ [Móc Kéo] của ${hooker.name} đã hoàn tất chuỗi kéo, hồi chiêu 4 lượt!`, 'system');
                 }
-
-                if (window.soundCtrl) window.soundCtrl.playHookPull();
-                this.createHitSparks(victim.x, victim.y, '#ef4444');
-                this.addFloatingText(`🪝 GIẬT MÓC ${pulledSteps} Ô!`, victim.x, victim.y, '#ef4444');
-                this.addCombatLog(`💥 HẾT LƯỢT SAU: Dây xích Hookman siết mạnh, giật ${tether.target} lại gần ${pulledSteps} ô!`, 'clash');
-
-                // Kích hoạt Cooldown 4 lượt sau khi giật xong cho đúng bên tung móc!
-                if (tether.source === 'CPU') {
-                    this.cpuCooldowns[tether.skillId] = tether.cdAfterPull || 4;
-                } else {
-                    this.cooldowns[tether.skillId] = tether.cdAfterPull || 4;
-                }
-                this.addCombatLog(`⏳ [Móc Kéo] của ${tether.source === 'CPU' ? 'CPU' : 'bạn'} đã hoàn tất chuỗi kéo, bắt đầu hồi chiêu 4 lượt!`, 'system');
             } else {
                 tether.turnsUntilPull--;
-                this.addCombatLog(`🪝 Dây móc Hookman vẫn đang găm chặt vào ${tether.target}, sẽ siết kéo 2 ô vào cuối lượt sau!`, 'system');
+                this.addCombatLog(`🪝 Dây móc vẫn đang găm chặt vào ${victim ? victim.name : 'đối thủ'}, sẽ siết kéo vào cuối lượt sau!`, 'system');
                 remainingTethers.push(tether);
             }
         }
@@ -3268,60 +3070,72 @@ class GameEngine {
             }
         });
 
-        // Xử lý nổ lựu đạn (Lựa chọn A: Sát thương bất kỳ ai trong vùng 3x3)
         detonatedHazards.forEach(h => {
             if (window.soundCtrl) window.soundCtrl.playExplosion();
             this.createExplosionBurst(h.x, h.y, 45);
             this.addFloatingText('💥 BÙM! LỰU ĐẠN NỔ (50 DMG)!', h.x, h.y, '#ef4444');
             this.addCombatLog(`💥 LỰU ĐẠN TẠI (${h.x}, ${h.y}) PHÁT NỔ! Quét sạch khu vực 3x3 với 50 sát thương!`, 'clash');
 
-            if (Math.abs(this.cpu.x - h.x) <= 1 && Math.abs(this.cpu.y - h.y) <= 1) {
-                this.applyDamage(this.cpu, h.power);
-                this.createHitSparks(this.cpu.x, this.cpu.y, '#ff3366');
-                this.addFloatingText(`-${h.power} HP!`, this.cpu.x, this.cpu.y, '#f87171');
-                this.addCombatLog(`➔ CPU dính trọn vụ nổ Lựu Đạn! Mất ${h.power} HP!`, 'hit');
-            }
+            for (const u of allUnits) {
+                if (u.hp > 0 && Math.abs(u.x - h.x) <= 1 && Math.abs(u.y - h.y) <= 1) {
+                    this.applyDamage(u, h.power);
+                    this.createHitSparks(u.x, u.y, u.color);
+                    this.addFloatingText(`-${h.power} HP! (LỰU ĐẠN)`, u.x, u.y, '#f87171');
+                    this.addCombatLog(`➔ ${u.name} dính trọn vụ nổ Lựu Đạn! Mất ${h.power} HP!`, 'hit');
 
-            if (Math.abs(this.player.x - h.x) <= 1 && Math.abs(this.player.y - h.y) <= 1) {
-                this.applyDamage(this.player, h.power);
-                this.createHitSparks(this.player.x, this.player.y, '#00f2fe');
-                this.addFloatingText(`-${h.power} HP! (DÍNH BOM CỦA MÌNH)`, this.player.x, this.player.y, '#f87171');
-                this.addCombatLog(`➔ BẠN TỰ BƯỚC VÀO VÙNG NỔ LỰU ĐẠN CỦA MÌNH! Mất ${h.power} HP!`, 'hit');
-
-                const playerIsHookman = this.player.charId === 'hookman' || (this.selectedCharacter && this.selectedCharacter.id === 'hookman');
-                if (playerIsHookman) {
-                    this.playerRevealedTurns = 2;
-                    this.addFloatingText('HIỆN HÌNH!', this.player.x, this.player.y, '#f43f5e');
-                    this.addCombatLog(`💥 Vụ nổ làm Hookman hiện nguyên hình và không thể tàng hình tới hết lượt sau!`, 'clash');
+                    if (u.charId === 'hookman') {
+                        u.revealedTurns = 2;
+                        if (u.isPlayer) this.playerRevealedTurns = 2;
+                        this.addFloatingText(this.lang === 'en' ? 'REVEALED!' : 'HIỆN HÌNH!', u.x, u.y, '#f43f5e');
+                    }
                 }
             }
         });
 
         this.groundHazards = this.groundHazards.filter(h => h.turnsLeft > 0);
 
+        const blueAliveCount = this.blueTeam.filter(u => u.hp > 0).length;
+        const redAliveCount = this.redTeam.filter(u => u.hp > 0).length;
+
+        if (blueAliveCount === 0 || redAliveCount === 0) {
+            this.handleGameOver();
+            return;
+        }
+
         this.turn++;
         this.phase = 'PLANNING';
         this.currentStep = -1;
         this.playerQueue = [];
         this.cpuQueue = [];
-        this.player.shieldDir = null;
-        this.cpu.shieldDir = null;
+        for (const u of allUnits) {
+            u.shieldDir = null;
+        }
 
         for (let i = 0; i < 4; i++) {
-            document.getElementById(`p-slot-${i}`).classList.remove('active-step');
-            document.getElementById(`c-slot-${i}`).classList.remove('active-step');
+            const pSlot = document.getElementById(`p-slot-${i}`);
             const cSlot = document.getElementById(`c-slot-${i}`);
-            cSlot.className = 'queue-slot';
-            cSlot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">Bí mật</span>`;
+            if (pSlot) pSlot.classList.remove('active-step');
+            if (cSlot) {
+                cSlot.classList.remove('active-step');
+                cSlot.className = 'queue-slot';
+                cSlot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">${this.lang === 'en' ? 'Secret' : 'Bí mật'}</span>`;
+            }
+        }
+
+        if (this.player) {
+            this.cooldowns = this.player.cooldowns;
+            this.skillAmmo = this.player.skillAmmo;
+            this.playerBuffs = this.player.buffs;
+        }
+        if (this.cpu) {
+            this.cpuCooldowns = this.cpu.cooldowns;
+            this.cpuSkillAmmo = this.cpu.skillAmmo;
+            this.cpuBuffs = this.cpu.buffs;
         }
 
         this.updateSkillButtons();
         this.updateQueueDisplay();
         this.updateHUD();
-
-        if (this.player.hp <= 0 || this.cpu.hp <= 0) {
-            this.handleGameOver();
-        }
     }
 
     applyDamage(entity, amount) {
@@ -3334,26 +3148,28 @@ class GameEngine {
         const title = document.getElementById('modalTitle');
         const desc = document.getElementById('modalDesc');
 
+        const blueAlive = this.blueTeam.filter(u => u.hp > 0).length;
+        const redAlive = this.redTeam.filter(u => u.hp > 0).length;
         const pName = getCharName(this.selectedCharacter, this.lang);
         const cName = getCharName(this.cpuCharacter, this.lang);
 
-        if (this.player.hp <= 0 && this.cpu.hp <= 0) {
+        if (blueAlive === 0 && redAlive === 0) {
             title.innerText = t('modalDrawTitle');
             title.className = 'modal-title clash';
             desc.innerText = t('modalDrawDesc');
-        } else if (this.cpu.hp <= 0) {
+        } else if (redAlive === 0) {
             title.innerText = t('modalVictoryTitle');
             title.className = 'modal-title victory';
             desc.innerText = this.lang === 'en'
-                ? `Outstanding! [${pName}] eliminated the CPU Sentinel [${cName}] on Turn ${this.turn}!`
-                : `Xuất sắc! [${pName}] đã đánh bại ${cName} của CPU ở Lượt ${this.turn}!`;
+                ? `VICTORY! Your squad eliminated all ${this.redTeamSize} enemy operatives on Turn ${this.turn}!`
+                : `CHIẾN THẮNG! Đội của bạn đã quét sạch toàn bộ ${this.redTeamSize} kẻ địch ở Lượt ${this.turn}!`;
             if (window.soundCtrl) window.soundCtrl.playVictory();
         } else {
             title.innerText = t('modalDefeatTitle');
             title.className = 'modal-title defeat';
             desc.innerText = this.lang === 'en'
-                ? `Your operative was eliminated by CPU Sentinel [${cName}]. Adjust your tactics for the next match!`
-                : `Bạn đã bị ${cName} của CPU hạ gục. Hãy thử điều chỉnh chiến thuật ở ván sau!`;
+                ? `DEFEAT! Your squad was wiped out on Turn ${this.turn}. Adjust your tactics!`
+                : `THẤT BẠI! Toàn bộ đội hình của bạn đã bị tiêu diệt ở Lượt ${this.turn}. Hãy thử lại!`;
             if (window.soundCtrl) window.soundCtrl.playDefeat();
         }
 
@@ -3362,42 +3178,31 @@ class GameEngine {
     }
 
     restartGame() {
-        document.getElementById('gameModal').style.display = 'none';
+        const modal = document.getElementById('gameModal');
+        if (modal) modal.style.display = 'none';
         this.turn = 1;
         this.phase = 'PLANNING';
         this.currentStep = -1;
         this.cancelPathPlanning();
-        this.applySelectedCharacter();
-        this.applyCpuCharacter(this.selectedCpuOption);
+        this.setupTeams();
 
         this.groundHazards = [];
         this.playerRevealedTurns = 0;
         this.cpuRevealedTurns = 0;
         this.activeHookTethers = [];
 
-        this.player.x = 2;
-        this.player.y = 3;
-        this.player.renderX = 2;
-        this.player.renderY = 3;
-        this.player.dir = 'RIGHT';
-        this.player.hp = this.player.maxHp;
-        this.player.shieldDir = null;
-
-        this.cpu.x = 17;
-        this.cpu.y = 3;
-        this.cpu.renderX = 17;
-        this.cpu.renderY = 3;
-        this.cpu.dir = 'LEFT';
-        this.cpu.hp = this.cpu.maxHp;
-        this.cpu.shieldDir = null;
-
         this.playerQueue = [];
         this.cpuQueue = [];
         this.floatingTexts = [];
         this.particles = [];
 
-        document.getElementById('combatLog').innerHTML = '<div class="log-entry system">Trận đấu mới đã bắt đầu!</div>';
-        this.addCombatLog(`Bạn: [${this.player.name}] vs CPU: [${this.cpu.name}]`, 'system');
+        const logElem = document.getElementById('combatLog');
+        if (logElem) {
+            logElem.innerHTML = `<div class="log-entry system">${this.lang === 'en' ? 'New squad battle commenced!' : 'Trận đại chiến đội hình mới đã bắt đầu!'}</div>`;
+        }
+        this.addCombatLog(this.lang === 'en'
+            ? `Squad Battle: Blue Team (${this.blueTeamSize} units) vs Red Team (${this.redTeamSize} units)!`
+            : `Đại chiến Đội hình: Đội Xanh (${this.blueTeamSize} người) vs Đội Đỏ (${this.redTeamSize} người)!`, 'system');
 
         this.updateSkillButtons();
         this.updateHUD();
@@ -3724,11 +3529,18 @@ class GameEngine {
         const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1);
         this.lastTime = timestamp;
 
-        this.player.renderX += (this.player.x - this.player.renderX) * 0.2;
-        this.player.renderY += (this.player.y - this.player.renderY) * 0.2;
-
-        this.cpu.renderX += (this.cpu.x - this.cpu.renderX) * 0.2;
-        this.cpu.renderY += (this.cpu.y - this.cpu.renderY) * 0.2;
+        if (this.blueTeam) {
+            for (const u of this.blueTeam) {
+                u.renderX += (u.x - u.renderX) * 0.2;
+                u.renderY += (u.y - u.renderY) * 0.2;
+            }
+        }
+        if (this.redTeam) {
+            for (const u of this.redTeam) {
+                u.renderX += (u.x - u.renderX) * 0.2;
+                u.renderY += (u.y - u.renderY) * 0.2;
+            }
+        }
 
         this.updateCamera();
 
@@ -3819,31 +3631,35 @@ class GameEngine {
             }
         }
 
-        // 6. Vẽ Fighters (Hệ thống Tàng hình 7x7 của Hookman)
-        const playerIsHookman = this.player.charId === 'hookman' || (this.selectedCharacter && this.selectedCharacter.id === 'hookman');
-        const playerStealthActive = this.isPlayerStealthed();
-        const playerRevealed = playerIsHookman && this.playerRevealedTurns > 0;
+        // 6. Vẽ toàn bộ Chiến binh (Hệ thống Tàng hình 7x7 của Hookman cho cả Đội Xanh & Đội Đỏ)
+        const livingBlues = this.blueTeam ? this.blueTeam.filter(u => u.hp > 0) : [this.player];
+        const livingReds = this.redTeam ? this.redTeam.filter(u => u.hp > 0) : [this.cpu];
 
-        const cpuIsHookman = this.cpu.charId === 'hookman' || (this.cpu.name && this.cpu.name.includes('Hookman'));
-        const cpuStealthActive = this.isCpuStealthed();
-        const cpuRevealed = cpuIsHookman && this.cpuRevealedTurns > 0;
-
-        // Người chơi: Luôn nhìn thấy bản thân (hiển thị hiệu ứng tàng hình hoặc bị lộ nếu đang kích hoạt)
-        this.drawFighter(this.player, this.player.color, `${this.player.name} [BẠN]`, playerStealthActive, playerRevealed, this.playerRevealedTurns);
-
-        // CPU: Nếu CPU là Hookman và ngoài phạm vi 7x7 -> NGƯỜI CHƠI SẼ KHÔNG NHÌN THẤY!
-        if (!cpuStealthActive) {
-            this.drawFighter(this.cpu, this.cpu.color, `${this.cpu.name} [CPU]`, false, cpuRevealed, this.cpuRevealedTurns);
+        // Vẽ Đội Xanh
+        for (const u of livingBlues) {
+            const isHookman = u.charId === 'hookman';
+            const isStealth = isHookman && u.revealedTurns <= 0 && livingReds.every(r => this.isOutside7x7(u, r));
+            const isRevealed = isHookman && u.revealedTurns > 0;
+            const tag = u.isPlayer ? `${u.name} [${this.lang === 'en' ? 'YOU' : 'BẠN'}]` : u.name;
+            this.drawFighter(u, u.isPlayer ? u.color : '#38bdf8', tag, isStealth, isRevealed, u.revealedTurns);
         }
 
-        // Vẽ Dây Móc đang găm nối giữa người tung móc và nạn nhân (Active Hook Tether)
+        // Vẽ Đội Đỏ
+        for (const u of livingReds) {
+            const isHookman = u.charId === 'hookman';
+            const isStealth = isHookman && u.revealedTurns <= 0 && livingBlues.every(b => this.isOutside7x7(u, b));
+            const isRevealed = isHookman && u.revealedTurns > 0;
+            if (!isStealth) {
+                this.drawFighter(u, '#f43f5e', u.name, false, isRevealed, u.revealedTurns);
+            }
+        }
+
+        // Vẽ Dây Móc đang găm nối
         if (this.activeHookTethers && this.activeHookTethers.length > 0) {
             this.activeHookTethers.forEach(tether => {
-                const hooker = tether.source === 'PLAYER' ? this.player : this.cpu;
-                const victim = tether.target === 'CPU' ? this.cpu : this.player;
-                const canSeeVictim = !(cpuIsHookman && cpuStealthActive && tether.target === 'CPU');
-
-                if (canSeeVictim) {
+                const hooker = tether.sourceUnit || (tether.source === 'PLAYER' ? this.player : this.cpu);
+                const victim = tether.targetUnit || (tether.target === 'CPU' ? this.cpu : this.player);
+                if (hooker && victim && hooker.hp > 0 && victim.hp > 0) {
                     ctx.save();
                     ctx.strokeStyle = '#ef4444';
                     ctx.lineWidth = 2.5;
@@ -3853,7 +3669,6 @@ class GameEngine {
                     ctx.lineTo(victim.renderX * CELL_SIZE + CELL_SIZE / 2, victim.renderY * CELL_SIZE + CELL_SIZE / 2);
                     ctx.stroke();
 
-                    // Biểu tượng móc xích ở giữa sợi dây căng
                     const midX = ((hooker.renderX + victim.renderX) / 2) * CELL_SIZE + CELL_SIZE / 2;
                     const midY = ((hooker.renderY + victim.renderY) / 2) * CELL_SIZE + CELL_SIZE / 2;
                     ctx.setLineDash([]);
@@ -3929,33 +3744,23 @@ class GameEngine {
             ctx.stroke();
 
             ctx.save();
-            ctx.setLineDash([]);
-            ctx.fillStyle = '#0f172a';
-            ctx.strokeStyle = this.player.color;
-            ctx.lineWidth = 2;
+            ctx.fillStyle = this.player.color;
+            ctx.shadowColor = this.player.color;
+            ctx.shadowBlur = 10;
             ctx.beginPath();
-            ctx.arc(currX, currY, 11, 0, Math.PI * 2);
+            ctx.arc(currX, currY, 6, 0, Math.PI * 2);
             ctx.fill();
-            ctx.stroke();
+            ctx.restore();
 
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 10px sans-serif';
+            ctx.font = 'bold 12px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`${idx + 1}`, currX, currY);
-            ctx.restore();
+            ctx.fillText(`${idx + 1}`, currX, currY - 14);
 
             prevX = currX;
             prevY = currY;
         });
-
-        if (this.activePath.length > 0) {
-            const last = this.activePath[this.activePath.length - 1];
-            ctx.setLineDash([]);
-            ctx.strokeStyle = this.player.color;
-            ctx.lineWidth = 2;
-            ctx.strokeRect(last.x * CELL_SIZE + 4, last.y * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8);
-        }
 
         ctx.restore();
     }
@@ -3967,41 +3772,70 @@ class GameEngine {
 
         ctx.save();
         for (const act of this.playerQueue) {
-            if (act.type === 'PATH_MOVE' && act.path && act.path.length > 0) {
+            if (act.type === 'PATH_MOVE' && act.path) {
                 let px = startX * CELL_SIZE + CELL_SIZE / 2;
                 let py = startY * CELL_SIZE + CELL_SIZE / 2;
 
-                ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+                ctx.save();
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
                 ctx.lineWidth = 3;
                 ctx.setLineDash([4, 4]);
 
-                for (const node of act.path) {
-                    const nx = node.x * CELL_SIZE + CELL_SIZE / 2;
-                    const ny = node.y * CELL_SIZE + CELL_SIZE / 2;
+                for (const pNode of act.path) {
+                    const nx = pNode.x * CELL_SIZE + CELL_SIZE / 2;
+                    const ny = pNode.y * CELL_SIZE + CELL_SIZE / 2;
+
                     ctx.beginPath();
                     ctx.moveTo(px, py);
                     ctx.lineTo(nx, ny);
                     ctx.stroke();
+
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(nx, ny, 4, 0, Math.PI * 2);
+                    ctx.fill();
+
                     px = nx;
                     py = ny;
                 }
+                ctx.restore();
 
-                const lastNode = act.path[act.path.length - 1];
-                startX = lastNode.x;
-                startY = lastNode.y;
-            } else if (act.type === 'LEAP') {
-                const pD = DIRECTIONS[act.dir];
-                let destX = startX + pD.dx * (act.range || 3);
-                let destY = startY + pD.dy * (act.range || 3);
-                destX = Math.max(0, Math.min(GRID_COLS - 1, destX));
-                destY = Math.max(0, Math.min(GRID_ROWS - 1, destY));
-
-                const hasEnemy = (this.cpu.x === destX && this.cpu.y === destY);
-                const hasHazard = this.groundHazards.some(h => h.x === destX && h.y === destY);
-                if (hasEnemy || hasHazard) {
-                    destX = Math.max(0, Math.min(GRID_COLS - 1, destX + pD.dx * (act.leapExtra || 2)));
-                    destY = Math.max(0, Math.min(GRID_ROWS - 1, destY + pD.dy * (act.leapExtra || 2)));
+                if (act.path.length > 0) {
+                    const last = act.path[act.path.length - 1];
+                    startX = last.x;
+                    startY = last.y;
                 }
+            } else if (act.type === 'DASH') {
+                const d = DIRECTIONS[act.dir];
+                const destX = Math.max(0, Math.min(GRID_COLS - 1, startX + d.dx * (act.range || 2)));
+                const destY = Math.max(0, Math.min(GRID_ROWS - 1, startY + d.dy * (act.range || 2)));
+
+                const px = startX * CELL_SIZE + CELL_SIZE / 2;
+                const py = startY * CELL_SIZE + CELL_SIZE / 2;
+                const nx = destX * CELL_SIZE + CELL_SIZE / 2;
+                const ny = destY * CELL_SIZE + CELL_SIZE / 2;
+
+                ctx.save();
+                ctx.strokeStyle = 'rgba(251, 146, 60, 0.55)';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([6, 3]);
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                ctx.lineTo(nx, ny);
+                ctx.stroke();
+
+                ctx.fillStyle = '#fb923c';
+                ctx.beginPath();
+                ctx.arc(nx, ny, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                startX = destX;
+                startY = destY;
+            } else if (act.type === 'LEAP') {
+                const d = DIRECTIONS[act.dir];
+                let destX = Math.max(0, Math.min(GRID_COLS - 1, startX + d.dx * (act.range || 3)));
+                let destY = Math.max(0, Math.min(GRID_ROWS - 1, startY + d.dy * (act.range || 3)));
 
                 const px = startX * CELL_SIZE + CELL_SIZE / 2;
                 const py = startY * CELL_SIZE + CELL_SIZE / 2;
@@ -4039,12 +3873,11 @@ class GameEngine {
         ctx.translate(cx, cy);
 
         // Kiểm tra Buff Thuốc Lá (Smoke guy)
-        const hasCigaretteBuff = (fighter === this.player && this.playerBuffs && this.playerBuffs.cigarette && this.playerBuffs.cigarette.turnsLeft > 0);
+        const hasCigaretteBuff = (fighter.buffs && fighter.buffs.cigarette && fighter.buffs.cigarette.turnsLeft > 0);
 
         // Nếu ở trạng thái Tàng hình (Stealth)
         if (isStealth) {
             ctx.globalAlpha = 0.55;
-            // Vòng hào quang tím tàng hình
             ctx.save();
             ctx.strokeStyle = '#a78bfa';
             ctx.setLineDash([4, 4]);
@@ -4053,9 +3886,8 @@ class GameEngine {
             ctx.arc(0, 0, 28, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
-            tag = `${tag} [ẨN NẤP 7x7]`;
+            tag = `${tag} [ẨN 7x7]`;
         } else if (isRevealed) {
-            // Vòng cảnh báo đỏ lộ diện khi bị trúng đạn
             ctx.save();
             ctx.strokeStyle = '#f43f5e';
             ctx.setLineDash([3, 3]);
@@ -4068,7 +3900,6 @@ class GameEngine {
         }
 
         if (hasCigaretteBuff) {
-            // Vòng khói thuốc bốc lên quanh người
             ctx.save();
             ctx.strokeStyle = 'rgba(251, 146, 60, 0.6)';
             ctx.setLineDash([3, 5]);
@@ -4077,7 +3908,7 @@ class GameEngine {
             ctx.arc(0, 0, 28, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
-            tag = `${tag} [🚬 +30% DMG]`;
+            tag = `${tag} [🚬]`;
         }
 
         // Hiệu ứng phát sáng
@@ -4126,11 +3957,23 @@ class GameEngine {
             ctx.stroke();
         }
 
+        // Thanh máu Mini trên đầu nhân vật
+        const barW = 32;
+        const barH = 4;
+        const hpRatio = Math.max(0, Math.min(1, fighter.hp / fighter.maxHp));
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.fillRect(-barW / 2, -32, barW, barH);
+        ctx.fillStyle = hpRatio > 0.5 ? '#10b981' : (hpRatio > 0.25 ? '#f59e0b' : '#ef4444');
+        ctx.fillRect(-barW / 2, -32, barW * hpRatio, barH);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(-barW / 2, -32, barW, barH);
+
         // Tên tag
-        ctx.font = 'bold 9px sans-serif';
+        ctx.font = 'bold 8.5px sans-serif';
         ctx.fillStyle = isStealth ? '#c084fc' : (isRevealed ? '#f43f5e' : (hasCigaretteBuff ? '#fb923c' : '#f8fafc'));
         ctx.textAlign = 'center';
-        ctx.fillText(tag, 0, -24);
+        ctx.fillText(tag, 0, -23);
 
         ctx.restore();
     }
@@ -4161,19 +4004,29 @@ class GameEngine {
             mCtx.fillRect(hz.x * cellW - 1, hz.y * cellH - 1, 3, 3);
         });
 
-        // Vẽ người chơi
-        mCtx.fillStyle = this.player.color;
-        mCtx.beginPath();
-        mCtx.arc((this.player.x + 0.5) * cellW, (this.player.y + 0.5) * cellH, 3.5, 0, Math.PI * 2);
-        mCtx.fill();
+        // Vẽ toàn bộ chiến binh Đội Xanh
+        if (this.blueTeam) {
+            this.blueTeam.filter(u => u.hp > 0).forEach(u => {
+                mCtx.fillStyle = u.isPlayer ? u.color : '#38bdf8';
+                mCtx.beginPath();
+                mCtx.arc((u.x + 0.5) * cellW, (u.y + 0.5) * cellH, 3.5, 0, Math.PI * 2);
+                mCtx.fill();
+            });
+        }
 
-        // CPU: Chỉ vẽ chấm nếu CPU không ở trạng thái tàng hình
-        const cpuStealthActive = this.isCpuStealthed();
-        if (!cpuStealthActive) {
-            mCtx.fillStyle = this.cpu.color;
-            mCtx.beginPath();
-            mCtx.arc((this.cpu.x + 0.5) * cellW, (this.cpu.y + 0.5) * cellH, 3.5, 0, Math.PI * 2);
-            mCtx.fill();
+        // Vẽ toàn bộ chiến binh Đội Đỏ (trừ tàng hình)
+        if (this.redTeam) {
+            const livingBlues = this.blueTeam ? this.blueTeam.filter(u => u.hp > 0) : [this.player];
+            this.redTeam.filter(u => u.hp > 0).forEach(u => {
+                const isHookman = u.charId === 'hookman';
+                const isStealth = isHookman && u.revealedTurns <= 0 && livingBlues.every(b => this.isOutside7x7(u, b));
+                if (!isStealth) {
+                    mCtx.fillStyle = '#f43f5e';
+                    mCtx.beginPath();
+                    mCtx.arc((u.x + 0.5) * cellW, (u.y + 0.5) * cellH, 3.5, 0, Math.PI * 2);
+                    mCtx.fill();
+                }
+            });
         }
     }
 }

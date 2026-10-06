@@ -830,6 +830,255 @@ header {
 }
 
 /* =========================================
+   TEAM BATTLE MODE (UP TO 5v5)
+   ========================================= */
+.team-battle-mode-section {
+    width: 100%;
+    max-width: 900px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin: 6px 0 16px 0;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), inset 0 0 15px rgba(56, 189, 248, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.team-mode-title-box {
+    text-align: center;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+    padding-bottom: 8px;
+}
+
+.team-mode-title {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #38bdf8;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+}
+
+.team-mode-sub {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 2px;
+    display: block;
+}
+
+.team-preset-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.team-preset-btn {
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid #475569;
+    color: #cbd5e1;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.team-preset-btn:hover {
+    border-color: #38bdf8;
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.team-preset-btn.active {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    border-color: #38bdf8;
+    color: #fff;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+}
+
+.team-custom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+@media (max-width: 768px) {
+    .team-custom-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.team-box {
+    background: rgba(11, 19, 36, 0.8);
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.team-blue-box {
+    border-left: 3px solid #38bdf8;
+}
+
+.team-red-box {
+    border-right: 3px solid #f43f5e;
+}
+
+.team-box-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.team-box-title {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #f1f5f9;
+    flex: 1;
+}
+
+.team-blue-box .team-box-title {
+    color: #38bdf8;
+}
+
+.team-red-box .team-box-title {
+    color: #f43f5e;
+}
+
+.team-count-pill {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: rgba(30, 41, 59, 0.8);
+    color: #cbd5e1;
+    border: 1px solid #475569;
+}
+
+.team-size-selectors {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.team-size-btn {
+    flex: 1;
+    min-width: 55px;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid #475569;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 5px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.team-size-btn:hover {
+    color: #fff;
+    border-color: #64748b;
+}
+
+.team-blue-box .team-size-btn.active {
+    background: linear-gradient(135deg, #0284c7, #0ea5e9);
+    border-color: #38bdf8;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+.team-red-box .team-size-btn.active {
+    background: linear-gradient(135deg, #e11d48, #f43f5e);
+    border-color: #fda4af;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
+}
+
+.team-roster-preview-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.team-roster-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid #334155;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.team-roster-chip.is-player {
+    border-color: #10b981;
+    color: #34d399;
+}
+
+.team-roster-chip.is-ally {
+    border-color: #0284c7;
+    color: #38bdf8;
+}
+
+.team-roster-chip.is-enemy {
+    border-color: #e11d48;
+    color: #fb7185;
+}
+
+/* HUD Top Team Bars */
+.team-roster-hud-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+}
+
+.team-hud-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid #334155;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.team-hud-chip.alive {
+    border-color: #0284c7;
+    color: #e2e8f0;
+}
+
+.team-hud-chip.dead {
+    opacity: 0.45;
+    border-color: #475569;
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+.team-score-badge {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #fbbf24;
+    letter-spacing: 0.5px;
+    margin-top: 3px;
+    text-shadow: 0 0 6px rgba(251, 191, 36, 0.5);
+}
+
+/* =========================================
    MAIN MENU SCREEN (TITLE / START SCREEN)
    ========================================= */
 .main-menu-screen {

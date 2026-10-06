@@ -44,11 +44,13 @@
             <div style="font-size: 0.72rem; color: #38bdf8; margin-top: 5px;">
                 Hướng hiện tại: <b id="currentDirText">PHẢI (D)</b>
             </div>
+            <div id="playerTeamRosterBar" class="team-roster-hud-bar"></div>
         </div>
 
         <div class="turn-badge">
             <div class="turn-num" id="turnDisplay">LƯỢT 1</div>
             <div class="turn-phase" id="phaseDisplay">LẬP KẾ HOẠCH</div>
+            <div id="teamScoreDisplay" class="team-score-badge">🔵 1 Sống vs 🔴 1 Sống</div>
         </div>
 
         <div class="fighter-card cpu">
@@ -62,6 +64,7 @@
             <div style="font-size: 0.72rem; color: #ff3366; margin-top: 5px;">
                 Trạng thái: <b id="cpuStatusText">ĐANG TÍNH TOÁN</b>
             </div>
+            <div id="cpuTeamRosterBar" class="team-roster-hud-bar"></div>
         </div>
     </div>
 
@@ -451,13 +454,67 @@
 
         <!-- Tùy Chọn Đối Thủ CPU -->
         <div class="cpu-select-section">
-            <span class="cpu-select-label">🎯 ĐỐI THỦ CPU:</span>
+            <span class="cpu-select-label" id="cpuSelectHeaderLabel">🎯 ĐỐI THỦ CPU:</span>
             <div class="cpu-select-options" id="cpuSelectOptions">
                 <button class="cpu-opt-btn active" data-cpuchar="random">🎲 Ngẫu Nhiên</button>
                 <button class="cpu-opt-btn" data-cpuchar="trooper">🪖 Trooper</button>
                 <button class="cpu-opt-btn" data-cpuchar="hookman">🪝 Hookman</button>
                 <button class="cpu-opt-btn" data-cpuchar="smoke_guy">🚬 Smoke Guy</button>
                 <button class="cpu-opt-btn" data-cpuchar="razor">⚡ Razor</button>
+            </div>
+        </div>
+
+        <!-- Tùy Chọn Quy Mô Đội Hình (Tối đa 5 người mỗi đội) -->
+        <div class="team-battle-mode-section">
+            <div class="team-mode-title-box">
+                <span class="team-mode-title" id="teamModeSectionTitle">⚔️ QUY MÔ ĐỘI HÌNH & BỔ SUNG CPU (TỐI ĐA 5 NGƯỜI / ĐỘI)</span>
+                <span class="team-mode-sub" id="teamModeSectionSub">Tùy chỉnh số lượng CPU tham chiến cho Đội Bạn và Đội Địch (1v1 đến 5v5)</span>
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="team-preset-options">
+                <button class="team-preset-btn active" id="btnPreset1v1" data-preset="1v1">⚔️ 1 vs 1</button>
+                <button class="team-preset-btn" id="btnPreset2v2" data-preset="2v2">👥 2 vs 2</button>
+                <button class="team-preset-btn" id="btnPreset3v3" data-preset="3v3">🛡️ 3 vs 3</button>
+                <button class="team-preset-btn" id="btnPreset4v4" data-preset="4v4">🎖️ 4 vs 4</button>
+                <button class="team-preset-btn" id="btnPreset5v5" data-preset="5v5">👑 5 vs 5</button>
+            </div>
+
+            <!-- Custom Selectors (Blue & Red) -->
+            <div class="team-custom-grid">
+                <!-- Đội Bạn (Đồng Minh) -->
+                <div class="team-box team-blue-box">
+                    <div class="team-box-header">
+                        <span class="team-badge-icon">🔵</span>
+                        <span class="team-box-title" id="teamBlueBoxTitle">ĐỘI BẠN (ĐỒNG MINH):</span>
+                        <span class="team-count-pill" id="blueTeamCountPill">1 Thành viên</span>
+                    </div>
+                    <div class="team-size-selectors" id="blueTeamSizeSelectors">
+                        <button class="team-size-btn active" data-team="blue" data-size="1">1 (Solo)</button>
+                        <button class="team-size-btn" data-team="blue" data-size="2">2 (+1 CPU)</button>
+                        <button class="team-size-btn" data-team="blue" data-size="3">3 (+2 CPU)</button>
+                        <button class="team-size-btn" data-team="blue" data-size="4">4 (+3 CPU)</button>
+                        <button class="team-size-btn" data-team="blue" data-size="5">5 (+4 CPU)</button>
+                    </div>
+                    <div class="team-roster-preview-list" id="blueRosterList"></div>
+                </div>
+
+                <!-- Đội Địch (Đối Thủ CPU) -->
+                <div class="team-box team-red-box">
+                    <div class="team-box-header">
+                        <span class="team-badge-icon">🔴</span>
+                        <span class="team-box-title" id="teamRedBoxTitle">ĐỘI ĐỊCH (ĐỐI THỦ CPU):</span>
+                        <span class="team-count-pill" id="redTeamCountPill">1 Thành viên</span>
+                    </div>
+                    <div class="team-size-selectors" id="redTeamSizeSelectors">
+                        <button class="team-size-btn active" data-team="red" data-size="1">1 CPU</button>
+                        <button class="team-size-btn" data-team="red" data-size="2">2 CPU</button>
+                        <button class="team-size-btn" data-team="red" data-size="3">3 CPU</button>
+                        <button class="team-size-btn" data-team="red" data-size="4">4 CPU</button>
+                        <button class="team-size-btn" data-team="red" data-size="5">5 CPU</button>
+                    </div>
+                    <div class="team-roster-preview-list" id="redRosterList"></div>
+                </div>
             </div>
         </div>
 
