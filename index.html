@@ -51,6 +51,16 @@
             <div class="turn-num" id="turnDisplay">LƯỢT 1</div>
             <div class="turn-phase" id="phaseDisplay">LẬP KẾ HOẠCH</div>
             <div id="teamScoreDisplay" class="team-score-badge">🔵 1 Sống vs 🔴 1 Sống</div>
+            <!-- KOTH Status Elements -->
+            <div id="kothScoreBanner" class="koth-score-banner" style="display: none;">
+                <div class="koth-scores-row">
+                    <span id="kothBlueScoreText" class="koth-score-val blue">🔵 0/15</span>
+                    <span class="koth-score-sep">•</span>
+                    <span id="kothRedScoreText" class="koth-score-val red">🔴 0/15</span>
+                </div>
+                <div id="kothHillStatusBadge" class="koth-hill-badge">⚪ CỨ ĐIỂM: TRUNG LẬP (0/2)</div>
+                <div id="kothOvertimeBadge" class="koth-overtime-badge" style="display: none;">🔥 OVERTIME 🔥</div>
+            </div>
         </div>
 
         <div class="fighter-card cpu">
@@ -86,6 +96,11 @@
                 <div class="queue-label">
                     <span>Hàng đợi lệnh của Bạn (4 Hành động)</span>
                     <span id="queueCountText" style="color: #38bdf8; font-weight: bold;">0 / 4</span>
+                </div>
+                <!-- Banner khi người chơi hy sinh và đang chờ hồi sinh -->
+                <div id="playerRespawnNotice" class="player-respawn-notice" style="display: none;">
+                    <span class="respawn-icon">💀</span>
+                    <span id="playerRespawnNoticeText">BẠN ĐÃ HY SINH! Đang hồi sinh tại căn cứ sau 2 lượt...</span>
                 </div>
                 <div class="queue-slots" id="playerQueueSlots">
                     <div class="queue-slot" id="p-slot-0"><span class="slot-step-num">#1</span><span class="slot-icon">?</span><span class="slot-name">Trống</span></div>
@@ -469,6 +484,10 @@
             <div class="team-mode-title-box">
                 <span class="team-mode-title" id="teamModeSectionTitle">⚔️ QUY MÔ ĐỘI HÌNH & BỔ SUNG CPU (TỐI ĐA 5 NGƯỜI / ĐỘI)</span>
                 <span class="team-mode-sub" id="teamModeSectionSub">Tùy chỉnh số lượng CPU tham chiến cho Đội Bạn và Đội Địch (1v1 đến 5v5)</span>
+                <div class="mode-objective-pill" id="modeObjectivePill">
+                    <span id="modeObjectiveBadge" class="mode-badge">⚔️ Sinh Tử 1v1 (Duel)</span>
+                    <span id="modeObjectiveDesc" class="mode-desc">Đấu tay đôi sinh tử truyền thống - Tiêu diệt đối thủ để giành chiến thắng!</span>
+                </div>
             </div>
 
             <!-- Quick Presets -->

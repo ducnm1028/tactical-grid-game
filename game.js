@@ -64,6 +64,14 @@ class GameEngine {
         this.blueTeamSize = 1;
         this.redTeamSize = 1;
         this.currentTeamPreset = '1v1';
+        this.gameMode = 'DUEL'; // 'DUEL' (1v1) hoặc 'KOTH' (King of the Hill khi >= 2 người / đội)
+        this.kothZone = { minX: 8, maxX: 12, minY: 1, maxY: 5 }; // Khu vực Cứ Điểm 5x5 ở giữa bản đồ 20x7
+        this.hillScale = 0; // -2 (Đỏ chiếm), -1 (Đỏ đang chiếm), 0 (Trung lập), +1 (Xanh đang chiếm), +2 (Xanh chiếm)
+        this.blueScore = 0;
+        this.redScore = 0;
+        this.SCORE_LIMIT = 15;
+        this.inOvertime = false;
+        this.RESPAWN_TURNS = 2;
         this.blueTeam = [];
         this.redTeam = [];
 
@@ -252,6 +260,7 @@ class GameEngine {
         const num = parseInt(preset[0], 10) || 1;
         this.blueTeamSize = num;
         this.redTeamSize = num;
+        this.gameMode = (this.blueTeamSize === 1 && this.redTeamSize === 1) ? 'DUEL' : 'KOTH';
         this.setupTeams();
         this.updateTeamModeUI();
     }
@@ -263,6 +272,7 @@ class GameEngine {
         } else {
             this.currentTeamPreset = 'custom';
         }
+        this.gameMode = (this.blueTeamSize === 1 && this.redTeamSize === 1) ? 'DUEL' : 'KOTH';
         this.setupTeams();
         this.updateTeamModeUI();
     }
@@ -274,12 +284,15 @@ class GameEngine {
         } else {
             this.currentTeamPreset = 'custom';
         }
+        this.gameMode = (this.blueTeamSize === 1 && this.redTeamSize === 1) ? 'DUEL' : 'KOTH';
         this.setupTeams();
         this.updateTeamModeUI();
     }
 
     updateTeamModeUI() {
         if (typeof document === 'undefined' || !document.getElementById) return;
+
+        this.gameMode = (this.blueTeamSize === 1 && this.redTeamSize === 1) ? 'DUEL' : 'KOTH';
 
         const presets = ['1v1', '2v2', '3v3', '4v4', '5v5'];
         presets.forEach(p => {
@@ -306,6 +319,18 @@ class GameEngine {
         const redCount = document.getElementById('redTeamCountPill');
         if (redCount) {
             redCount.innerText = t('teamCountFormat', { count: this.redTeamSize });
+        }
+
+        const modeBadge = document.getElementById('modeObjectiveBadge');
+        const modeDesc = document.getElementById('modeObjectiveDesc');
+        if (modeBadge && modeDesc) {
+            if (this.gameMode === 'DUEL') {
+                modeBadge.innerText = t('modeDuelName');
+                modeDesc.innerText = t('duelObjectiveDesc');
+            } else {
+                modeBadge.innerText = t('modeKothName');
+                modeDesc.innerText = t('kothObjectiveDesc');
+            }
         }
 
         this.updateTeamRosterPreviews();
@@ -386,6 +411,30 @@ class GameEngine {
         return team === 'BLUE' ? blueSpawns[index % 5] : redSpawns[index % 5];
     }
 
+    isInCaptureZone(x, y) {
+        return x >= this.kothZone.minX && x <= this.kothZone.maxX &&
+               y >= this.kothZone.minY && y <= this.kothZone.maxY;
+    }
+
+    getRespawnPosition(team, index) {
+        const defaultSpawn = this.getTeamSpawnPosition(team, index);
+        const allLiving = [...(this.blueTeam || []), ...(this.redTeam || [])].filter(u => u.hp > 0 && !u.isDead);
+        if (!allLiving.some(u => u.x === defaultSpawn.x && u.y === defaultSpawn.y)) {
+            return defaultSpawn;
+        }
+        const minCol = team === 'BLUE' ? 0 : 15;
+        const maxCol = team === 'BLUE' ? 4 : 19;
+        for (let offset = 0; offset <= 4; offset++) {
+            for (let r = 0; r < GRID_ROWS; r++) {
+                const col = team === 'BLUE' ? minCol + offset : maxCol - offset;
+                if (!allLiving.some(u => u.x === col && u.y === r)) {
+                    return { x: col, y: r };
+                }
+            }
+        }
+        return defaultSpawn;
+    }
+
     createUnit(id, team, index, charObj, isPlayer = false, customName = null) {
         const spawn = this.getTeamSpawnPosition(team, index);
         const unit = {
@@ -419,7 +468,9 @@ class GameEngine {
                 cigarette: { turnsLeft: 0, dmgBonusPercent: 30, moveBonus: 1 }
             },
             queue: [],
-            alive: true
+            alive: true,
+            isDead: false,
+            respawnTurns: 0
         };
         charObj.skills.forEach(s => {
             if (s.maxAmmo) unit.skillAmmo[s.id] = s.maxAmmo;
@@ -431,6 +482,7 @@ class GameEngine {
         const unlockedChars = CHARACTERS_DATABASE.filter(c => c.isUnlocked);
         const blueSize = Math.max(1, Math.min(5, this.blueTeamSize || 1));
         const redSize = Math.max(1, Math.min(5, this.redTeamSize || 1));
+        this.gameMode = (blueSize === 1 && redSize === 1) ? 'DUEL' : 'KOTH';
 
         // 1. Blue Team
         this.blueTeam = [];
@@ -645,13 +697,24 @@ class GameEngine {
         this.applySelectedCharacter();
         this.applyCpuCharacter(this.selectedCpuOption);
         this.setupTeams();
+        this.turn = 1;
+        this.hillScale = 0;
+        this.blueScore = 0;
+        this.redScore = 0;
+        this.inOvertime = false;
         this.phase = 'PLANNING';
         if (window.soundCtrl) window.soundCtrl.playCommit();
         const pName = getCharName(this.selectedCharacter, this.lang);
         const cName = getCharName(this.cpuCharacter, this.lang);
-        this.addCombatLog(this.lang === 'en'
-            ? `Squad Battle started! Your squad (${this.blueTeamSize} units) vs Enemy CPU squad (${this.redTeamSize} units)!`
-            : `Đại chiến Đội hình bắt đầu! Đội bạn (${this.blueTeamSize} người) vs Đội CPU (${this.redTeamSize} người)!`, 'system');
+        if (this.gameMode === 'KOTH') {
+            this.addCombatLog(this.lang === 'en'
+                ? `👑 King of the Hill started! Squads: Blue (${this.blueTeamSize}) vs Red (${this.redTeamSize}). Hold the 5x5 Hill to reach 15 points!`
+                : `👑 Chế độ Chiếm Cứ Điểm 5x5 bắt đầu! Đội hình: Xanh (${this.blueTeamSize}) vs Đỏ (${this.redTeamSize}). Chiếm giữ Cứ điểm để đạt 15 điểm!`, 'system');
+        } else {
+            this.addCombatLog(this.lang === 'en'
+                ? `⚔️ 1v1 Classic Duel started! Eliminate your opponent to win!`
+                : `⚔️ Đấu tay đôi 1v1 sinh tử bắt đầu! Tiêu diệt đối thủ để chiến thắng!`, 'system');
+        }
         this.updateHUD();
         this.updateQueueDisplay();
     }
@@ -1014,6 +1077,17 @@ class GameEngine {
     updateSkillButtons() {
         const char = this.selectedCharacter;
         const skillContainer = document.getElementById('dynamicSkillButtons');
+        if (!skillContainer) return;
+
+        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) {
+            skillContainer.innerHTML = `
+                <div style="padding: 10px; color: #f43f5e; font-weight: bold; background: rgba(244,63,94,0.12); border: 1px dashed #f43f5e; border-radius: 6px; width: 100%; text-align: center;">
+                    ${t('respawnNoticeText', { turns: this.player.respawnTurns })}
+                </div>
+            `;
+            return;
+        }
+
         skillContainer.innerHTML = char.skills.map((s, idx) => {
             const cd = this.cooldowns[s.id] || 0;
             const isCooldown = cd > 0;
@@ -1137,6 +1211,7 @@ class GameEngine {
     // --- Xử lý vẽ Lộ trình Di chuyển (Path Movement) ---
     startPathPlanning() {
         if (this.phase !== 'PLANNING') return;
+        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) return;
         if (this.playerQueue.length >= 4) {
             this.addCombatLog('Hàng đợi đã đầy 4 lệnh! Nhấn [SPACE] để thực thi.', 'system');
             return;
@@ -1414,6 +1489,7 @@ class GameEngine {
 
     addSkillToQueue(skillIndex) {
         if (this.phase !== 'PLANNING') return;
+        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) return;
         const skill = this.selectedCharacter.skills[skillIndex];
         if (!skill) return;
 
@@ -1553,6 +1629,7 @@ class GameEngine {
 
     undoAction() {
         if (this.phase !== 'PLANNING') return;
+        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) return;
         if (this.playerQueue.length > 0) {
             this.playerQueue.pop();
             if (window.soundCtrl) window.soundCtrl.playUndo();
@@ -1562,6 +1639,7 @@ class GameEngine {
 
     clearQueue() {
         if (this.phase !== 'PLANNING') return;
+        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) return;
         this.cancelPathPlanning();
         if (this.playerQueue.length > 0) {
             this.playerQueue = [];
@@ -1596,9 +1674,15 @@ class GameEngine {
         const countText = document.getElementById('queueCountText');
         countText.innerText = `${this.playerQueue.length} / 4`;
 
+        const isPlayerDead = this.gameMode === 'KOTH' && this.player && this.player.hp <= 0;
+
         if (this.playerQueue.length === 4 && this.phase === 'PLANNING') {
             commitBtn.disabled = false;
-            commitBtn.innerHTML = `<span>${t('btnCommitPrefix')} (4/4) 🚀</span>`;
+            if (isPlayerDead) {
+                commitBtn.innerHTML = `<span>${this.lang === 'en' ? 'WAITING RESPAWN' : 'SẴN SÀNG (CHỜ HỒI SINH)'} ⏳</span>`;
+            } else {
+                commitBtn.innerHTML = `<span>${t('btnCommitPrefix')} (4/4) 🚀</span>`;
+            }
             commitBtn.style.animation = 'pulse 1s infinite alternate';
         } else {
             commitBtn.disabled = true;
@@ -1636,24 +1720,50 @@ class GameEngine {
         // Render Roster Bars & Score
         const pRoster = document.getElementById('playerTeamRosterBar');
         if (pRoster && this.blueTeam && this.blueTeam.length > 0) {
-            pRoster.innerHTML = this.blueTeam.map(u => `
-                <div class="team-hud-chip ${u.hp > 0 ? 'alive' : 'dead'}" title="${u.name}: ${Math.round(u.hp)}/${u.maxHp} HP">
-                    <span>${u.avatar}</span>
-                    <span>${u.isPlayer ? (this.lang === 'en' ? 'You' : 'Bạn') : (u.character ? u.character.name.split(' (')[0] : u.name)}</span>
-                    <span style="color: ${u.hp > 0 ? '#34d399' : '#f87171'}; font-weight:800;">${u.hp > 0 ? Math.round(u.hp) + ' HP' : (this.lang === 'en' ? 'K.O' : 'HẠ')}</span>
-                </div>
-            `).join('');
+            pRoster.innerHTML = this.blueTeam.map(u => {
+                let statusDisplay = `${Math.round(u.hp)} HP`;
+                let chipClass = 'team-hud-chip alive';
+                if (u.hp <= 0) {
+                    if (this.gameMode === 'KOTH' && u.respawnTurns > 0) {
+                        statusDisplay = t('respawningTag', { turns: u.respawnTurns });
+                        chipClass = 'team-hud-chip respawning';
+                    } else {
+                        statusDisplay = this.lang === 'en' ? 'K.O' : 'HẠ';
+                        chipClass = 'team-hud-chip dead';
+                    }
+                }
+                return `
+                    <div class="${chipClass}" title="${u.name}: ${u.hp > 0 ? Math.round(u.hp) + '/' + u.maxHp + ' HP' : statusDisplay}">
+                        <span>${u.avatar}</span>
+                        <span>${u.isPlayer ? (this.lang === 'en' ? 'You' : 'Bạn') : (u.character ? u.character.name.split(' (')[0] : u.name)}</span>
+                        <span style="color: ${u.hp > 0 ? '#34d399' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}</span>
+                    </div>
+                `;
+            }).join('');
         }
 
         const cRoster = document.getElementById('cpuTeamRosterBar');
         if (cRoster && this.redTeam && this.redTeam.length > 0) {
-            cRoster.innerHTML = this.redTeam.map(u => `
-                <div class="team-hud-chip ${u.hp > 0 ? 'alive' : 'dead'}" title="${u.name}: ${Math.round(u.hp)}/${u.maxHp} HP">
-                    <span>${u.avatar}</span>
-                    <span>${u.character ? u.character.name.split(' (')[0] : u.name}</span>
-                    <span style="color: ${u.hp > 0 ? '#fb7185' : '#f87171'}; font-weight:800;">${u.hp > 0 ? Math.round(u.hp) + ' HP' : (this.lang === 'en' ? 'K.O' : 'HẠ')}</span>
-                </div>
-            `).join('');
+            cRoster.innerHTML = this.redTeam.map(u => {
+                let statusDisplay = `${Math.round(u.hp)} HP`;
+                let chipClass = 'team-hud-chip alive';
+                if (u.hp <= 0) {
+                    if (this.gameMode === 'KOTH' && u.respawnTurns > 0) {
+                        statusDisplay = t('respawningTag', { turns: u.respawnTurns });
+                        chipClass = 'team-hud-chip respawning';
+                    } else {
+                        statusDisplay = this.lang === 'en' ? 'K.O' : 'HẠ';
+                        chipClass = 'team-hud-chip dead';
+                    }
+                }
+                return `
+                    <div class="${chipClass}" title="${u.name}: ${u.hp > 0 ? Math.round(u.hp) + '/' + u.maxHp + ' HP' : statusDisplay}">
+                        <span>${u.avatar}</span>
+                        <span>${u.character ? u.character.name.split(' (')[0] : u.name}</span>
+                        <span style="color: ${u.hp > 0 ? '#fb7185' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}</span>
+                    </div>
+                `;
+            }).join('');
         }
 
         const scoreElem = document.getElementById('teamScoreDisplay');
@@ -1661,6 +1771,62 @@ class GameEngine {
             const blueAlive = this.blueTeam.filter(u => u.hp > 0).length;
             const redAlive = this.redTeam.filter(u => u.hp > 0).length;
             scoreElem.innerText = `🔵 ${blueAlive} ${this.lang === 'en' ? 'Alive' : 'Sống'} vs 🔴 ${redAlive} ${this.lang === 'en' ? 'Alive' : 'Sống'}`;
+        }
+
+        // KOTH HUD Banner & Overtime
+        const kothBanner = document.getElementById('kothScoreBanner');
+        if (kothBanner) {
+            if (this.gameMode === 'KOTH') {
+                kothBanner.style.display = 'flex';
+                const bScore = document.getElementById('kothBlueScoreText');
+                const rScore = document.getElementById('kothRedScoreText');
+                const hBadge = document.getElementById('kothHillStatusBadge');
+                const otBadge = document.getElementById('kothOvertimeBadge');
+
+                if (bScore) bScore.innerText = `🔵 ${this.blueScore}/15`;
+                if (rScore) rScore.innerText = `🔴 ${this.redScore}/15`;
+
+                if (hBadge) {
+                    let hillText = t('kothHillNeutral');
+                    let badgeClass = 'koth-hill-badge';
+                    if (this.hillScale === 2) {
+                        hillText = t('kothHillCapturedBlue');
+                        badgeClass += ' blue-held';
+                    } else if (this.hillScale === 1) {
+                        hillText = t('kothHillCapturingBlue', { status: 1 });
+                        badgeClass += ' blue-capping';
+                    } else if (this.hillScale === -1) {
+                        hillText = t('kothHillCapturingRed', { status: 1 });
+                        badgeClass += ' red-capping';
+                    } else if (this.hillScale === -2) {
+                        hillText = t('kothHillCapturedRed');
+                        badgeClass += ' red-held';
+                    }
+                    hBadge.innerText = hillText;
+                    hBadge.className = badgeClass;
+                }
+
+                if (otBadge) {
+                    otBadge.style.display = this.inOvertime ? 'inline-block' : 'none';
+                    if (this.inOvertime) {
+                        otBadge.innerText = t('kothOvertimeBadge');
+                    }
+                }
+            } else {
+                kothBanner.style.display = 'none';
+            }
+        }
+
+        // Thông báo Người chơi đang chờ hồi sinh
+        const respawnNotice = document.getElementById('playerRespawnNotice');
+        if (respawnNotice) {
+            if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) {
+                respawnNotice.style.display = 'flex';
+                const respText = document.getElementById('playerRespawnNoticeText');
+                if (respText) respText.innerText = t('respawnNoticeText', { turns: this.player.respawnTurns });
+            } else {
+                respawnNotice.style.display = 'none';
+            }
         }
 
         document.getElementById('turnDisplay').innerText = `${t('turnPrefix')} ${this.turn}`;
@@ -1812,6 +1978,24 @@ class GameEngine {
             let targetX = (unit.team === 'BLUE' ? 15 : 4);
             let targetY = 3;
             let targetInvisible = false;
+
+            if (this.gameMode === 'KOTH') {
+                const opponentsInZone = livingOpponents.filter(opp => this.isInCaptureZone(opp.x, opp.y));
+                if (opponentsInZone.length > 0) {
+                    let minZDist = 999;
+                    for (const opp of opponentsInZone) {
+                        const d = Math.abs(opp.x - simX) + Math.abs(opp.y - simY);
+                        if (d < minZDist) {
+                            minZDist = d;
+                            target = opp;
+                        }
+                    }
+                } else if (!this.isInCaptureZone(simX, simY) && minDist > 2) {
+                    target = null;
+                    targetX = 10;
+                    targetY = 3;
+                }
+            }
 
             if (target) {
                 targetX = target.x;
@@ -2574,12 +2758,14 @@ class GameEngine {
 
         this.updateHUD();
 
-        const blueAliveCount = this.blueTeam.filter(u => u.hp > 0).length;
-        const redAliveCount = this.redTeam.filter(u => u.hp > 0).length;
+        if (this.gameMode === 'DUEL') {
+            const blueAliveCount = this.blueTeam.filter(u => u.hp > 0).length;
+            const redAliveCount = this.redTeam.filter(u => u.hp > 0).length;
 
-        if (blueAliveCount === 0 || redAliveCount === 0) {
-            this.handleGameOver();
-            return;
+            if (blueAliveCount === 0 || redAliveCount === 0) {
+                this.handleGameOver();
+                return;
+            }
         }
 
         await this.delay(450);
@@ -3094,21 +3280,158 @@ class GameEngine {
 
         this.groundHazards = this.groundHazards.filter(h => h.turnsLeft > 0);
 
-        const blueAliveCount = this.blueTeam.filter(u => u.hp > 0).length;
-        const redAliveCount = this.redTeam.filter(u => u.hp > 0).length;
+        // 6. Xử lý Hồi sinh trong Chế độ KOTH (Áp dụng cho tất cả nhân vật sau 2 lượt)
+        if (this.gameMode === 'KOTH') {
+            for (const u of allUnits) {
+                if (u.hp <= 0) {
+                    if (u.respawnTurns > 0) {
+                        u.respawnTurns--;
+                    }
+                    if (u.respawnTurns <= 0) {
+                        u.hp = u.maxHp;
+                        u.isDead = false;
+                        u.alive = true;
+                        const spawnPos = this.getRespawnPosition(u.team, u.index);
+                        u.x = spawnPos.x;
+                        u.y = spawnPos.y;
+                        u.renderX = spawnPos.x;
+                        u.renderY = spawnPos.y;
+                        u.revealedTurns = 0;
+                        for (const sId in u.cooldowns) {
+                            u.cooldowns[sId] = 0;
+                        }
+                        if (u.character && u.character.skills) {
+                            u.character.skills.forEach(s => {
+                                if (s.maxAmmo) u.skillAmmo[s.id] = s.maxAmmo;
+                            });
+                        }
+                        this.addCombatLog(t('respawnLogMsg', { name: u.name }), 'system');
+                        this.addFloatingText('✨ HỒI SINH!', u.x, u.y, '#10b981');
+                        this.createBuffSparks(u.x, u.y, '#10b981');
+                        if (u.isPlayer && window.soundCtrl) window.soundCtrl.playSelect();
+                    }
+                }
+            }
+        }
 
-        if (blueAliveCount === 0 || redAliveCount === 0) {
-            this.handleGameOver();
-            return;
+        // 7. Đánh giá Cứ Điểm 5x5 & Tích lũy Điểm Chế độ KOTH
+        if (this.gameMode === 'KOTH') {
+            const blueInZone = this.blueTeam.filter(u => u.hp > 0 && this.isInCaptureZone(u.x, u.y)).length;
+            const redInZone = this.redTeam.filter(u => u.hp > 0 && this.isInCaptureZone(u.x, u.y)).length;
+
+            if (blueInZone > 0 && redInZone === 0) {
+                // Đội Xanh chiếm mà không có đối thủ tranh chấp
+                if (this.hillScale < 2) {
+                    this.hillScale++;
+                    this.addCombatLog(
+                        this.hillScale === 2
+                            ? (this.lang === 'en' ? '🚩 BLUE SQUAD CAPTURED THE 5x5 HILL! (+1 Point/Turn)' : '🚩 ĐỘI XANH ĐÃ CHIẾM ĐƯỢC CỨ ĐIỂM 5x5! (+1 Điểm/Lượt)')
+                            : (this.lang === 'en' ? `🚩 Blue capturing the Hill (${this.hillScale}/2)` : `🚩 Đội Xanh đang tiến chiếm cứ điểm! (Trạng thái: ${this.hillScale}/2)`),
+                        'hit'
+                    );
+                }
+            } else if (redInZone > 0 && blueInZone === 0) {
+                // Đội Đỏ chiếm mà không có đối thủ tranh chấp
+                if (this.hillScale > -2) {
+                    this.hillScale--;
+                    this.addCombatLog(
+                        this.hillScale === -2
+                            ? (this.lang === 'en' ? '🚩 RED SQUAD CAPTURED THE 5x5 HILL! (+1 Point/Turn)' : '🚩 ĐỘI ĐỎ ĐÃ CHIẾM ĐƯỢC CỨ ĐIỂM 5x5! (+1 Điểm/Lượt)')
+                            : (this.lang === 'en' ? `🚩 Red capturing the Hill (${Math.abs(this.hillScale)}/2)` : `🚩 Đội Đỏ đang tiến chiếm cứ điểm! (Trạng thái: ${Math.abs(this.hillScale)}/2)`),
+                        'clash'
+                    );
+                }
+            } else if (blueInZone > 0 && redInZone > 0) {
+                this.addCombatLog(
+                    this.lang === 'en'
+                        ? `⚔️ CONTESTED! Both teams have units on the Hill (${blueInZone} Blue vs ${redInZone} Red)! Status frozen!`
+                        : `⚔️ TRANH CHẤP! Cả 2 đội đều có người tại Cứ Điểm (${blueInZone} Xanh vs ${redInZone} Đỏ)! Trạng thái bị khóa!`,
+                    'system'
+                );
+            }
+
+            // Ghi 1 điểm cho mỗi lượt khi status đạt số 2 (hoặc -2 cho Red)
+            if (this.hillScale === 2) {
+                this.blueScore++;
+                this.addFloatingText('+1 ĐIỂM!', 10, 3, '#38bdf8');
+                this.addCombatLog(
+                    this.lang === 'en'
+                        ? `⭐ Blue controls the Hill: +1 Point! (${this.blueScore}/${this.SCORE_LIMIT})`
+                        : `⭐ Đội Xanh kiểm soát Cứ Điểm: +1 Điểm! (${this.blueScore}/${this.SCORE_LIMIT})`,
+                    'system'
+                );
+            } else if (this.hillScale === -2) {
+                this.redScore++;
+                this.addFloatingText('+1 ĐIỂM!', 10, 3, '#f43f5e');
+                this.addCombatLog(
+                    this.lang === 'en'
+                        ? `⭐ Red controls the Hill: +1 Point! (${this.redScore}/${this.SCORE_LIMIT})`
+                        : `⭐ Đội Đỏ kiểm soát Cứ Điểm: +1 Điểm! (${this.redScore}/${this.SCORE_LIMIT})`,
+                    'system'
+                );
+            }
+
+            // Kiểm tra Điều kiện Thắng & Overtime
+            const blueReached = this.blueScore >= this.SCORE_LIMIT;
+            const redReached = this.redScore >= this.SCORE_LIMIT;
+
+            if (blueReached && !redReached) {
+                if (redInZone > 0 || this.hillScale !== 2) {
+                    this.inOvertime = true;
+                    this.addCombatLog(t('kothOvertimeNotice'), 'clash');
+                } else {
+                    this.handleGameOver('BLUE_KOTH');
+                    return;
+                }
+            } else if (redReached && !blueReached) {
+                if (blueInZone > 0 || this.hillScale !== -2) {
+                    this.inOvertime = true;
+                    this.addCombatLog(t('kothOvertimeNotice'), 'clash');
+                } else {
+                    this.handleGameOver('RED_KOTH');
+                    return;
+                }
+            } else if (blueReached && redReached) {
+                if (this.hillScale === 2 && redInZone === 0) {
+                    this.handleGameOver('BLUE_KOTH');
+                    return;
+                } else if (this.hillScale === -2 && blueInZone === 0) {
+                    this.handleGameOver('RED_KOTH');
+                    return;
+                } else {
+                    this.inOvertime = true;
+                    this.addCombatLog(t('kothOvertimeNotice'), 'clash');
+                }
+            }
+        } else {
+            // Chế độ DUEL 1v1
+            const blueAliveCount = this.blueTeam.filter(u => u.hp > 0).length;
+            const redAliveCount = this.redTeam.filter(u => u.hp > 0).length;
+
+            if (blueAliveCount === 0 || redAliveCount === 0) {
+                this.handleGameOver();
+                return;
+            }
         }
 
         this.turn++;
         this.phase = 'PLANNING';
         this.currentStep = -1;
-        this.playerQueue = [];
         this.cpuQueue = [];
         for (const u of allUnits) {
             u.shieldDir = null;
+        }
+
+        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) {
+            const respawnLabel = t('respawningTag', { turns: this.player.respawnTurns });
+            this.playerQueue = [
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' }
+            ];
+        } else {
+            this.playerQueue = [];
         }
 
         for (let i = 0; i < 4; i++) {
@@ -3140,37 +3463,59 @@ class GameEngine {
 
     applyDamage(entity, amount) {
         entity.hp = Math.max(0, entity.hp - amount);
+        if (entity.hp === 0 && this.gameMode === 'KOTH' && !entity.isDead) {
+            entity.isDead = true;
+            entity.alive = false;
+            entity.respawnTurns = this.RESPAWN_TURNS;
+            this.addCombatLog(`💀 ${entity.name} ${this.lang === 'en' ? 'was eliminated! Respawning in 2 turns...' : 'đã hy sinh! Hồi sinh sau 2 lượt...'}`, 'clash');
+            this.addFloatingText('💀 K.O! (RESPAWN 2L)', entity.x, entity.y, '#f43f5e');
+        }
     }
 
-    handleGameOver() {
+    handleGameOver(kothWinner = null) {
         this.phase = 'GAMEOVER';
         const modal = document.getElementById('gameModal');
         const title = document.getElementById('modalTitle');
         const desc = document.getElementById('modalDesc');
 
-        const blueAlive = this.blueTeam.filter(u => u.hp > 0).length;
-        const redAlive = this.redTeam.filter(u => u.hp > 0).length;
-        const pName = getCharName(this.selectedCharacter, this.lang);
-        const cName = getCharName(this.cpuCharacter, this.lang);
-
-        if (blueAlive === 0 && redAlive === 0) {
-            title.innerText = t('modalDrawTitle');
-            title.className = 'modal-title clash';
-            desc.innerText = t('modalDrawDesc');
-        } else if (redAlive === 0) {
-            title.innerText = t('modalVictoryTitle');
-            title.className = 'modal-title victory';
-            desc.innerText = this.lang === 'en'
-                ? `VICTORY! Your squad eliminated all ${this.redTeamSize} enemy operatives on Turn ${this.turn}!`
-                : `CHIẾN THẮNG! Đội của bạn đã quét sạch toàn bộ ${this.redTeamSize} kẻ địch ở Lượt ${this.turn}!`;
-            if (window.soundCtrl) window.soundCtrl.playVictory();
+        if (this.gameMode === 'KOTH') {
+            const blueAlive = this.blueTeam.filter(u => u.hp > 0).length;
+            const redAlive = this.redTeam.filter(u => u.hp > 0).length;
+            const isBlueVictory = kothWinner === 'BLUE_KOTH' || (kothWinner === null && (this.blueScore > this.redScore || (redAlive === 0 && blueAlive > 0)));
+            if (isBlueVictory) {
+                title.innerText = t('modalVictoryKothTitle');
+                title.className = 'modal-title victory';
+                desc.innerText = t('modalVictoryKothDesc');
+                if (window.soundCtrl) window.soundCtrl.playVictory();
+            } else {
+                title.innerText = t('modalDefeatKothTitle');
+                title.className = 'modal-title defeat';
+                desc.innerText = t('modalDefeatKothDesc');
+                if (window.soundCtrl) window.soundCtrl.playDefeat();
+            }
         } else {
-            title.innerText = t('modalDefeatTitle');
-            title.className = 'modal-title defeat';
-            desc.innerText = this.lang === 'en'
-                ? `DEFEAT! Your squad was wiped out on Turn ${this.turn}. Adjust your tactics!`
-                : `THẤT BẠI! Toàn bộ đội hình của bạn đã bị tiêu diệt ở Lượt ${this.turn}. Hãy thử lại!`;
-            if (window.soundCtrl) window.soundCtrl.playDefeat();
+            const blueAlive = this.blueTeam.filter(u => u.hp > 0).length;
+            const redAlive = this.redTeam.filter(u => u.hp > 0).length;
+
+            if (blueAlive === 0 && redAlive === 0) {
+                title.innerText = t('modalDrawTitle');
+                title.className = 'modal-title clash';
+                desc.innerText = t('modalDrawDesc');
+            } else if (redAlive === 0) {
+                title.innerText = t('modalVictoryTitle');
+                title.className = 'modal-title victory';
+                desc.innerText = this.lang === 'en'
+                    ? `VICTORY! You eliminated your rival on Turn ${this.turn}!`
+                    : `CHIẾN THẮNG! Bạn đã hạ gục đối thủ ở Lượt ${this.turn}!`;
+                if (window.soundCtrl) window.soundCtrl.playVictory();
+            } else {
+                title.innerText = t('modalDefeatTitle');
+                title.className = 'modal-title defeat';
+                desc.innerText = this.lang === 'en'
+                    ? `DEFEAT! You were eliminated on Turn ${this.turn}. Adjust your tactics!`
+                    : `THẤT BẠI! Bạn đã bị hạ gục ở Lượt ${this.turn}. Hãy thử lại!`;
+                if (window.soundCtrl) window.soundCtrl.playDefeat();
+            }
         }
 
         modal.style.display = 'flex';
@@ -3185,6 +3530,10 @@ class GameEngine {
         this.currentStep = -1;
         this.cancelPathPlanning();
         this.setupTeams();
+        this.hillScale = 0;
+        this.blueScore = 0;
+        this.redScore = 0;
+        this.inOvertime = false;
 
         this.groundHazards = [];
         this.playerRevealedTurns = 0;
@@ -3574,6 +3923,53 @@ class GameEngine {
                 ctx.font = '10px monospace';
                 ctx.fillText(`${c},${r}`, x + 4, y + 14);
             }
+        }
+
+        // 1.5 Vẽ Khu Vực Chiếm Cứ Điểm 5x5 (King of the Hill)
+        if (this.gameMode === 'KOTH') {
+            const kz = this.kothZone;
+            const zX = kz.minX * CELL_SIZE;
+            const zY = kz.minY * CELL_SIZE;
+            const zW = (kz.maxX - kz.minX + 1) * CELL_SIZE;
+            const zH = (kz.maxY - kz.minY + 1) * CELL_SIZE;
+
+            ctx.save();
+            let zoneBg = 'rgba(245, 158, 11, 0.08)';
+            let borderColor = 'rgba(245, 158, 11, 0.8)';
+            let statusText = this.lang === 'en' ? 'NEUTRAL (0/2)' : 'TRUNG LẬP (0/2)';
+
+            if (this.hillScale === 2) {
+                zoneBg = 'rgba(56, 189, 248, 0.22)';
+                borderColor = 'rgba(56, 189, 248, 0.95)';
+                statusText = this.lang === 'en' ? 'BLUE ZONE (2/2) [+1/T]' : 'ĐỘI XANH KIỂM SOÁT (2/2) [+1/L]';
+            } else if (this.hillScale === 1) {
+                zoneBg = 'rgba(56, 189, 248, 0.12)';
+                borderColor = 'rgba(56, 189, 248, 0.7)';
+                statusText = this.lang === 'en' ? 'BLUE CAPTURING (1/2)' : 'ĐỘI XANH ĐANG CHIẾM (1/2)';
+            } else if (this.hillScale === -1) {
+                zoneBg = 'rgba(244, 63, 94, 0.12)';
+                borderColor = 'rgba(244, 63, 94, 0.7)';
+                statusText = this.lang === 'en' ? 'RED CAPTURING (1/2)' : 'ĐỘI ĐỎ ĐANG CHIẾM (1/2)';
+            } else if (this.hillScale === -2) {
+                zoneBg = 'rgba(244, 63, 94, 0.22)';
+                borderColor = 'rgba(244, 63, 94, 0.95)';
+                statusText = this.lang === 'en' ? 'RED ZONE (2/2) [+1/T]' : 'ĐỘI ĐỎ KIỂM SOÁT (2/2) [+1/L]';
+            }
+
+            ctx.fillStyle = zoneBg;
+            ctx.fillRect(zX, zY, zW, zH);
+
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 6]);
+            ctx.strokeRect(zX, zY, zW, zH);
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = borderColor;
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`🚩 ${statusText}`, zX + zW / 2, zY + 18);
+            ctx.restore();
         }
 
         // 2. Vẽ các Quả Lựu đạn trên mặt đất (Ground Hazards & Vùng 3x3)
@@ -3997,6 +4393,31 @@ class GameEngine {
         mCtx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
         mCtx.lineWidth = 1;
         mCtx.strokeRect(vpX, 0, vpW, h);
+
+        // Vẽ Cứ Điểm 5x5 trên Minimap nếu ở chế độ KOTH
+        if (this.gameMode === 'KOTH') {
+            const kz = this.kothZone;
+            const mzX = kz.minX * cellW;
+            const mzY = kz.minY * cellH;
+            const mzW = (kz.maxX - kz.minX + 1) * cellW;
+            const mzH = (kz.maxY - kz.minY + 1) * cellH;
+
+            let mColor = 'rgba(245, 158, 11, 0.25)';
+            let mBorder = '#f59e0b';
+            if (this.hillScale === 2) {
+                mColor = 'rgba(56, 189, 248, 0.35)';
+                mBorder = '#38bdf8';
+            } else if (this.hillScale === -2) {
+                mColor = 'rgba(244, 63, 94, 0.35)';
+                mBorder = '#f43f5e';
+            }
+
+            mCtx.fillStyle = mColor;
+            mCtx.fillRect(mzX, mzY, mzW, mzH);
+            mCtx.strokeStyle = mBorder;
+            mCtx.lineWidth = 1;
+            mCtx.strokeRect(mzX, mzY, mzW, mzH);
+        }
 
         // Vẽ bom trên minimap
         mCtx.fillStyle = '#ef4444';
