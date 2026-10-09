@@ -865,6 +865,19 @@ class GameEngine {
         const finishPathBtn = document.getElementById('btnFinishPath');
         if (finishPathBtn) finishPathBtn.innerText = t('btnFinishPath');
 
+        // Control Panel Instruction & Badges
+        const instBadge = document.querySelector('#controlPanelInstruction .inst-icon-badge');
+        if (instBadge) instBadge.innerText = t('controlInstBadge');
+
+        const instText = document.getElementById('controlPanelInstructionText');
+        if (instText) instText.innerHTML = t('controlPanelInstruction');
+
+        const actSubBadge = document.getElementById('actionSubBadge');
+        if (actSubBadge) actSubBadge.innerText = t('actionSubBadge');
+
+        const dirSubBadge = document.getElementById('directionSubBadge');
+        if (dirSubBadge) dirSubBadge.innerText = t('directionSubBadge');
+
         // Re-render dynamic elements
         this.initCharacterSelectUI();
         this.renderHowToPlayUI();
@@ -979,6 +992,9 @@ class GameEngine {
                             <div class="hk-row"><span class="hk-key">[Space]</span><span class="hk-desc">${t('hkSpaceDesc')}</span></div>
                             <div class="hk-row"><span class="hk-key">[⌫ Backspace]</span><span class="hk-desc">${t('hkBackDesc')}</span></div>
                             <div class="hk-row"><span class="hk-key">[Esc]</span><span class="hk-desc">${t('hkEscDesc')}</span></div>
+                        </div>
+                        <div class="guide-callout tip" style="margin-top: 10px;">
+                            ${t('guideSec3TipText')}
                         </div>
                     </div>
                 </div>
@@ -1123,12 +1139,14 @@ class GameEngine {
             }
 
             const isBlocked = isCooldown || isTethered || isCigaretteActive || isAmmoEmpty;
+            const isSkill2Plus = idx >= 1;
+            const dirReminder = isSkill2Plus ? (this.lang === 'en' ? ' • [Tip: Select direction first]' : ' • [Lưu ý: Phải chọn hướng trước]') : '';
 
             return `
                 <button class="key-badge ${isBlocked ? 'cooldown' : ''}" 
                         data-skill-idx="${idx}" 
                         style="border-color: ${isBlocked ? '#ef4444' : (s.color || '#475569')}" 
-                        title="${s.desc} ${isCooldown ? `(Đang hồi ${cd} lượt)` : (isTethered ? '(Dây móc đang găm vào đối thủ, cuối lượt sau sẽ giật 2 ô)' : '')}">
+                        title="${s.desc}${dirReminder} ${isCooldown ? `(Đang hồi ${cd} lượt)` : (isTethered ? '(Dây móc đang găm vào đối thủ, cuối lượt sau sẽ giật 2 ô)' : '')}">
                     <b>[${idx + 1}]</b> ${s.icon} ${s.name}${statusLabel}
                 </button>
             `;
@@ -1620,10 +1638,19 @@ class GameEngine {
         this.playerQueue.push(action);
         if (window.soundCtrl) window.soundCtrl.playSelect();
 
+        const dirObj = DIRECTIONS[action.dir];
+        const dirLabel = this.lang === 'en' ? (dirObj.label_en || dirObj.label) : dirObj.label;
+        this.addCombatLog(
+            this.lang === 'en'
+                ? `Queued [${action.name}] facing [${dirLabel} ${action.dirSymbol}]!`
+                : `Đã nạp [${action.name}] hướng [${dirLabel} ${action.dirSymbol}] vào hàng đợi!`,
+            'system'
+        );
+
         this.updateQueueDisplay();
 
         if (this.playerQueue.length === 4) {
-            this.addCombatLog('Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
+            this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
         }
     }
 

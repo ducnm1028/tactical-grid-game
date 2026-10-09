@@ -146,9 +146,18 @@
 
     <!-- Hotkey HUD (ĐÃ HOÁN ĐỔI: Thêm Hành Động ở TRƯỚC, Chọn Hướng ở SAU) -->
     <div class="hotkey-guide">
+        <!-- Banner Hướng dẫn cạnh Bảng điều khiển: Chọn hướng trước cho chiêu [2]+ -->
+        <div class="control-panel-instruction" id="controlPanelInstruction">
+            <span class="inst-icon-badge">💡 HƯỚNG DẪN</span>
+            <span class="inst-message" id="controlPanelInstructionText">Nếu chọn các lệnh từ <b>[2]</b> trở lên, bạn <b>phải chọn hướng sử dụng kĩ năng trước</b> (bằng 8 nút hướng hoặc phím WASD/QEZC)!</span>
+        </div>
+
         <!-- 1. THÊM HÀNH ĐỘNG (Bên Trái) -->
         <div class="hotkey-group" id="actionButtonsGroup">
-            <span class="hotkey-group-label">Thêm Hành động:</span>
+            <div class="hotkey-group-title-row">
+                <span class="hotkey-group-label" id="actionGroupLabel">Thêm Hành động:</span>
+                <span class="hotkey-sub-badge" id="actionSubBadge">⚠️ [2]+: Chọn hướng trước</span>
+            </div>
             <div id="dynamicSkillButtons" style="display: inline-flex; gap: 8px;">
                 <!-- Sinh tự động theo nhân vật được chọn -->
             </div>
@@ -156,7 +165,10 @@
 
         <!-- 2. CHỌN HƯỚNG (8 Hướng Thẳng & Chéo) -->
         <div class="hotkey-group" id="directionButtonsGroup">
-            <span class="hotkey-group-label">Hướng (8 Hướng):</span>
+            <div class="hotkey-group-title-row">
+                <span class="hotkey-group-label" id="directionGroupLabel">Hướng (8 Hướng):</span>
+                <span class="hotkey-sub-badge step-hint" id="directionSubBadge">⬅️ Bước 1 cho [2]+</span>
+            </div>
             <div class="dir-buttons-container">
                 <button class="key-badge dir-btn" id="btnKeyQ" data-key="q" title="Lên-Trái (Q / Num 7)">Q ↖</button>
                 <button class="key-badge dir-btn" id="btnKeyW" data-key="w" title="Lên (W / Num 8)">W ↑</button>
@@ -345,6 +357,9 @@
                             <div class="hk-row"><span class="hk-key">[Space]</span><span class="hk-desc">Chốt lộ trình di chuyển / THỰC THI 4 LỆNH khi đã đầy</span></div>
                             <div class="hk-row"><span class="hk-key">[⌫ Backspace]</span><span class="hk-desc">Xóa 1 hành động gần nhất trong hàng đợi</span></div>
                             <div class="hk-row"><span class="hk-key">[Esc]</span><span class="hk-desc">Hủy toàn bộ 4 hành động để lập kế hoạch lại</span></div>
+                        </div>
+                        <div class="guide-callout tip" id="guideSec3TipBox" style="margin-top: 10px;">
+                            💡 <b>Lưu ý quan trọng:</b> Lệnh <b>[1]</b> là vẽ lộ trình di chuyển (chọn hướng từng bước). Với tất cả các kỹ năng từ <b>[2]</b> trở lên, bạn <b>bắt buộc phải chọn hướng sử dụng kĩ năng trước</b> (WASD / 8 nút hướng) rồi mới bấm phím chiêu!
                         </div>
                     </div>
                 </div>

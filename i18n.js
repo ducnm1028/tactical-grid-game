@@ -77,6 +77,11 @@ const I18N_DICTIONARY = {
         btnUndo: "<b>[⌫/Backspace]</b> Xóa 1",
         btnClear: "<b>[Esc]</b> Hủy hết",
         btnCommitPrefix: "<b>[SPACE]</b> THỰC THI",
+        controlPanelInstruction: "Nếu chọn các lệnh từ <b>[2]</b> trở lên, bạn <b>phải chọn hướng sử dụng kĩ năng trước</b> (bằng 8 nút hướng hoặc phím WASD/QEZC)!",
+        controlInstBadge: "💡 HƯỚNG DẪN",
+        actionSubBadge: "⚠️ [2]+: Chọn hướng trước",
+        directionSubBadge: "⬅️ Bước 1 cho [2]+",
+        guideSec3TipText: "💡 <b>Lưu ý quan trọng:</b> Lệnh <b>[1]</b> là vẽ lộ trình di chuyển (chọn hướng từng bước). Với tất cả các kỹ năng từ <b>[2]</b> trở lên, bạn <b>bắt buộc phải chọn hướng sử dụng kĩ năng trước</b> (WASD / 8 nút hướng) rồi mới bấm phím chiêu!",
 
         // Directions
         dirUp: "Lên",
@@ -267,6 +272,11 @@ const I18N_DICTIONARY = {
         btnUndo: "<b>[⌫/Backspace]</b> Undo 1",
         btnClear: "<b>[Esc]</b> Clear All",
         btnCommitPrefix: "<b>[SPACE]</b> EXECUTE",
+        controlPanelInstruction: "When selecting skills from <b>[2]</b> and above, you <b>must select the skill direction first</b> (using the 8 direction buttons or WASD/QEZC)!",
+        controlInstBadge: "💡 GUIDE",
+        actionSubBadge: "⚠️ [2]+: Pick direction first",
+        directionSubBadge: "⬅️ Step 1 for [2]+",
+        guideSec3TipText: "💡 <b>Important Note:</b> Command <b>[1]</b> plans movement paths step by step. For all skills from <b>[2]</b> and above, you <b>must select the skill direction first</b> (WASD / 8 direction buttons) before clicking or queueing the skill!",
 
         // Directions
         dirUp: "Up",
