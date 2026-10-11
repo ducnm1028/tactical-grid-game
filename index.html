@@ -94,7 +94,7 @@
             <!-- Player Action Queue -->
             <div class="queue-row">
                 <div class="queue-label">
-                    <span>Hàng đợi lệnh của Bạn (4 Hành động)</span>
+                    <span id="playerQueueTitleText">Hàng đợi lệnh của Bạn (4 Hành động)</span>
                     <span id="queueCountText" style="color: #38bdf8; font-weight: bold;">0 / 4</span>
                 </div>
                 <!-- Banner khi người chơi hy sinh và đang chờ hồi sinh -->
@@ -113,8 +113,8 @@
             <!-- CPU Action Queue (Hidden during planning) -->
             <div class="queue-row">
                 <div class="queue-label">
-                    <span>Lệnh bí mật của CPU (Giải mã khi thực thi)</span>
-                    <span style="color: #ff3366;">BÍ MẬT</span>
+                    <span id="cpuQueueTitleText">Lệnh bí mật của CPU (Giải mã khi thực thi)</span>
+                    <span id="cpuQueueStatusText" style="color: #ff3366;">BÍ MẬT</span>
                 </div>
                 <div class="queue-slots" id="cpuQueueSlots">
                     <div class="queue-slot" id="c-slot-0"><span class="slot-step-num">#1</span><span class="slot-icon">🔒</span><span class="slot-name">Bí mật</span></div>
@@ -197,6 +197,28 @@
             <div id="modalTitle" class="modal-title victory">CHIẾN THẮNG!</div>
             <div id="modalDesc" class="modal-desc">Bạn đã đánh bại Sentinel của CPU!</div>
             <button id="restartBtn" class="restart-btn">Chơi Lại Ván Mới (Enter)</button>
+        </div>
+    </div>
+
+    <!-- Modal Chuyển Giao Lập Lệnh 2 Người Chơi (Hotseat Transition Modal) -->
+    <div id="hotseatTransitionModal" class="hotseat-modal" style="display: none;">
+        <div class="hotseat-card">
+            <div class="hotseat-icon-glow">🔒 ➔ 👥</div>
+            <div id="hotseatTitle" class="hotseat-title">ĐÃ KHÓA BÍ MẬT LỆNH NGƯỜI CHƠI 1!</div>
+            <div id="hotseatDesc" class="hotseat-desc">
+                Vui lòng đổi quyền điều khiển cho <b>Người Chơi 2 (P2)</b>.<br>
+                Toàn bộ 4 lệnh của P1 đã được ẩn giấu an toàn!
+            </div>
+            <div id="hotseatTargetInfo" class="hotseat-target-info">
+                <span id="hotseatNextPlayerAvatar" class="hotseat-avatar">🪝</span>
+                <div class="hotseat-ptext">
+                    <div id="hotseatNextPlayerName" class="hotseat-pname">Người Chơi 2 (Hookman)</div>
+                    <div id="hotseatNextPlayerTeam" class="hotseat-pteam">Đội Đỏ 🔴</div>
+                </div>
+            </div>
+            <button id="btnHotseatContinue" class="hotseat-btn">
+                BẮT ĐẦU LẬP LỆNH CHO P2 (SPACE / ENTER) ➔
+            </button>
         </div>
     </div>
 
@@ -475,11 +497,84 @@
     <!-- Màn hình Chọn Nhân vật (Character Selection Screen) -->
     <div id="charSelectScreen" class="char-select-screen" style="display: none;">
         <div class="char-select-header">
-            <h2>CHỌN CHIẾN BINH CỦA BẠN</h2>
-            <p>Mỗi nhân vật sở hữu phong cách chiến đấu và 4 chiêu thức độc nhất</p>
+            <h2 id="charSelectHeaderMainTitle">CHỌN CHIẾN BINH CỦA BẠN</h2>
+            <p id="charSelectHeaderSubText">Mỗi nhân vật sở hữu phong cách chiến đấu và 4 chiêu thức độc nhất</p>
         </div>
+
+        <!-- Bộ chọn Chế độ thi đấu: 1P vs CPU hoặc 2P Local (Hotseat) -->
+        <div class="match-mode-selector-container">
+            <span class="match-mode-label" id="matchModeLabel">🎮 CHẾ ĐỘ THI ĐẤU:</span>
+            <div class="match-mode-buttons">
+                <button id="btnMode1Player" class="match-mode-btn active" data-mode="1p">
+                    🤖 1 NGƯỜI CHƠI (VS CPU)
+                </button>
+                <button id="btnMode2Player" class="match-mode-btn" data-mode="2p">
+                    👥 2 NGƯỜI CHƠI LOCAL (HOTSEAT)
+                </button>
+            </div>
+        </div>
+
+        <!-- Bảng Cấu Hình 2 Người Chơi Local (Hotseat Mode Setup) -->
+        <div id="twoPlayerConfigSection" class="two-player-config-section" style="display: none;">
+            <div class="two-player-setup-grid">
+                <!-- Cấu hình Người Chơi 1 (P1) -->
+                <div class="player-config-card" id="p1ConfigCard">
+                    <div class="p-card-header">
+                        <span class="p-tag-pill p1-tag">🎮 NGƯỜI CHƠI 1 (P1)</span>
+                        <span class="p-active-badge" id="p1ActiveSummaryBadge">🔵 Đội Xanh</span>
+                    </div>
+                    <div class="p-config-row">
+                        <label class="p-config-label" id="p1TeamChoiceLabel">Chọn Đội:</label>
+                        <div class="p-team-toggle-group">
+                            <button class="p-team-btn team-blue active" id="btnP1TeamBlue" data-player="1" data-team="BLUE">🔵 Đội Xanh</button>
+                            <button class="p-team-btn team-red" id="btnP1TeamRed" data-player="1" data-team="RED">🔴 Đội Đỏ</button>
+                        </div>
+                    </div>
+                    <div class="p-config-row">
+                        <label class="p-config-label" id="p1CharChoiceLabel">Chọn Chiến Binh:</label>
+                        <div class="p-char-select-grid" id="p1CharSelectGrid">
+                            <button class="p-char-mini-btn active" data-player="1" data-char="trooper">🪖 Trooper</button>
+                            <button class="p-char-mini-btn" data-player="1" data-char="hookman">🪝 Hookman</button>
+                            <button class="p-char-mini-btn" data-player="1" data-char="smoke_guy">🚬 Smoke Guy</button>
+                            <button class="p-char-mini-btn" data-player="1" data-char="razor">⚡ Razor</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cấu hình Người Chơi 2 (P2) -->
+                <div class="player-config-card" id="p2ConfigCard">
+                    <div class="p-card-header">
+                        <span class="p-tag-pill p2-tag">🎮 NGƯỜI CHƠI 2 (P2)</span>
+                        <span class="p-active-badge" id="p2ActiveSummaryBadge">🔴 Đội Đỏ</span>
+                    </div>
+                    <div class="p-config-row">
+                        <label class="p-config-label" id="p2TeamChoiceLabel">Chọn Đội:</label>
+                        <div class="p-team-toggle-group">
+                            <button class="p-team-btn team-blue" id="btnP2TeamBlue" data-player="2" data-team="BLUE">🔵 Đội Xanh</button>
+                            <button class="p-team-btn team-red active" id="btnP2TeamRed" data-player="2" data-team="RED">🔴 Đội Đỏ</button>
+                        </div>
+                    </div>
+                    <div class="p-config-row">
+                        <label class="p-config-label" id="p2CharChoiceLabel">Chọn Chiến Binh:</label>
+                        <div class="p-char-select-grid" id="p2CharSelectGrid">
+                            <button class="p-char-mini-btn" data-player="2" data-char="trooper">🪖 Trooper</button>
+                            <button class="p-char-mini-btn active" data-player="2" data-char="hookman">🪝 Hookman</button>
+                            <button class="p-char-mini-btn" data-player="2" data-char="smoke_guy">🚬 Smoke Guy</button>
+                            <button class="p-char-mini-btn" data-player="2" data-char="razor">⚡ Razor</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tình trạng Đối đầu / Hợp tác -->
+            <div class="two-player-matchup-banner" id="twoPlayerMatchupBanner">
+                <span class="matchup-icon">⚔️</span>
+                <span id="twoPlayerMatchupText">Đối Đầu Trực Tiếp: Người Chơi 1 (🔵 Đội Xanh) vs Người Chơi 2 (🔴 Đội Đỏ)</span>
+            </div>
+        </div>
+
         <div class="char-grid" id="charGridContainer">
-            <!-- Được render tự động từ characters.js -->
+            <!-- Được render tự động từ characters.js (Cho 1P mode) -->
         </div>
 
         <!-- Tùy Chọn Đối Thủ CPU -->

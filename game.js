@@ -131,8 +131,22 @@ class GameEngine {
         this.floatingTexts = [];
         this.particles = [];
 
+        // Quản lý Chế độ 2 Người Chơi Local (Hotseat Mode)
+        this.isTwoPlayerMode = false;
+        this.p1Team = 'BLUE';
+        this.p2Team = 'RED';
+        this.p1Character = getCharacterById('trooper');
+        this.p2Character = getCharacterById('hookman');
+        this.p1Unit = null;
+        this.p2Unit = null;
+        this.activePlanningPlayer = 1;
+        this.p1Queue = [];
+        this.p2Queue = [];
+        this.isHotseatModalOpen = false;
+
         this.setupTeams();
         this.initCharacterSelectUI();
+        this.initMatchModeUI();
         this.initTeamModeUI();
         this.initMenuAndGuideUI();
         this.bindEvents();
@@ -219,6 +233,164 @@ class GameEngine {
 
         const startBtn = document.getElementById('btnStartBattle');
         if (startBtn) startBtn.onclick = () => this.startBattle();
+    }
+
+    // --- Khởi tạo Giao diện Chế độ Thi đấu (1P vs CPU hoặc 2P Local Hotseat) ---
+    initMatchModeUI() {
+        const btn1P = document.getElementById('btnMode1Player');
+        const btn2P = document.getElementById('btnMode2Player');
+        if (btn1P) btn1P.addEventListener('click', () => this.setMatchMode(false));
+        if (btn2P) btn2P.addEventListener('click', () => this.setMatchMode(true));
+
+        // P1 Team
+        const btnP1Blue = document.getElementById('btnP1TeamBlue');
+        const btnP1Red = document.getElementById('btnP1TeamRed');
+        if (btnP1Blue) btnP1Blue.addEventListener('click', () => this.setP1Team('BLUE'));
+        if (btnP1Red) btnP1Red.addEventListener('click', () => this.setP1Team('RED'));
+
+        // P2 Team
+        const btnP2Blue = document.getElementById('btnP2TeamBlue');
+        const btnP2Red = document.getElementById('btnP2TeamRed');
+        if (btnP2Blue) btnP2Blue.addEventListener('click', () => this.setP2Team('BLUE'));
+        if (btnP2Red) btnP2Red.addEventListener('click', () => this.setP2Team('RED'));
+
+        // P1 Character
+        const p1CharBtns = document.querySelectorAll('#p1CharSelectGrid .p-char-mini-btn');
+        p1CharBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const charId = btn.getAttribute('data-char');
+                this.setP1Character(charId);
+            });
+        });
+
+        // P2 Character
+        const p2CharBtns = document.querySelectorAll('#p2CharSelectGrid .p-char-mini-btn');
+        p2CharBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const charId = btn.getAttribute('data-char');
+                this.setP2Character(charId);
+            });
+        });
+
+        // Nút tiếp tục trong Hotseat Modal
+        const btnHotseatCont = document.getElementById('btnHotseatContinue');
+        if (btnHotseatCont) {
+            btnHotseatCont.addEventListener('click', () => {
+                this.continueToP2Planning();
+            });
+        }
+
+        this.updateMatchModeUI();
+    }
+
+    setMatchMode(isTwoPlayer) {
+        this.isTwoPlayerMode = !!isTwoPlayer;
+        this.updateMatchModeUI();
+        if (window.soundCtrl) window.soundCtrl.playSelect();
+    }
+
+    setP1Team(team) {
+        if (team === 'BLUE' || team === 'RED') {
+            this.p1Team = team;
+            this.updateMatchModeUI();
+            if (window.soundCtrl) window.soundCtrl.playSelect();
+        }
+    }
+
+    setP2Team(team) {
+        if (team === 'BLUE' || team === 'RED') {
+            this.p2Team = team;
+            this.updateMatchModeUI();
+            if (window.soundCtrl) window.soundCtrl.playSelect();
+        }
+    }
+
+    setP1Character(charId) {
+        const char = typeof charId === 'string' ? getCharacterById(charId) : charId;
+        if (char && char.isUnlocked) {
+            this.p1Character = char;
+            this.updateMatchModeUI();
+            if (window.soundCtrl) window.soundCtrl.playSelect();
+        }
+    }
+
+    setP2Character(charId) {
+        const char = typeof charId === 'string' ? getCharacterById(charId) : charId;
+        if (char && char.isUnlocked) {
+            this.p2Character = char;
+            this.updateMatchModeUI();
+            if (window.soundCtrl) window.soundCtrl.playSelect();
+        }
+    }
+
+    updateMatchModeUI() {
+        if (typeof document === 'undefined' || !document.getElementById) return;
+
+        const btn1P = document.getElementById('btnMode1Player');
+        const btn2P = document.getElementById('btnMode2Player');
+        if (btn1P && btn1P.classList) btn1P.classList.toggle('active', !this.isTwoPlayerMode);
+        if (btn2P && btn2P.classList) btn2P.classList.toggle('active', this.isTwoPlayerMode);
+
+        const twoPlayerSec = document.getElementById('twoPlayerConfigSection');
+        const charGrid = document.getElementById('charGridContainer');
+        const cpuSec = document.querySelector('.cpu-select-section');
+
+        if (twoPlayerSec && twoPlayerSec.style) twoPlayerSec.style.display = this.isTwoPlayerMode ? 'block' : 'none';
+        if (charGrid && charGrid.style) charGrid.style.display = this.isTwoPlayerMode ? 'none' : 'grid';
+        if (cpuSec && cpuSec.style) cpuSec.style.display = this.isTwoPlayerMode ? 'none' : 'flex';
+
+        // P1 Team buttons
+        const btnP1Blue = document.getElementById('btnP1TeamBlue');
+        const btnP1Red = document.getElementById('btnP1TeamRed');
+        if (btnP1Blue && btnP1Blue.classList) btnP1Blue.classList.toggle('active', this.p1Team === 'BLUE');
+        if (btnP1Red && btnP1Red.classList) btnP1Red.classList.toggle('active', this.p1Team === 'RED');
+
+        // P2 Team buttons
+        const btnP2Blue = document.getElementById('btnP2TeamBlue');
+        const btnP2Red = document.getElementById('btnP2TeamRed');
+        if (btnP2Blue && btnP2Blue.classList) btnP2Blue.classList.toggle('active', this.p2Team === 'BLUE');
+        if (btnP2Red && btnP2Red.classList) btnP2Red.classList.toggle('active', this.p2Team === 'RED');
+
+        // P1 Char buttons
+        const p1CharBtns = document.querySelectorAll('#p1CharSelectGrid .p-char-mini-btn');
+        p1CharBtns.forEach(btn => {
+            if (btn && btn.classList) btn.classList.toggle('active', btn.getAttribute('data-char') === this.p1Character.id);
+        });
+
+        // P2 Char buttons
+        const p2CharBtns = document.querySelectorAll('#p2CharSelectGrid .p-char-mini-btn');
+        p2CharBtns.forEach(btn => {
+            if (btn && btn.classList) btn.classList.toggle('active', btn.getAttribute('data-char') === this.p2Character.id);
+        });
+
+        // Badges summary
+        const p1Badge = document.getElementById('p1ActiveSummaryBadge');
+        if (p1Badge) {
+            p1Badge.innerText = `${this.p1Team === 'BLUE' ? (this.lang === 'en' ? '🔵 Blue Team' : '🔵 Đội Xanh') : (this.lang === 'en' ? '🔴 Red Team' : '🔴 Đội Đỏ')} • ${this.p1Character.avatar} ${getCharName(this.p1Character, this.lang)}`;
+        }
+        const p2Badge = document.getElementById('p2ActiveSummaryBadge');
+        if (p2Badge) {
+            p2Badge.innerText = `${this.p2Team === 'BLUE' ? (this.lang === 'en' ? '🔵 Blue Team' : '🔵 Đội Xanh') : (this.lang === 'en' ? '🔴 Red Team' : '🔴 Đội Đỏ')} • ${this.p2Character.avatar} ${getCharName(this.p2Character, this.lang)}`;
+        }
+
+        // Matchup banner
+        const matchupText = document.getElementById('twoPlayerMatchupText');
+        if (matchupText) {
+            const isPvp = this.p1Team !== this.p2Team;
+            if (isPvp) {
+                matchupText.innerHTML = this.lang === 'en'
+                    ? `⚔️ Direct Battle: Player 1 (${this.p1Team === 'BLUE' ? '🔵 Blue' : '🔴 Red'}) vs Player 2 (${this.p2Team === 'BLUE' ? '🔵 Blue' : '🔴 Red'})`
+                    : `⚔️ Đối Đầu Trực Tiếp: Người Chơi 1 (${this.p1Team === 'BLUE' ? '🔵 Đội Xanh' : '🔴 Đội Đỏ'}) vs Người Chơi 2 (${this.p2Team === 'BLUE' ? '🔵 Đội Xanh' : '🔴 Đội Đỏ'})`;
+            } else {
+                const teamName = this.p1Team === 'BLUE' ? (this.lang === 'en' ? '🔵 Blue Team' : '🔵 Đội Xanh') : (this.lang === 'en' ? '🔴 Red Team' : '🔴 Đội Đỏ');
+                matchupText.innerHTML = this.lang === 'en'
+                    ? `🤝 Co-op Squad: Both Player 1 & Player 2 on ${teamName} against CPU rivals!`
+                    : `🤝 Hợp Tác Cùng Phe: Cả 2 Người Chơi cùng thuộc ${teamName} tác chiến chống lại CPU!`;
+            }
+        }
+
+        this.setupTeams();
+        this.updateTeamRosterPreviews();
     }
 
     // --- Khởi tạo Giao diện Chế độ Đội hình (Tối đa 5 người mỗi đội) ---
@@ -344,11 +516,81 @@ class GameEngine {
         if (!blueList || !redList) return;
 
         const unlockedChars = CHARACTERS_DATABASE.filter(c => c.isUnlocked);
+
+        if (this.isTwoPlayerMode) {
+            // Roster Đội Xanh (2P Mode)
+            let blueHtml = '';
+            if (this.p1Team === 'BLUE') {
+                blueHtml += `
+                    <div class="team-roster-chip is-player" title="${getCharName(this.p1Character, this.lang)} (${this.p1Character.maxHp} HP)">
+                        <span>🎮 ${this.p1Character.avatar}</span>
+                        <span>${getCharName(this.p1Character, this.lang)}</span>
+                        <span style="color: #38bdf8; font-size: 0.68rem; font-weight:800;">[P1]</span>
+                    </div>
+                `;
+            }
+            if (this.p2Team === 'BLUE') {
+                blueHtml += `
+                    <div class="team-roster-chip is-player" title="${getCharName(this.p2Character, this.lang)} (${this.p2Character.maxHp} HP)">
+                        <span>🎮 ${this.p2Character.avatar}</span>
+                        <span>${getCharName(this.p2Character, this.lang)}</span>
+                        <span style="color: #38bdf8; font-size: 0.68rem; font-weight:800;">[P2]</span>
+                    </div>
+                `;
+            }
+            const currentBlueHumans = (this.p1Team === 'BLUE' ? 1 : 0) + (this.p2Team === 'BLUE' ? 1 : 0);
+            for (let i = currentBlueHumans; i < this.blueTeamSize; i++) {
+                const allyChar = unlockedChars[i % unlockedChars.length];
+                blueHtml += `
+                    <div class="team-roster-chip is-ally" title="${getCharName(allyChar, this.lang)} (${allyChar.maxHp} HP)">
+                        <span>🤖 ${allyChar.avatar}</span>
+                        <span>${getCharName(allyChar, this.lang)}</span>
+                        <span style="color: #38bdf8; font-size: 0.65rem;">+CPU</span>
+                    </div>
+                `;
+            }
+            blueList.innerHTML = blueHtml || `<span style="color:#64748b; font-size:0.75rem;">(Trống)</span>`;
+
+            // Roster Đội Đỏ (2P Mode)
+            let redHtml = '';
+            if (this.p1Team === 'RED') {
+                redHtml += `
+                    <div class="team-roster-chip is-enemy" title="${getCharName(this.p1Character, this.lang)} (${this.p1Character.maxHp} HP)">
+                        <span>🎮 ${this.p1Character.avatar}</span>
+                        <span>${getCharName(this.p1Character, this.lang)}</span>
+                        <span style="color: #f43f5e; font-size: 0.68rem; font-weight:800;">[P1]</span>
+                    </div>
+                `;
+            }
+            if (this.p2Team === 'RED') {
+                redHtml += `
+                    <div class="team-roster-chip is-enemy" title="${getCharName(this.p2Character, this.lang)} (${this.p2Character.maxHp} HP)">
+                        <span>🎮 ${this.p2Character.avatar}</span>
+                        <span>${getCharName(this.p2Character, this.lang)}</span>
+                        <span style="color: #f43f5e; font-size: 0.68rem; font-weight:800;">[P2]</span>
+                    </div>
+                `;
+            }
+            const currentRedHumans = (this.p1Team === 'RED' ? 1 : 0) + (this.p2Team === 'RED' ? 1 : 0);
+            for (let j = currentRedHumans; j < this.redTeamSize; j++) {
+                const enemyChar = unlockedChars[(j + 2) % unlockedChars.length];
+                redHtml += `
+                    <div class="team-roster-chip is-enemy" title="${getCharName(enemyChar, this.lang)} (${enemyChar.maxHp} HP)">
+                        <span>🤖 ${enemyChar.avatar}</span>
+                        <span>${getCharName(enemyChar, this.lang)}</span>
+                        <span style="color: #fb7185; font-size: 0.65rem;">+CPU</span>
+                    </div>
+                `;
+            }
+            redList.innerHTML = redHtml || `<span style="color:#64748b; font-size:0.75rem;">(Trống)</span>`;
+            return;
+        }
+
         const pChar = this.selectedCharacter || getCharacterById('trooper');
         const otherChars = unlockedChars.filter(c => c.id !== pChar.id);
         const allyPool = otherChars.length > 0 ? otherChars : unlockedChars;
 
-        // Blue Team Roster
+        // Blue Team Roster (1P Mode)
         let blueHtml = `
             <div class="team-roster-chip is-player" title="${getCharName(pChar, this.lang)} (100 HP)">
                 <span>👑 ${pChar.avatar}</span>
@@ -368,7 +610,7 @@ class GameEngine {
         }
         blueList.innerHTML = blueHtml;
 
-        // Red Team Roster
+        // Red Team Roster (1P Mode)
         let cLeaderChar = getCharacterById(this.selectedCpuOption);
         if (!cLeaderChar) cLeaderChar = unlockedChars[0];
 
@@ -480,6 +722,78 @@ class GameEngine {
 
     setupTeams() {
         const unlockedChars = CHARACTERS_DATABASE.filter(c => c.isUnlocked);
+
+        if (this.isTwoPlayerMode) {
+            let blueSize = Math.max(1, Math.min(5, this.blueTeamSize || 1));
+            let redSize = Math.max(1, Math.min(5, this.redTeamSize || 1));
+            if (this.p1Team === 'BLUE' && this.p2Team === 'BLUE') {
+                blueSize = Math.max(2, blueSize);
+                this.blueTeamSize = blueSize;
+            }
+            if (this.p1Team === 'RED' && this.p2Team === 'RED') {
+                redSize = Math.max(2, redSize);
+                this.redTeamSize = redSize;
+            }
+            this.gameMode = (blueSize === 1 && redSize === 1) ? 'DUEL' : 'KOTH';
+
+            this.blueTeam = [];
+            this.redTeam = [];
+
+            // 1. Blue Team (2P Mode)
+            const bluePlayers = [];
+            if (this.p1Team === 'BLUE') bluePlayers.push({ pNum: 1, char: this.p1Character });
+            if (this.p2Team === 'BLUE') bluePlayers.push({ pNum: 2, char: this.p2Character });
+
+            for (let i = 0; i < bluePlayers.length; i++) {
+                const pInfo = bluePlayers[i];
+                const unit = this.createUnit(`blue_${i}`, 'BLUE', i, pInfo.char, true, `(P${pInfo.pNum}) [${getCharName(pInfo.char, this.lang)}]`);
+                unit.playerIndex = pInfo.pNum;
+                if (pInfo.pNum === 1) this.p1Unit = unit;
+                if (pInfo.pNum === 2) this.p2Unit = unit;
+                this.blueTeam.push(unit);
+            }
+
+            for (let i = this.blueTeam.length; i < blueSize; i++) {
+                const allyChar = unlockedChars[i % unlockedChars.length];
+                const allyUnit = this.createUnit(`blue_${i}`, 'BLUE', i, allyChar, false);
+                this.blueTeam.push(allyUnit);
+            }
+
+            // 2. Red Team (2P Mode)
+            const redPlayers = [];
+            if (this.p1Team === 'RED') redPlayers.push({ pNum: 1, char: this.p1Character });
+            if (this.p2Team === 'RED') redPlayers.push({ pNum: 2, char: this.p2Character });
+
+            for (let j = 0; j < redPlayers.length; j++) {
+                const pInfo = redPlayers[j];
+                const unit = this.createUnit(`red_${j}`, 'RED', j, pInfo.char, true, `(P${pInfo.pNum}) [${getCharName(pInfo.char, this.lang)}]`);
+                unit.playerIndex = pInfo.pNum;
+                if (pInfo.pNum === 1) this.p1Unit = unit;
+                if (pInfo.pNum === 2) this.p2Unit = unit;
+                this.redTeam.push(unit);
+            }
+
+            for (let j = this.redTeam.length; j < redSize; j++) {
+                const enemyChar = unlockedChars[(j + 2) % unlockedChars.length];
+                const enemyUnit = this.createUnit(`red_${j}`, 'RED', j, enemyChar, false);
+                this.redTeam.push(enemyUnit);
+            }
+
+            // Đồng bộ tham chiếu tương thích ngược
+            this.player = this.p1Unit || this.blueTeam[0];
+            this.cpu = this.p2Unit || this.redTeam[0];
+            this.cooldowns = this.player.cooldowns;
+            this.skillAmmo = this.player.skillAmmo;
+            this.playerBuffs = this.player.buffs;
+            this.cpuCooldowns = this.cpu.cooldowns;
+            this.cpuSkillAmmo = this.cpu.skillAmmo;
+            this.cpuBuffs = this.cpu.buffs;
+            this.playerRevealedTurns = this.player.revealedTurns;
+            this.cpuRevealedTurns = this.cpu.revealedTurns;
+            this.activePathMaxSteps = this.player.moveBudget;
+            return;
+        }
+
         const blueSize = Math.max(1, Math.min(5, this.blueTeamSize || 1));
         const redSize = Math.max(1, Math.min(5, this.redTeamSize || 1));
         this.gameMode = (blueSize === 1 && redSize === 1) ? 'DUEL' : 'KOTH';
@@ -694,9 +1008,26 @@ class GameEngine {
         if (menu) menu.style.display = 'none';
         if (charSel) charSel.style.display = 'none';
         if (guide) guide.style.display = 'none';
-        this.applySelectedCharacter();
-        this.applyCpuCharacter(this.selectedCpuOption);
-        this.setupTeams();
+
+        if (this.isTwoPlayerMode) {
+            this.setupTeams();
+            this.activePlanningPlayer = 1;
+            this.p1Queue = [];
+            this.p2Queue = [];
+            this.playerQueue = [];
+            this.cpuQueue = [];
+            this.selectedCharacter = this.p1Character;
+            this.cooldowns = this.p1Unit.cooldowns;
+            this.skillAmmo = this.p1Unit.skillAmmo;
+            this.playerBuffs = this.p1Unit.buffs;
+            this.currentSelectedDir = this.p1Unit.dir || (this.p1Unit.team === 'BLUE' ? 'RIGHT' : 'LEFT');
+            this.highlightSelectedDirButton();
+        } else {
+            this.applySelectedCharacter();
+            this.applyCpuCharacter(this.selectedCpuOption);
+            this.setupTeams();
+        }
+
         this.turn = 1;
         this.hillScale = 0;
         this.blueScore = 0;
@@ -704,9 +1035,14 @@ class GameEngine {
         this.inOvertime = false;
         this.phase = 'PLANNING';
         if (window.soundCtrl) window.soundCtrl.playCommit();
-        const pName = getCharName(this.selectedCharacter, this.lang);
-        const cName = getCharName(this.cpuCharacter, this.lang);
-        if (this.gameMode === 'KOTH') {
+
+        if (this.isTwoPlayerMode) {
+            const p1 = this.p1Unit;
+            const p2 = this.p2Unit;
+            this.addCombatLog(this.lang === 'en'
+                ? `👥 2-Player Local Match started! P1 (${p1.name}) vs P2 (${p2.name}). Planning Turn: Player 1 (P1)!`
+                : `👥 Trận đấu 2 Người Chơi Local bắt đầu! P1 (${p1.name}) vs P2 (${p2.name}). Lượt lập lệnh: Người Chơi 1 (P1)!`, 'system');
+        } else if (this.gameMode === 'KOTH') {
             this.addCombatLog(this.lang === 'en'
                 ? `👑 King of the Hill started! Squads: Blue (${this.blueTeamSize}) vs Red (${this.redTeamSize}). Hold the 5x5 Hill to reach 15 points!`
                 : `👑 Chế độ Chiếm Cứ Điểm 5x5 bắt đầu! Đội hình: Xanh (${this.blueTeamSize}) vs Đỏ (${this.redTeamSize}). Chiếm giữ Cứ điểm để đạt 15 điểm!`, 'system');
@@ -784,10 +1120,44 @@ class GameEngine {
         }
 
         // Character Select Screen
-        const csTitle = document.querySelector('.char-select-header h2');
+        const csTitle = document.getElementById('charSelectHeaderMainTitle') || document.querySelector('.char-select-header h2');
         if (csTitle) csTitle.innerText = t('charSelectHeaderTitle');
-        const csSub = document.querySelector('.char-select-header p');
+        const csSub = document.getElementById('charSelectHeaderSubText') || document.querySelector('.char-select-header p');
         if (csSub) csSub.innerText = t('charSelectHeaderSub');
+
+        // Match Mode Selector
+        const matchModeLbl = document.getElementById('matchModeLabel');
+        if (matchModeLbl) matchModeLbl.innerText = t('matchModeTitle');
+        const btn1P = document.getElementById('btnMode1Player');
+        if (btn1P) btn1P.innerText = t('mode1Player');
+        const btn2P = document.getElementById('btnMode2Player');
+        if (btn2P) btn2P.innerText = t('mode2Player');
+
+        // 2P Config Labels
+        const p1Choice = document.getElementById('p1TeamChoiceLabel');
+        if (p1Choice) p1Choice.innerText = t('teamChoicePrompt');
+        const p2Choice = document.getElementById('p2TeamChoiceLabel');
+        if (p2Choice) p2Choice.innerText = t('teamChoicePrompt');
+        const p1CharChoice = document.getElementById('p1CharChoiceLabel');
+        if (p1CharChoice) p1CharChoice.innerText = t('charChoicePrompt');
+        const p2CharChoice = document.getElementById('p2CharChoiceLabel');
+        if (p2CharChoice) p2CharChoice.innerText = t('charChoicePrompt');
+        const btnP1B = document.getElementById('btnP1TeamBlue');
+        if (btnP1B) btnP1B.innerText = t('teamBlueOpt');
+        const btnP1R = document.getElementById('btnP1TeamRed');
+        if (btnP1R) btnP1R.innerText = t('teamRedOpt');
+        const btnP2B = document.getElementById('btnP2TeamBlue');
+        if (btnP2B) btnP2B.innerText = t('teamBlueOpt');
+        const btnP2R = document.getElementById('btnP2TeamRed');
+        if (btnP2R) btnP2R.innerText = t('teamRedOpt');
+
+        // Hotseat Modal Texts
+        const hsTitle = document.getElementById('hotseatTitle');
+        if (hsTitle) hsTitle.innerText = t('hotseatTransitionTitle');
+        const hsDesc = document.getElementById('hotseatDesc');
+        if (hsDesc) hsDesc.innerHTML = t('hotseatTransitionDesc');
+        const hsBtn = document.getElementById('btnHotseatContinue');
+        if (hsBtn) hsBtn.innerText = t('hotseatBtnContinue');
 
         const cpuLabel = document.querySelector('.cpu-select-label');
         if (cpuLabel) cpuLabel.innerText = t('cpuSelectLabel');
@@ -1090,33 +1460,104 @@ class GameEngine {
         this.updateTeamRosterPreviews();
     }
 
+    getActivePlanningUnit() {
+        if (!this.isTwoPlayerMode) return this.player;
+        return (this.activePlanningPlayer === 1) ? this.p1Unit : this.p2Unit;
+    }
+
+    getActivePlanningQueue() {
+        if (!this.isTwoPlayerMode) return this.playerQueue;
+        return (this.activePlanningPlayer === 1) ? this.p1Queue : this.p2Queue;
+    }
+
+    confirmP1QueueAndTransitionToP2() {
+        if (this.phase !== 'PLANNING' || this.p1Queue.length !== 4) return;
+        this.cancelPathPlanning();
+        this.p1Unit.queue = [...this.p1Queue];
+        if (window.soundCtrl) window.soundCtrl.playCommit();
+
+        // Ẩn hiển thị hàng đợi của P1 để bảo mật (Anti-Peeking)
+        for (let i = 0; i < 4; i++) {
+            const slot = document.getElementById(`p-slot-${i}`);
+            if (slot) {
+                slot.className = 'queue-slot filled';
+                slot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">${t('secretLockedTitle')}</span>`;
+            }
+        }
+
+        // Mở Hotseat modal
+        this.isHotseatModalOpen = true;
+        const modal = document.getElementById('hotseatTransitionModal');
+        const p2Name = document.getElementById('hotseatNextPlayerName');
+        const p2Team = document.getElementById('hotseatNextPlayerTeam');
+        const p2Avatar = document.getElementById('hotseatNextPlayerAvatar');
+        if (p2Name && this.p2Unit) p2Name.innerText = `Người Chơi 2 [${getCharName(this.p2Unit.character, this.lang)}]`;
+        if (p2Team && this.p2Unit) p2Team.innerText = this.p2Unit.team === 'BLUE' ? (this.lang === 'en' ? '🔵 Blue Team' : '🔵 Đội Xanh') : (this.lang === 'en' ? '🔴 Red Team' : '🔴 Đội Đỏ');
+        if (p2Avatar && this.p2Unit) p2Avatar.innerText = this.p2Unit.avatar;
+        if (modal) modal.style.display = 'flex';
+    }
+
+    continueToP2Planning() {
+        this.isHotseatModalOpen = false;
+        const modal = document.getElementById('hotseatTransitionModal');
+        if (modal) modal.style.display = 'none';
+        if (window.soundCtrl) window.soundCtrl.playSelect();
+
+        this.activePlanningPlayer = 2;
+        this.selectedCharacter = this.p2Unit.character;
+        this.cooldowns = this.p2Unit.cooldowns;
+        this.skillAmmo = this.p2Unit.skillAmmo;
+        this.playerBuffs = this.p2Unit.buffs;
+        this.currentSelectedDir = this.p2Unit.dir || (this.p2Unit.team === 'BLUE' ? 'RIGHT' : 'LEFT');
+        this.highlightSelectedDirButton();
+
+        // Nếu P2 hy sinh trong KOTH, tự động điền lệnh chờ hồi sinh
+        if (this.gameMode === 'KOTH' && this.p2Unit.hp <= 0) {
+            const respawnLabel = t('respawningTag', { turns: this.p2Unit.respawnTurns });
+            this.p2Queue = [
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' }
+            ];
+        }
+
+        this.updateSkillButtons();
+        this.updateQueueDisplay();
+        this.updateHUD();
+        this.addCombatLog(`🎮 [P2] ${this.p2Unit.name} bắt đầu lên 4 lệnh!`, 'system');
+    }
+
     updateSkillButtons() {
-        const char = this.selectedCharacter;
+        const unit = this.getActivePlanningUnit();
+        if (!unit) return;
+        const char = unit.character;
+        const currentQueue = this.getActivePlanningQueue();
         const skillContainer = document.getElementById('dynamicSkillButtons');
         if (!skillContainer) return;
 
-        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) {
+        if (this.gameMode === 'KOTH' && unit && unit.hp <= 0) {
             skillContainer.innerHTML = `
                 <div style="padding: 10px; color: #f43f5e; font-weight: bold; background: rgba(244,63,94,0.12); border: 1px dashed #f43f5e; border-radius: 6px; width: 100%; text-align: center;">
-                    ${t('respawnNoticeText', { turns: this.player.respawnTurns })}
+                    ${t('respawnNoticeText', { turns: unit.respawnTurns })}
                 </div>
             `;
             return;
         }
 
         skillContainer.innerHTML = char.skills.map((s, idx) => {
-            const cd = this.cooldowns[s.id] || 0;
+            const cd = unit.cooldowns[s.id] || 0;
             const isCooldown = cd > 0;
-            const isTethered = this.activeHookTethers && this.activeHookTethers.some(t => t.skillId === s.id && t.source === 'PLAYER');
-            const isAdrenalineActive = s.id === 'HOOKMAN_ADRENALINE' && this.playerBuffs && this.playerBuffs.adrenaline.turnsLeft > 0;
-            const isCigaretteActive = s.id === 'SMOKE_CIGARETTE' && this.playerBuffs && this.playerBuffs.cigarette && this.playerBuffs.cigarette.turnsLeft > 0;
+            const isTethered = this.activeHookTethers && this.activeHookTethers.some(t => t.skillId === s.id && (t.sourceUnit === unit || t.source === 'PLAYER'));
+            const isAdrenalineActive = s.id === 'HOOKMAN_ADRENALINE' && unit.buffs && unit.buffs.adrenaline && unit.buffs.adrenaline.turnsLeft > 0;
+            const isCigaretteActive = s.id === 'SMOKE_CIGARETTE' && unit.buffs && unit.buffs.cigarette && unit.buffs.cigarette.turnsLeft > 0;
 
             let statusLabel = '';
             let isAmmoEmpty = false;
 
             if (s.maxAmmo) {
-                const totalAmmo = this.skillAmmo[s.id] !== undefined ? this.skillAmmo[s.id] : s.maxAmmo;
-                const queuedCount = this.playerQueue.filter(act => act.skillId === s.id).length;
+                const totalAmmo = unit.skillAmmo[s.id] !== undefined ? unit.skillAmmo[s.id] : s.maxAmmo;
+                const queuedCount = currentQueue.filter(act => act.skillId === s.id).length;
                 const availableAmmo = Math.max(0, totalAmmo - queuedCount);
                 if (isCooldown) {
                     statusLabel = `<span class="cd-tag">[Hồi: ${cd}L]</span>`;
@@ -1131,9 +1572,9 @@ class GameEngine {
             } else if (isTethered) {
                 statusLabel = `<span class="cd-tag" style="background:#ef4444; color:white;">[DÂY CĂNG]</span>`;
             } else if (isAdrenalineActive) {
-                statusLabel = `<span class="cd-tag" style="background:#10b981; color:white;">[+20% DMG: ${this.playerBuffs.adrenaline.turnsLeft}L]</span>`;
+                statusLabel = `<span class="cd-tag" style="background:#10b981; color:white;">[+20% DMG: ${unit.buffs.adrenaline.turnsLeft}L]</span>`;
             } else if (isCigaretteActive) {
-                statusLabel = `<span class="cd-tag" style="background:#eab308; color:black; font-weight:bold;">[ĐANG HÚT: ${this.playerBuffs.cigarette.turnsLeft}L]</span>`;
+                statusLabel = `<span class="cd-tag" style="background:#eab308; color:black; font-weight:bold;">[ĐANG HÚT: ${unit.buffs.cigarette.turnsLeft}L]</span>`;
             } else if (isCooldown) {
                 statusLabel = `<span class="cd-tag">[Hồi: ${cd}L]</span>`;
             }
@@ -1177,7 +1618,17 @@ class GameEngine {
 
         document.getElementById('btnUndo').addEventListener('click', () => this.undoAction());
         document.getElementById('btnClear').addEventListener('click', () => this.clearQueue());
-        document.getElementById('btnCommit').addEventListener('click', () => this.commitTurn());
+        document.getElementById('btnCommit').addEventListener('click', () => {
+            if (this.isTwoPlayerMode && this.phase === 'PLANNING') {
+                if (this.activePlanningPlayer === 1 && this.p1Queue.length === 4) {
+                    this.confirmP1QueueAndTransitionToP2();
+                } else if (this.activePlanningPlayer === 2 && this.p2Queue.length === 4) {
+                    this.commitTurn();
+                }
+            } else {
+                this.commitTurn();
+            }
+        });
         document.getElementById('restartBtn').addEventListener('click', () => this.restartGame());
         document.getElementById('btnFinishPath').addEventListener('click', () => this.finishActivePath());
 
@@ -1192,9 +1643,11 @@ class GameEngine {
 
     // --- Tính toán vị trí mô phỏng tiếp theo trong hàng đợi hiện tại ---
     getSimulatedPlayerPos() {
-        let sx = this.player.x;
-        let sy = this.player.y;
-        for (const act of this.playerQueue) {
+        const unit = this.getActivePlanningUnit();
+        const currentQueue = this.getActivePlanningQueue();
+        let sx = unit ? unit.x : this.player.x;
+        let sy = unit ? unit.y : this.player.y;
+        for (const act of currentQueue) {
             if (act.type === 'PATH_MOVE' && act.path && act.path.length > 0) {
                 const lastNode = act.path[act.path.length - 1];
                 sx = lastNode.x;
@@ -1209,7 +1662,8 @@ class GameEngine {
                 let ly = sy + d.dy * (act.range || 3);
                 lx = Math.max(0, Math.min(GRID_COLS - 1, lx));
                 ly = Math.max(0, Math.min(GRID_ROWS - 1, ly));
-                const hasEnemy = (this.cpu.x === lx && this.cpu.y === ly);
+                const allLiving = [...(this.blueTeam || []), ...(this.redTeam || [])].filter(u => u !== unit && u.hp > 0);
+                const hasEnemy = allLiving.some(u => u.x === lx && u.y === ly);
                 const hasHazard = this.groundHazards.some(h => h.x === lx && h.y === ly);
                 if (hasEnemy || hasHazard) {
                     lx = Math.max(0, Math.min(GRID_COLS - 1, lx + d.dx * (act.leapExtra || 2)));
@@ -1229,17 +1683,19 @@ class GameEngine {
     // --- Xử lý vẽ Lộ trình Di chuyển (Path Movement) ---
     startPathPlanning() {
         if (this.phase !== 'PLANNING') return;
-        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) return;
-        if (this.playerQueue.length >= 4) {
+        const unit = this.getActivePlanningUnit();
+        if (this.gameMode === 'KOTH' && unit && unit.hp <= 0) return;
+        const currentQueue = this.getActivePlanningQueue();
+        if (currentQueue.length >= 4) {
             this.addCombatLog('Hàng đợi đã đầy 4 lệnh! Nhấn [SPACE] để thực thi.', 'system');
             return;
         }
 
         this.isBuildingPath = true;
         this.activePath = [];
-        const isCigaretteActive = (this.playerBuffs && this.playerBuffs.cigarette && this.playerBuffs.cigarette.turnsLeft > 0) ||
-                                  this.playerQueue.some(act => act.skillId === 'SMOKE_CIGARETTE');
-        this.activePathMaxSteps = (this.selectedCharacter.moveBudget || 2) + (isCigaretteActive ? 1 : 0);
+        const isCigaretteActive = (unit && unit.buffs && unit.buffs.cigarette && unit.buffs.cigarette.turnsLeft > 0) ||
+                                  currentQueue.some(act => act.skillId === 'SMOKE_CIGARETTE');
+        this.activePathMaxSteps = ((unit && unit.character.moveBudget) || 2) + (isCigaretteActive ? 1 : 0);
 
         this.updatePathNoticeUI();
         if (window.soundCtrl) window.soundCtrl.playSelect();
@@ -1305,18 +1761,21 @@ class GameEngine {
             return;
         }
 
+        const unit = this.getActivePlanningUnit();
+        const currentQueue = this.getActivePlanningQueue();
+        const char = unit ? unit.character : this.selectedCharacter;
         const action = {
-            skillId: this.selectedCharacter.skills[0].id,
+            skillId: char.skills[0].id,
             type: 'PATH_MOVE',
             name: `Lộ Trình (${this.activePath.length}b)`,
             icon: '👟',
             path: [...this.activePath],
             dir: this.activePath[this.activePath.length - 1].dir,
             dirSymbol: this.activePath.map(p => p.symbol).join(' '),
-            color: this.selectedCharacter.themeColor
+            color: char.themeColor
         };
 
-        this.playerQueue.push(action);
+        currentQueue.push(action);
         this.isBuildingPath = false;
         this.activePath = [];
         this.updatePathNoticeUI();
@@ -1325,8 +1784,12 @@ class GameEngine {
         this.updateQueueDisplay();
         this.addCombatLog(`Đã nạp [${action.name}: ${action.dirSymbol}] vào hàng đợi!`, 'system');
 
-        if (this.playerQueue.length === 4) {
-            this.addCombatLog('Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
+        if (currentQueue.length === 4) {
+            if (this.isTwoPlayerMode && this.activePlanningPlayer === 1) {
+                this.addCombatLog(this.lang === 'en' ? 'P1 queue full (4/4)! Press [SPACE] to pass to P2!' : 'P1 đã đủ 4 lệnh. Bấm [SPACE] để xác nhận và chuyển P2!', 'system');
+            } else {
+                this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
+            }
         }
     }
 
@@ -1354,7 +1817,9 @@ class GameEngine {
             this.appendStepToActivePath(dir);
         } else {
             this.currentSelectedDir = dir;
-            this.player.dir = dir;
+            const activeUnit = this.getActivePlanningUnit();
+            if (activeUnit) activeUnit.dir = dir;
+            if (this.player) this.player.dir = dir;
             if (window.soundCtrl) window.soundCtrl.playSelect();
             this.highlightSelectedDirButton();
             this.updateHUD();
@@ -1379,6 +1844,14 @@ class GameEngine {
     }
 
     handleKeyDown(e) {
+        if (this.isHotseatModalOpen) {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                this.continueToP2Planning();
+            }
+            return;
+        }
+
         if (this.phase === 'LANG_SELECT') {
             if (e.code === 'Digit1' || e.key === '1' || e.key === 'v' || e.key === 'V') {
                 e.preventDefault();
@@ -1499,6 +1972,12 @@ class GameEngine {
             e.preventDefault();
             if (this.isBuildingPath) {
                 this.finishActivePath();
+            } else if (this.isTwoPlayerMode && this.phase === 'PLANNING') {
+                if (this.activePlanningPlayer === 1 && this.p1Queue.length === 4) {
+                    this.confirmP1QueueAndTransitionToP2();
+                } else if (this.activePlanningPlayer === 2 && this.p2Queue.length === 4) {
+                    this.commitTurn();
+                }
             } else if (this.playerQueue.length === 4 && this.phase === 'PLANNING') {
                 this.commitTurn();
             }
@@ -1507,8 +1986,12 @@ class GameEngine {
 
     addSkillToQueue(skillIndex) {
         if (this.phase !== 'PLANNING') return;
-        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) return;
-        const skill = this.selectedCharacter.skills[skillIndex];
+        const unit = this.getActivePlanningUnit();
+        if (this.gameMode === 'KOTH' && unit && unit.hp <= 0) return;
+        const currentQueue = this.getActivePlanningQueue();
+        const char = unit ? unit.character : this.selectedCharacter;
+        if (!char || !char.skills) return;
+        const skill = char.skills[skillIndex];
         if (!skill) return;
 
         // Nếu đang trong chế độ vẽ lộ trình mà nhấn chiêu khác -> Chốt lộ trình hiện tại trước
@@ -1520,9 +2003,15 @@ class GameEngine {
             }
         }
 
+        const ux = unit ? unit.x : this.player.x;
+        const uy = unit ? unit.y : this.player.y;
+        const uCooldowns = (unit && unit.cooldowns) ? unit.cooldowns : this.cooldowns;
+        const uSkillAmmo = (unit && unit.skillAmmo) ? unit.skillAmmo : this.skillAmmo;
+        const uBuffs = (unit && unit.buffs) ? unit.buffs : this.playerBuffs;
+
         // Kỹ năng chưa hoàn thiện (CUSTOM / Chưa thiết kế)
         if (skill.type === 'CUSTOM') {
-            this.addFloatingText('CHƯA THIẾT KẾ!', this.player.x, this.player.y, '#f59e0b');
+            this.addFloatingText('CHƯA THIẾT KẾ!', ux, uy, '#f59e0b');
             this.addCombatLog(`Chiêu [${skill.name}] hiện đang chờ ý tưởng thiết kế từ bạn!`, 'system');
             if (window.soundCtrl) window.soundCtrl.playUndo();
             return;
@@ -1535,29 +2024,29 @@ class GameEngine {
         }
 
         // Kiểm tra Dây Móc đang găm (Active Tether)
-        if (this.activeHookTethers && this.activeHookTethers.some(t => t.skillId === skill.id && t.source === 'PLAYER')) {
-            this.addFloatingText('ĐANG TRÓI DÂY!', this.player.x, this.player.y, '#ef4444');
+        if (this.activeHookTethers && this.activeHookTethers.some(t => t.skillId === skill.id && (t.sourceUnit === unit || (unit && unit.isPlayer && t.source === 'PLAYER')))) {
+            this.addFloatingText('ĐANG TRÓI DÂY!', ux, uy, '#ef4444');
             this.addCombatLog(`[${skill.name}] đang duy trì dây móc găm vào mục tiêu, cuối lượt sau sẽ giật kéo tiếp!`, 'hit');
             if (window.soundCtrl) window.soundCtrl.playUndo();
             return;
         }
 
         // Kiểm tra Hồi chiêu (Cooldown)
-        if (this.cooldowns[skill.id] && this.cooldowns[skill.id] > 0) {
-            this.addFloatingText(`HỒI CHIÊU (${this.cooldowns[skill.id]}L)!`, this.player.x, this.player.y, '#f87171');
-            this.addCombatLog(`[${skill.name}] đang hồi chiêu! Còn ${this.cooldowns[skill.id]} lượt nữa.`, 'hit');
+        if (uCooldowns[skill.id] && uCooldowns[skill.id] > 0) {
+            this.addFloatingText(`HỒI CHIÊU (${uCooldowns[skill.id]}L)!`, ux, uy, '#f87171');
+            this.addCombatLog(`[${skill.name}] đang hồi chiêu! Còn ${uCooldowns[skill.id]} lượt nữa.`, 'hit');
             if (window.soundCtrl) window.soundCtrl.playUndo();
             return;
         }
 
         // Kiểm tra đạn/lượt dùng của kỹ năng có cơ số đạn (Ammo)
         if (skill.maxAmmo) {
-            const currentAmmo = this.skillAmmo[skill.id] !== undefined ? this.skillAmmo[skill.id] : skill.maxAmmo;
-            const queuedCount = this.playerQueue.filter(act => act.skillId === skill.id).length;
+            const currentAmmo = uSkillAmmo[skill.id] !== undefined ? uSkillAmmo[skill.id] : skill.maxAmmo;
+            const queuedCount = currentQueue.filter(act => act.skillId === skill.id).length;
             if (queuedCount >= currentAmmo) {
                 const emptyWord = skill.type === 'RECT_SLASH' ? 'HẾT LƯỢT DÙNG!' : 'HẾT ĐẠN!';
                 const unitWord = skill.type === 'RECT_SLASH' ? 'lượt sử dụng' : 'viên đạn';
-                this.addFloatingText(emptyWord, this.player.x, this.player.y, '#f87171');
+                this.addFloatingText(emptyWord, ux, uy, '#f87171');
                 this.addCombatLog(`[${skill.name}] chỉ còn ${currentAmmo} ${unitWord}!`, 'hit');
                 if (window.soundCtrl) window.soundCtrl.playUndo();
                 return;
@@ -1576,15 +2065,16 @@ class GameEngine {
                 };
                 const snapped = snapMap[this.currentSelectedDir] || 'RIGHT';
                 this.currentSelectedDir = snapped;
+                if (unit) unit.dir = snapped;
                 this.highlightSelectedDirButton();
-                this.addFloatingText(`HƯỚNG: ${DIRECTIONS[snapped].label}`, this.player.x, this.player.y, '#06b6d4');
+                this.addFloatingText(`HƯỚNG: ${DIRECTIONS[snapped].label}`, ux, uy, '#06b6d4');
                 this.addCombatLog(`⚠️ [${skill.name}] chỉ có thể vung theo 4 hướng chính! Tự động chuyển sang hướng [${DIRECTIONS[snapped].label}]!`, 'system');
             }
         }
 
         // Kiểm tra Thuốc Lá đang hút
-        if (skill.id === 'SMOKE_CIGARETTE' && this.playerBuffs && this.playerBuffs.cigarette && this.playerBuffs.cigarette.turnsLeft > 0) {
-            this.addFloatingText('ĐANG HÚT THUỐC!', this.player.x, this.player.y, '#eab308');
+        if (skill.id === 'SMOKE_CIGARETTE' && uBuffs && uBuffs.cigarette && uBuffs.cigarette.turnsLeft > 0) {
+            this.addFloatingText('ĐANG HÚT THUỐC!', ux, uy, '#eab308');
             this.addCombatLog(`[${skill.name}] đang duy trì hiệu lực (+30% DMG & +1 Tốc độ), không thể dùng đè!`, 'hit');
             if (window.soundCtrl) window.soundCtrl.playUndo();
             return;
@@ -1592,16 +2082,16 @@ class GameEngine {
 
         // Kỹ năng có hồi chiêu thông thường chỉ được dùng tối đa 1 lần trong 1 lượt (ngoại trừ kỹ năng có maxAmmo)
         if (!skill.maxAmmo && skill.cooldown && skill.cooldown > 0) {
-            const alreadyQueued = this.playerQueue.some(act => act.skillId === skill.id);
+            const alreadyQueued = currentQueue.some(act => act.skillId === skill.id);
             if (alreadyQueued) {
-                this.addFloatingText(`ĐÃ CHỌN TRONG LƯỢT!`, this.player.x, this.player.y, '#f87171');
+                this.addFloatingText(`ĐÃ CHỌN TRONG LƯỢT!`, ux, uy, '#f87171');
                 this.addCombatLog(`[${skill.name}] có hồi chiêu, chỉ được dùng tối đa 1 lần mỗi lượt!`, 'hit');
                 if (window.soundCtrl) window.soundCtrl.playUndo();
                 return;
             }
         }
 
-        if (this.playerQueue.length >= 4) {
+        if (currentQueue.length >= 4) {
             this.addCombatLog('Hàng đợi đã đầy (4/4)! Nhấn [SPACE] để thực thi.', 'system');
             return;
         }
@@ -1635,30 +2125,37 @@ class GameEngine {
             color: skill.color || '#38bdf8'
         };
 
-        this.playerQueue.push(action);
+        currentQueue.push(action);
         if (window.soundCtrl) window.soundCtrl.playSelect();
 
         const dirObj = DIRECTIONS[action.dir];
         const dirLabel = this.lang === 'en' ? (dirObj.label_en || dirObj.label) : dirObj.label;
+        const playerPrefix = this.isTwoPlayerMode ? `[P${this.activePlanningPlayer}] ` : '';
         this.addCombatLog(
             this.lang === 'en'
-                ? `Queued [${action.name}] facing [${dirLabel} ${action.dirSymbol}]!`
-                : `Đã nạp [${action.name}] hướng [${dirLabel} ${action.dirSymbol}] vào hàng đợi!`,
+                ? `${playerPrefix}Queued [${action.name}] facing [${dirLabel} ${action.dirSymbol}]!`
+                : `${playerPrefix}Đã nạp [${action.name}] hướng [${dirLabel} ${action.dirSymbol}] vào hàng đợi!`,
             'system'
         );
 
         this.updateQueueDisplay();
 
-        if (this.playerQueue.length === 4) {
-            this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
+        if (currentQueue.length === 4) {
+            if (this.isTwoPlayerMode && this.activePlanningPlayer === 1) {
+                this.addCombatLog(this.lang === 'en' ? 'P1 queue full (4/4)! Press [SPACE] to pass to P2!' : 'P1 đã đủ 4 lệnh. Bấm [SPACE] để xác nhận và chuyển P2!', 'system');
+            } else {
+                this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
+            }
         }
     }
 
     undoAction() {
         if (this.phase !== 'PLANNING') return;
-        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) return;
-        if (this.playerQueue.length > 0) {
-            this.playerQueue.pop();
+        const unit = this.getActivePlanningUnit();
+        if (this.gameMode === 'KOTH' && unit && unit.hp <= 0) return;
+        const currentQueue = this.getActivePlanningQueue();
+        if (currentQueue.length > 0) {
+            currentQueue.pop();
             if (window.soundCtrl) window.soundCtrl.playUndo();
             this.updateQueueDisplay();
         }
@@ -1666,16 +2163,146 @@ class GameEngine {
 
     clearQueue() {
         if (this.phase !== 'PLANNING') return;
-        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) return;
+        const unit = this.getActivePlanningUnit();
+        if (this.gameMode === 'KOTH' && unit && unit.hp <= 0) return;
         this.cancelPathPlanning();
-        if (this.playerQueue.length > 0) {
-            this.playerQueue = [];
+        const currentQueue = this.getActivePlanningQueue();
+        if (currentQueue.length > 0) {
+            currentQueue.length = 0;
             if (window.soundCtrl) window.soundCtrl.playUndo();
             this.updateQueueDisplay();
         }
     }
 
     updateQueueDisplay() {
+        const commitBtn = document.getElementById('btnCommit');
+        const countText = document.getElementById('queueCountText');
+        const pTitleElem = document.getElementById('playerQueueTitleText');
+        const cTitleElem = document.getElementById('cpuQueueTitleText');
+        const cStatusElem = document.getElementById('cpuQueueStatusText');
+
+        if (this.isTwoPlayerMode) {
+            const p1 = this.p1Unit || this.player;
+            const p2 = this.p2Unit || this.cpu;
+
+            if (pTitleElem && p1) {
+                const teamName = p1.team === 'BLUE' ? (this.lang === 'en' ? 'BLUE' : 'XANH') : (this.lang === 'en' ? 'RED' : 'ĐỎ');
+                pTitleElem.innerText = `🎮 ${this.lang === 'en' ? 'PLAYER 1' : 'NGƯỜI CHƠI 1'} [${getCharName(p1.character, this.lang)}] (${teamName})`;
+            }
+            if (cTitleElem && p2) {
+                const teamName = p2.team === 'BLUE' ? (this.lang === 'en' ? 'BLUE' : 'XANH') : (this.lang === 'en' ? 'RED' : 'ĐỎ');
+                cTitleElem.innerText = `🎮 ${this.lang === 'en' ? 'PLAYER 2' : 'NGƯỜI CHƠI 2'} [${getCharName(p2.character, this.lang)}] (${teamName})`;
+            }
+
+            if (this.phase === 'PLANNING') {
+                if (this.activePlanningPlayer === 1) {
+                    if (cStatusElem) cStatusElem.innerText = this.lang === 'en' ? '(Waiting P1 pass)' : '(Chờ P1 giao lượt)';
+                    // Render P1 Queue
+                    for (let i = 0; i < 4; i++) {
+                        const slot = document.getElementById(`p-slot-${i}`);
+                        if (i < this.p1Queue.length) {
+                            const act = this.p1Queue[i];
+                            slot.className = 'queue-slot filled';
+                            slot.innerHTML = `
+                                <span class="slot-step-num">#${i + 1}</span>
+                                <span class="slot-icon">${act.icon}</span>
+                                <span class="slot-name">${act.name}</span>
+                                <span class="slot-dir" style="letter-spacing: 2px;">${act.dirSymbol || ''}</span>
+                            `;
+                        } else {
+                            slot.className = 'queue-slot';
+                            slot.innerHTML = `
+                                <span class="slot-step-num">#${i + 1}</span>
+                                <span class="slot-icon">?</span>
+                                <span class="slot-name">${t('slotEmpty')}</span>
+                            `;
+                        }
+
+                        // P2 slots show pending
+                        const cSlot = document.getElementById(`c-slot-${i}`);
+                        if (cSlot) {
+                            cSlot.className = 'queue-slot';
+                            cSlot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">⏳</span><span class="slot-name">${this.lang === 'en' ? 'Pending P2' : 'Chờ P2'}</span>`;
+                        }
+                    }
+
+                    if (countText) countText.innerText = `${this.p1Queue.length} / 4`;
+                    if (commitBtn) {
+                        if (this.p1Queue.length === 4) {
+                            commitBtn.disabled = false;
+                            commitBtn.innerHTML = `<span>[SPACE] ${t('btnCommitP1')} ➔</span>`;
+                            commitBtn.style.animation = 'pulse 1s infinite alternate';
+                        } else {
+                            commitBtn.disabled = true;
+                            commitBtn.innerHTML = `<span>${t('btnCommitP1')} (${this.p1Queue.length}/4)</span>`;
+                            commitBtn.style.animation = 'none';
+                        }
+                    }
+                } else {
+                    // activePlanningPlayer === 2
+                    if (cStatusElem) cStatusElem.innerText = this.lang === 'en' ? '(Active Planning)' : '(Đang lập lệnh)';
+                    // P1 slots masked with secret lock (Anti-peeking)
+                    for (let i = 0; i < 4; i++) {
+                        const slot = document.getElementById(`p-slot-${i}`);
+                        if (slot) {
+                            slot.className = 'queue-slot filled';
+                            slot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">${t('secretLockedTitle')}</span>`;
+                        }
+
+                        // Render P2 Queue
+                        const cSlot = document.getElementById(`c-slot-${i}`);
+                        if (cSlot) {
+                            if (i < this.p2Queue.length) {
+                                const act = this.p2Queue[i];
+                                cSlot.className = 'queue-slot filled';
+                                cSlot.innerHTML = `
+                                    <span class="slot-step-num">#${i + 1}</span>
+                                    <span class="slot-icon">${act.icon}</span>
+                                    <span class="slot-name">${act.name}</span>
+                                    <span class="slot-dir" style="letter-spacing: 2px;">${act.dirSymbol || ''}</span>
+                                `;
+                            } else {
+                                cSlot.className = 'queue-slot';
+                                cSlot.innerHTML = `
+                                    <span class="slot-step-num">#${i + 1}</span>
+                                    <span class="slot-icon">?</span>
+                                    <span class="slot-name">${t('slotEmpty')}</span>
+                                `;
+                            }
+                        }
+                    }
+
+                    if (countText) countText.innerText = `${this.p2Queue.length} / 4`;
+                    if (commitBtn) {
+                        if (this.p2Queue.length === 4) {
+                            commitBtn.disabled = false;
+                            commitBtn.innerHTML = `<span>[SPACE] ${t('btnCommitP2')} 🚀</span>`;
+                            commitBtn.style.animation = 'pulse 1s infinite alternate';
+                        } else {
+                            commitBtn.disabled = true;
+                            commitBtn.innerHTML = `<span>${t('btnCommitP2')} (${this.p2Queue.length}/4)</span>`;
+                            commitBtn.style.animation = 'none';
+                        }
+                    }
+                }
+            } else if (this.phase === 'RESOLVING') {
+                if (cStatusElem) cStatusElem.innerText = this.lang === 'en' ? '(Resolving...)' : '(Đang thực thi...)';
+                if (commitBtn) {
+                    commitBtn.disabled = true;
+                    commitBtn.innerHTML = `<span>${this.lang === 'en' ? 'SIMULTANEOUS RESOLUTION (WEGO)...' : 'ĐANG PHÂN XỬ ĐỒNG THỜI (WEGO)...'}</span>`;
+                    commitBtn.style.animation = 'none';
+                }
+            }
+
+            this.updateSkillButtons();
+            return;
+        }
+
+        // --- 1P Mode ---
+        if (pTitleElem) pTitleElem.innerText = t('playerQueueTitle');
+        if (cTitleElem) cTitleElem.innerText = t('cpuQueueTitle');
+        if (cStatusElem) cStatusElem.innerText = t('secretTag');
+
         for (let i = 0; i < 4; i++) {
             const slot = document.getElementById(`p-slot-${i}`);
             if (i < this.playerQueue.length) {
@@ -1697,9 +2324,7 @@ class GameEngine {
             }
         }
 
-        const commitBtn = document.getElementById('btnCommit');
-        const countText = document.getElementById('queueCountText');
-        countText.innerText = `${this.playerQueue.length} / 4`;
+        if (countText) countText.innerText = `${this.playerQueue.length} / 4`;
 
         const isPlayerDead = this.gameMode === 'KOTH' && this.player && this.player.hp <= 0;
 
@@ -1721,27 +2346,42 @@ class GameEngine {
     }
 
     updateHUD() {
+        const p1 = (this.isTwoPlayerMode && this.p1Unit) ? this.p1Unit : this.player;
+        const p2 = (this.isTwoPlayerMode && this.p2Unit) ? this.p2Unit : this.cpu;
+
         const pFill = document.getElementById('playerHpFill');
         const pText = document.getElementById('playerHpText');
-        const pPct = Math.max(0, (this.player.hp / this.player.maxHp) * 100);
-        pFill.style.width = `${pPct}%`;
-        pText.innerText = `${Math.round(this.player.hp)} / ${this.player.maxHp} HP`;
+        const pPct = Math.max(0, (p1.hp / p1.maxHp) * 100);
+        if (pFill) pFill.style.width = `${pPct}%`;
+        if (pText) pText.innerText = `${Math.round(p1.hp)} / ${p1.maxHp} HP`;
 
         const cFill = document.getElementById('cpuHpFill');
         const cText = document.getElementById('cpuHpText');
-        const cPct = Math.max(0, (this.cpu.hp / this.cpu.maxHp) * 100);
-        cFill.style.width = `${cPct}%`;
-        cText.innerText = `${Math.round(this.cpu.hp)} / ${this.cpu.maxHp} HP`;
+        const cPct = Math.max(0, (p2.hp / p2.maxHp) * 100);
+        if (cFill) cFill.style.width = `${cPct}%`;
+        if (cText) cText.innerText = `${Math.round(p2.hp)} / ${p2.maxHp} HP`;
 
         const playerBadge = document.getElementById('playerNameBadge');
-        if (playerBadge && this.selectedCharacter) {
-            playerBadge.innerText = `${getCharName(this.selectedCharacter, this.lang).toUpperCase()} ${t('playerBadgeSuffix')}`;
+        if (playerBadge) {
+            if (this.isTwoPlayerMode) {
+                const teamTag = p1.team === 'BLUE' ? (this.lang === 'en' ? 'BLUE' : 'XANH') : (this.lang === 'en' ? 'RED' : 'ĐỎ');
+                playerBadge.innerText = `🎮 [P1] ${getCharName(p1.character, this.lang).toUpperCase()} (${teamTag})`;
+                playerBadge.style.color = p1.color;
+            } else if (this.selectedCharacter) {
+                playerBadge.innerText = `${getCharName(this.selectedCharacter, this.lang).toUpperCase()} ${t('playerBadgeSuffix')}`;
+            }
         }
 
         const cpuBadge = document.getElementById('cpuNameBadge');
-        if (cpuBadge && this.cpuCharacter) {
-            cpuBadge.innerText = `${this.cpu.avatar} ${getCharName(this.cpuCharacter, this.lang).toUpperCase()} ${t('cpuBadgeSuffix')}`;
-            cpuBadge.style.color = this.cpu.color;
+        if (cpuBadge) {
+            if (this.isTwoPlayerMode) {
+                const teamTag = p2.team === 'BLUE' ? (this.lang === 'en' ? 'BLUE' : 'XANH') : (this.lang === 'en' ? 'RED' : 'ĐỎ');
+                cpuBadge.innerText = `🎮 [P2] ${getCharName(p2.character, this.lang).toUpperCase()} (${teamTag})`;
+                cpuBadge.style.color = p2.color;
+            } else if (this.cpuCharacter) {
+                cpuBadge.innerText = `${this.cpu.avatar} ${getCharName(this.cpuCharacter, this.lang).toUpperCase()} ${t('cpuBadgeSuffix')}`;
+                cpuBadge.style.color = this.cpu.color;
+            }
         }
 
         // Render Roster Bars & Score
@@ -1759,10 +2399,13 @@ class GameEngine {
                         chipClass = 'team-hud-chip dead';
                     }
                 }
+                const pTag = u.playerIndex === 1 ? '[P1]' : (u.playerIndex === 2 ? '[P2]' : (u.isPlayer ? (this.lang === 'en' ? 'You' : 'Bạn') : '+CPU'));
+                const pColor = u.playerIndex === 1 ? '#34d399' : (u.playerIndex === 2 ? '#fb7185' : (u.isPlayer ? '#34d399' : '#38bdf8'));
                 return `
                     <div class="${chipClass}" title="${u.name}: ${u.hp > 0 ? Math.round(u.hp) + '/' + u.maxHp + ' HP' : statusDisplay}">
                         <span>${u.avatar}</span>
-                        <span>${u.isPlayer ? (this.lang === 'en' ? 'You' : 'Bạn') : (u.character ? u.character.name.split(' (')[0] : u.name)}</span>
+                        <span>${u.character ? u.character.name.split(' (')[0] : u.name}</span>
+                        <span style="color: ${pColor}; font-size: 0.65rem; font-weight:800;">${pTag}</span>
                         <span style="color: ${u.hp > 0 ? '#34d399' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}</span>
                     </div>
                 `;
@@ -1783,10 +2426,13 @@ class GameEngine {
                         chipClass = 'team-hud-chip dead';
                     }
                 }
+                const pTag = u.playerIndex === 1 ? '[P1]' : (u.playerIndex === 2 ? '[P2]' : '+CPU');
+                const pColor = u.playerIndex === 1 ? '#34d399' : (u.playerIndex === 2 ? '#fb7185' : '#fb7185');
                 return `
                     <div class="${chipClass}" title="${u.name}: ${u.hp > 0 ? Math.round(u.hp) + '/' + u.maxHp + ' HP' : statusDisplay}">
                         <span>${u.avatar}</span>
                         <span>${u.character ? u.character.name.split(' (')[0] : u.name}</span>
+                        <span style="color: ${pColor}; font-size: 0.65rem; font-weight:800;">${pTag}</span>
                         <span style="color: ${u.hp > 0 ? '#fb7185' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}</span>
                     </div>
                 `;
@@ -1847,10 +2493,11 @@ class GameEngine {
         // Thông báo Người chơi đang chờ hồi sinh
         const respawnNotice = document.getElementById('playerRespawnNotice');
         if (respawnNotice) {
-            if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) {
+            const activePlanningUnit = this.getActivePlanningUnit();
+            if (this.gameMode === 'KOTH' && activePlanningUnit && activePlanningUnit.hp <= 0) {
                 respawnNotice.style.display = 'flex';
                 const respText = document.getElementById('playerRespawnNoticeText');
-                if (respText) respText.innerText = t('respawnNoticeText', { turns: this.player.respawnTurns });
+                if (respText) respText.innerText = t('respawnNoticeText', { turns: activePlanningUnit.respawnTurns });
             } else {
                 respawnNotice.style.display = 'none';
             }
@@ -2506,7 +3153,71 @@ class GameEngine {
 
     // --- Khóa lệnh & Thực thi lượt đồng thời ---
     commitTurn() {
-        if (this.phase !== 'PLANNING' || this.playerQueue.length !== 4) return;
+        if (this.phase !== 'PLANNING') return;
+
+        if (this.isTwoPlayerMode) {
+            if (this.p1Queue.length !== 4 || this.p2Queue.length !== 4) return;
+            this.cancelPathPlanning();
+            this.phase = 'RESOLVING';
+            if (window.soundCtrl) window.soundCtrl.playCommit();
+            this.addCombatLog(`--- [${this.lang === 'en' ? 'TURN' : 'LƯỢT'} ${this.turn}] ${this.lang === 'en' ? 'WEGO SIMULTANEOUS RESOLUTION' : 'THỰC THI ĐỒNG THỜI WEGO'} ---`, 'system');
+
+            // 1. Gán queue và hồi chiêu cho P1
+            this.p1Unit.queue = [...this.p1Queue];
+            for (const act of this.p1Queue) {
+                if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
+                    this.p1Unit.cooldowns[act.skillId] = act.cooldown;
+                }
+            }
+
+            // 2. Gán queue và hồi chiêu cho P2
+            this.p2Unit.queue = [...this.p2Queue];
+            for (const act of this.p2Queue) {
+                if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
+                    this.p2Unit.cooldowns[act.skillId] = act.cooldown;
+                }
+            }
+
+            // 3. Sinh hàng đợi hành động cho toàn bộ CPU còn lại
+            const allUnits = [...this.blueTeam, ...this.redTeam];
+            for (const u of allUnits) {
+                if (u !== this.p1Unit && u !== this.p2Unit) {
+                    if (u.hp > 0) {
+                        u.queue = this.generateCpuQueueForUnit(u);
+                        for (const act of u.queue) {
+                            if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
+                                u.cooldowns[act.skillId] = act.cooldown;
+                            }
+                        }
+                    } else {
+                        u.queue = [];
+                    }
+                }
+            }
+
+            this.playerQueue = this.p1Unit.queue;
+            this.cpuQueue = this.p2Unit.queue;
+
+            for (let i = 0; i < 4; i++) {
+                const cSlot = document.getElementById(`c-slot-${i}`);
+                if (cSlot) {
+                    cSlot.className = 'queue-slot';
+                    cSlot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">${this.lang === 'en' ? 'Secret' : 'Bí mật'}</span>`;
+                }
+                const pSlot = document.getElementById(`p-slot-${i}`);
+                if (pSlot) {
+                    pSlot.className = 'queue-slot';
+                    pSlot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">${this.lang === 'en' ? 'Secret' : 'Bí mật'}</span>`;
+                }
+            }
+
+            this.updateHUD();
+            this.currentStep = 0;
+            this.executeResolutionStep(0);
+            return;
+        }
+
+        if (this.playerQueue.length !== 4) return;
 
         this.cancelPathPlanning();
         this.phase = 'RESOLVING';
@@ -2593,16 +3304,43 @@ class GameEngine {
         const pAct = this.playerQueue[stepIndex];
         const cAct = (this.cpu && this.cpu.queue && this.cpu.queue[stepIndex]) ? this.cpu.queue[stepIndex] : null;
 
-        // Giải mã lệnh CPU chủ lực cho giao diện
-        const cSlot = document.getElementById(`c-slot-${stepIndex}`);
-        if (cSlot && cAct) {
-            cSlot.className = 'queue-slot filled active-step';
-            cSlot.innerHTML = `
-                <span class="slot-step-num">#${stepIndex + 1}</span>
-                <span class="slot-icon">${cAct.icon}</span>
-                <span class="slot-name">${cAct.name}</span>
-                <span class="slot-dir" style="letter-spacing: 2px;">${cAct.dirSymbol || ''}</span>
-            `;
+        if (this.isTwoPlayerMode) {
+            const p1Act = (this.p1Unit && this.p1Unit.queue) ? this.p1Unit.queue[stepIndex] : pAct;
+            const p2Act = (this.p2Unit && this.p2Unit.queue) ? this.p2Unit.queue[stepIndex] : cAct;
+
+            const pSlot = document.getElementById(`p-slot-${stepIndex}`);
+            if (pSlot && p1Act) {
+                pSlot.className = 'queue-slot filled active-step';
+                pSlot.innerHTML = `
+                    <span class="slot-step-num">#${stepIndex + 1}</span>
+                    <span class="slot-icon">${p1Act.icon}</span>
+                    <span class="slot-name">${p1Act.name}</span>
+                    <span class="slot-dir" style="letter-spacing: 2px;">${p1Act.dirSymbol || ''}</span>
+                `;
+            }
+
+            const cSlot = document.getElementById(`c-slot-${stepIndex}`);
+            if (cSlot && p2Act) {
+                cSlot.className = 'queue-slot filled active-step';
+                cSlot.innerHTML = `
+                    <span class="slot-step-num">#${stepIndex + 1}</span>
+                    <span class="slot-icon">${p2Act.icon}</span>
+                    <span class="slot-name">${p2Act.name}</span>
+                    <span class="slot-dir" style="letter-spacing: 2px;">${p2Act.dirSymbol || ''}</span>
+                `;
+            }
+        } else {
+            // Giải mã lệnh CPU chủ lực cho giao diện
+            const cSlot = document.getElementById(`c-slot-${stepIndex}`);
+            if (cSlot && cAct) {
+                cSlot.className = 'queue-slot filled active-step';
+                cSlot.innerHTML = `
+                    <span class="slot-step-num">#${stepIndex + 1}</span>
+                    <span class="slot-icon">${cAct.icon}</span>
+                    <span class="slot-name">${cAct.name}</span>
+                    <span class="slot-dir" style="letter-spacing: 2px;">${cAct.dirSymbol || ''}</span>
+                `;
+            }
         }
 
         // Lấy danh sách toàn bộ chiến binh còn sống
@@ -3449,16 +4187,52 @@ class GameEngine {
             u.shieldDir = null;
         }
 
-        if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) {
-            const respawnLabel = t('respawningTag', { turns: this.player.respawnTurns });
-            this.playerQueue = [
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' }
-            ];
+        if (this.isTwoPlayerMode) {
+            this.activePlanningPlayer = 1;
+            this.p1Queue = [];
+            this.p2Queue = [];
+            this.selectedCharacter = this.p1Unit.character;
+            this.player = this.p1Unit;
+            this.cpu = this.p2Unit;
+            this.cooldowns = this.p1Unit.cooldowns;
+            this.skillAmmo = this.p1Unit.skillAmmo;
+            this.playerBuffs = this.p1Unit.buffs;
+            this.currentSelectedDir = this.p1Unit.dir || (this.p1Unit.team === 'BLUE' ? 'RIGHT' : 'LEFT');
+            this.highlightSelectedDirButton();
+
+            if (this.gameMode === 'KOTH' && this.p1Unit && this.p1Unit.hp <= 0) {
+                const respawnLabel = t('respawningTag', { turns: this.p1Unit.respawnTurns });
+                this.p1Queue = [
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' }
+                ];
+            }
+            this.playerQueue = this.p1Queue;
         } else {
-            this.playerQueue = [];
+            if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) {
+                const respawnLabel = t('respawningTag', { turns: this.player.respawnTurns });
+                this.playerQueue = [
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' }
+                ];
+            } else {
+                this.playerQueue = [];
+            }
+
+            if (this.player) {
+                this.cooldowns = this.player.cooldowns;
+                this.skillAmmo = this.player.skillAmmo;
+                this.playerBuffs = this.player.buffs;
+            }
+            if (this.cpu) {
+                this.cpuCooldowns = this.cpu.cooldowns;
+                this.cpuSkillAmmo = this.cpu.skillAmmo;
+                this.cpuBuffs = this.cpu.buffs;
+            }
         }
 
         for (let i = 0; i < 4; i++) {
@@ -3470,17 +4244,6 @@ class GameEngine {
                 cSlot.className = 'queue-slot';
                 cSlot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">${this.lang === 'en' ? 'Secret' : 'Bí mật'}</span>`;
             }
-        }
-
-        if (this.player) {
-            this.cooldowns = this.player.cooldowns;
-            this.skillAmmo = this.player.skillAmmo;
-            this.playerBuffs = this.player.buffs;
-        }
-        if (this.cpu) {
-            this.cpuCooldowns = this.cpu.cooldowns;
-            this.cpuSkillAmmo = this.cpu.skillAmmo;
-            this.cpuBuffs = this.cpu.buffs;
         }
 
         this.updateSkillButtons();
@@ -3505,6 +4268,100 @@ class GameEngine {
         const title = document.getElementById('modalTitle');
         const desc = document.getElementById('modalDesc');
 
+        if (this.isTwoPlayerMode) {
+            const isPvp = this.p1Team !== this.p2Team;
+            let p1Won = false;
+            let p2Won = false;
+            let isDraw = false;
+
+            if (this.gameMode === 'KOTH') {
+                const blueAlive = this.blueTeam.filter(u => u.hp > 0).length;
+                const redAlive = this.redTeam.filter(u => u.hp > 0).length;
+                const isBlueWinner = kothWinner === 'BLUE_KOTH' || (kothWinner === null && (this.blueScore > this.redScore || (redAlive === 0 && blueAlive > 0)));
+                const isRedWinner = kothWinner === 'RED_KOTH' || (kothWinner === null && (this.redScore > this.blueScore || (blueAlive === 0 && redAlive > 0)));
+
+                if (isPvp) {
+                    if (isBlueWinner) {
+                        p1Won = (this.p1Team === 'BLUE');
+                        p2Won = (this.p2Team === 'BLUE');
+                    } else if (isRedWinner) {
+                        p1Won = (this.p1Team === 'RED');
+                        p2Won = (this.p2Team === 'RED');
+                    } else {
+                        isDraw = true;
+                    }
+                } else {
+                    const coopTeam = this.p1Team;
+                    p1Won = p2Won = (coopTeam === 'BLUE' ? isBlueWinner : isRedWinner);
+                }
+            } else {
+                // DUEL
+                const blueAlive = this.blueTeam.filter(u => u.hp > 0).length;
+                const redAlive = this.redTeam.filter(u => u.hp > 0).length;
+
+                if (blueAlive === 0 && redAlive === 0) {
+                    isDraw = true;
+                } else if (redAlive === 0) {
+                    if (isPvp) {
+                        p1Won = (this.p1Team === 'BLUE');
+                        p2Won = (this.p2Team === 'BLUE');
+                    } else {
+                        p1Won = p2Won = (this.p1Team === 'BLUE');
+                    }
+                } else if (blueAlive === 0) {
+                    if (isPvp) {
+                        p1Won = (this.p1Team === 'RED');
+                        p2Won = (this.p2Team === 'RED');
+                    } else {
+                        p1Won = p2Won = (this.p1Team === 'RED');
+                    }
+                }
+            }
+
+            if (isPvp) {
+                if (isDraw) {
+                    title.innerText = t('modalDrawTitle');
+                    title.className = 'modal-title clash';
+                    desc.innerText = t('modalDrawDesc');
+                } else if (p1Won) {
+                    title.innerText = t('p1VictoryModal');
+                    title.className = 'modal-title victory';
+                    desc.innerText = this.lang === 'en'
+                        ? `Player 1 [${getCharName(this.p1Unit.character, this.lang)}] defeated Player 2 on Turn ${this.turn}!`
+                        : `Người chơi 1 [${getCharName(this.p1Unit.character, this.lang)}] đã đánh bại Người chơi 2 ở Lượt ${this.turn}!`;
+                    if (window.soundCtrl) window.soundCtrl.playVictory();
+                } else if (p2Won) {
+                    title.innerText = t('p2VictoryModal');
+                    title.className = 'modal-title victory';
+                    desc.innerText = this.lang === 'en'
+                        ? `Player 2 [${getCharName(this.p2Unit.character, this.lang)}] defeated Player 1 on Turn ${this.turn}!`
+                        : `Người chơi 2 [${getCharName(this.p2Unit.character, this.lang)}] đã đánh bại Người chơi 1 ở Lượt ${this.turn}!`;
+                    if (window.soundCtrl) window.soundCtrl.playVictory();
+                }
+            } else {
+                if (p1Won) {
+                    title.innerText = t('coopVictoryModal');
+                    title.className = 'modal-title victory';
+                    desc.innerText = this.lang === 'en'
+                        ? `Player 1 & Player 2 successfully defeated all CPU enemies on Turn ${this.turn}!`
+                        : `Cả Người chơi 1 & 2 đã phối hợp đánh bại toàn bộ quân CPU ở Lượt ${this.turn}!`;
+                    if (window.soundCtrl) window.soundCtrl.playVictory();
+                } else {
+                    title.innerText = t('modalDefeatTitle');
+                    title.className = 'modal-title defeat';
+                    desc.innerText = this.lang === 'en'
+                        ? `Both players were defeated on Turn ${this.turn}. Try again!`
+                        : `Cả hai người chơi đã bị đối thủ CPU đánh bại ở Lượt ${this.turn}!`;
+                    if (window.soundCtrl) window.soundCtrl.playDefeat();
+                }
+            }
+
+            modal.style.display = 'flex';
+            this.updateHUD();
+            return;
+        }
+
+        // --- 1P Mode ---
         if (this.gameMode === 'KOTH') {
             const blueAlive = this.blueTeam.filter(u => u.hp > 0).length;
             const redAlive = this.redTeam.filter(u => u.hp > 0).length;
@@ -3566,6 +4423,12 @@ class GameEngine {
         this.playerRevealedTurns = 0;
         this.cpuRevealedTurns = 0;
         this.activeHookTethers = [];
+
+        if (this.isTwoPlayerMode) {
+            this.activePlanningPlayer = 1;
+            this.p1Queue = [];
+            this.p2Queue = [];
+        }
 
         this.playerQueue = [];
         this.cpuQueue = [];
