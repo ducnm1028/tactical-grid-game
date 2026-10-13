@@ -44,10 +44,11 @@ class GameEngine {
         this.activePath = []; // [{ dir, dx, dy, symbol, x, y }]
         this.activePathMaxSteps = 2;
 
-        // Hệ thống Hồi chiêu, Đạn dược & Vật thể mặt đất (Ground Hazards / Lựu đạn)
+        // Hệ thống Hồi chiêu, Đạn dược & Vật thể mặt đất (Ground Hazards / Lựu đạn / Vùng Cháy)
         this.cooldowns = {}; // { [skillId]: turnsLeft }
         this.skillAmmo = {}; // { [skillId]: currentAmmo }
         this.groundHazards = []; // [{ id, type: 'GRENADE', x, y, turnsLeft: 2, power: 50, aoeRadius: 1 }]
+        this.fireZones = []; // [{ id, team, x, y, aoeRadius: 1, turnsLeft: 2, creatorName }]
 
         // Trạng thái Lộ diện khi trúng đạn (Hookman Stealth Break)
         this.playerRevealedTurns = 0;
@@ -712,7 +713,10 @@ class GameEngine {
             queue: [],
             alive: true,
             isDead: false,
-            respawnTurns: 0
+            respawnTurns: 0,
+            isOiled: false,
+            burnTurns: 0,
+            burnDmg: 5
         };
         charObj.skills.forEach(s => {
             if (s.maxAmmo) unit.skillAmmo[s.id] = s.maxAmmo;
@@ -1450,6 +1454,7 @@ class GameEngine {
         this.selectedCharacter = char;
         this.setupTeams();
         this.groundHazards = [];
+        this.fireZones = [];
         this.activeHookTethers = [];
 
         const pBadge = document.getElementById('playerNameBadge');
@@ -2122,6 +2127,9 @@ class GameEngine {
             fuse: skill.fuse,
             cooldown: skill.cooldown,
             aoeRadius: skill.aoeRadius,
+            burnTurns: skill.burnTurns,
+            burnDmg: skill.burnDmg,
+            fireZoneDuration: skill.fireZoneDuration,
             color: skill.color || '#38bdf8'
         };
 
@@ -2399,6 +2407,11 @@ class GameEngine {
                         chipClass = 'team-hud-chip dead';
                     }
                 }
+                let debuffBadges = '';
+                if (u.hp > 0) {
+                    if (u.isOiled) debuffBadges += ' <span style="color:#f59e0b;" title="Dính Dầu">🛢️</span>';
+                    if (u.burnTurns > 0) debuffBadges += ` <span style="color:#ea580c; font-weight:800;" title="Đang Cháy (${u.burnTurns}L)">🔥${u.burnTurns}</span>`;
+                }
                 const pTag = u.playerIndex === 1 ? '[P1]' : (u.playerIndex === 2 ? '[P2]' : (u.isPlayer ? (this.lang === 'en' ? 'You' : 'Bạn') : '+CPU'));
                 const pColor = u.playerIndex === 1 ? '#34d399' : (u.playerIndex === 2 ? '#fb7185' : (u.isPlayer ? '#34d399' : '#38bdf8'));
                 return `
@@ -2406,7 +2419,7 @@ class GameEngine {
                         <span>${u.avatar}</span>
                         <span>${u.character ? u.character.name.split(' (')[0] : u.name}</span>
                         <span style="color: ${pColor}; font-size: 0.65rem; font-weight:800;">${pTag}</span>
-                        <span style="color: ${u.hp > 0 ? '#34d399' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}</span>
+                        <span style="color: ${u.hp > 0 ? '#34d399' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}${debuffBadges}</span>
                     </div>
                 `;
             }).join('');
@@ -2426,6 +2439,11 @@ class GameEngine {
                         chipClass = 'team-hud-chip dead';
                     }
                 }
+                let debuffBadges = '';
+                if (u.hp > 0) {
+                    if (u.isOiled) debuffBadges += ' <span style="color:#f59e0b;" title="Dính Dầu">🛢️</span>';
+                    if (u.burnTurns > 0) debuffBadges += ` <span style="color:#ea580c; font-weight:800;" title="Đang Cháy (${u.burnTurns}L)">🔥${u.burnTurns}</span>`;
+                }
                 const pTag = u.playerIndex === 1 ? '[P1]' : (u.playerIndex === 2 ? '[P2]' : '+CPU');
                 const pColor = u.playerIndex === 1 ? '#34d399' : (u.playerIndex === 2 ? '#fb7185' : '#fb7185');
                 return `
@@ -2433,7 +2451,7 @@ class GameEngine {
                         <span>${u.avatar}</span>
                         <span>${u.character ? u.character.name.split(' (')[0] : u.name}</span>
                         <span style="color: ${pColor}; font-size: 0.65rem; font-weight:800;">${pTag}</span>
-                        <span style="color: ${u.hp > 0 ? '#fb7185' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}</span>
+                        <span style="color: ${u.hp > 0 ? '#fb7185' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}${debuffBadges}</span>
                     </div>
                 `;
             }).join('');
@@ -2696,6 +2714,8 @@ class GameEngine {
                 action = this.generateCpuActionSmokeGuy(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else if (charId === 'razor') {
                 action = this.generateCpuActionRazor(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
+            } else if (charId === 'fireman') {
+                action = this.generateCpuActionFireman(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else {
                 action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             }
@@ -3117,6 +3137,121 @@ class GameEngine {
         return this.createCpuPathMove(simX, simY, this.player.x, this.player.y, 2, false);
     }
 
+    generateCpuActionFireman(stepIdx, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs) {
+        if (playerInvisible) {
+            const shouldBlindFire = (stepIdx === 1 || stepIdx === 3 || Math.random() < 0.45);
+            if (shouldBlindFire) {
+                const bDir = this.getCpuBlindFireDir(simX, simY);
+                if (!simCooldowns['FIREMAN_FIRE_CANNON'] && Math.random() < 0.35) {
+                    simCooldowns['FIREMAN_FIRE_CANNON'] = 4;
+                    return {
+                        type: 'FIRE_CANNON',
+                        skillId: 'FIREMAN_FIRE_CANNON',
+                        name: 'Bắn Bừa Đại Bác Lửa',
+                        icon: '💥',
+                        dir: bDir,
+                        dirSymbol: DIRECTIONS[bDir].symbol,
+                        power: 15,
+                        range: 5,
+                        cooldown: 4,
+                        aoeRadius: 1,
+                        fireZoneDuration: 2,
+                        isBlindFire: true
+                    };
+                }
+                if (!simCooldowns['FIREMAN_OIL_BARREL'] && Math.random() < 0.35) {
+                    simCooldowns['FIREMAN_OIL_BARREL'] = 3;
+                    return {
+                        type: 'OIL_BARREL',
+                        skillId: 'FIREMAN_OIL_BARREL',
+                        name: 'Ném Bừa Thùng Dầu',
+                        icon: '🛢️',
+                        dir: bDir,
+                        dirSymbol: DIRECTIONS[bDir].symbol,
+                        power: 0,
+                        range: 6,
+                        cooldown: 3,
+                        aoeRadius: 1,
+                        isBlindFire: true
+                    };
+                }
+                return {
+                    type: 'RANGED_LINE',
+                    skillId: 'FIREMAN_GATTLING_FIRE',
+                    name: 'Bắn Bừa Gattling Fire',
+                    icon: '🔥',
+                    dir: bDir,
+                    dirSymbol: DIRECTIONS[bDir].symbol,
+                    power: 15,
+                    range: 5,
+                    burnTurns: 3,
+                    burnDmg: 5,
+                    isBlindFire: true
+                };
+            }
+            return this.createCpuPathMove(simX, simY, 10, 3, 2, false);
+        }
+
+        const alignedDir6 = this.getAlignedRangedDirection(simX, simY, this.player.x, this.player.y, 6);
+        const alignedDir5 = this.getAlignedRangedDirection(simX, simY, this.player.x, this.player.y, 5);
+
+        // 1. Thùng Dầu tầm 6 ô (Oil Barrel): Ưu tiên ném khi đối thủ chưa dính dầu
+        if (!simCooldowns['FIREMAN_OIL_BARREL'] && dist <= 6 && dist >= 2 && (!this.player.isOiled || Math.random() < 0.3)) {
+            const barrelDir = alignedDir6 || this.getDirectionTowards(dx, dy);
+            simCooldowns['FIREMAN_OIL_BARREL'] = 3;
+            return {
+                type: 'OIL_BARREL',
+                skillId: 'FIREMAN_OIL_BARREL',
+                name: 'Thùng Dầu',
+                icon: '🛢️',
+                dir: barrelDir,
+                dirSymbol: DIRECTIONS[barrelDir].symbol,
+                power: 0,
+                range: 6,
+                cooldown: 3,
+                aoeRadius: 1
+            };
+        }
+
+        // 2. Đại Bác Lửa tầm 5 ô (Fire Cannon)
+        if (!simCooldowns['FIREMAN_FIRE_CANNON'] && dist <= 5 && dist >= 2 && Math.random() < 0.7) {
+            const cannonDir = alignedDir5 || this.getDirectionTowards(dx, dy);
+            simCooldowns['FIREMAN_FIRE_CANNON'] = 4;
+            return {
+                type: 'FIRE_CANNON',
+                skillId: 'FIREMAN_FIRE_CANNON',
+                name: 'Đại Bác Lửa',
+                icon: '💥',
+                dir: cannonDir,
+                dirSymbol: DIRECTIONS[cannonDir].symbol,
+                power: 15,
+                range: 5,
+                cooldown: 4,
+                aoeRadius: 1,
+                fireZoneDuration: 2
+            };
+        }
+
+        // 3. Gattling Fire tầm 5 ô (Vũ khí chính)
+        if (alignedDir5 && dist <= 5) {
+            return {
+                type: 'RANGED_LINE',
+                skillId: 'FIREMAN_GATTLING_FIRE',
+                name: 'Gattling Fire',
+                icon: '🔥',
+                dir: alignedDir5,
+                dirSymbol: DIRECTIONS[alignedDir5].symbol,
+                power: 15,
+                range: 5,
+                burnTurns: 3,
+                burnDmg: 5
+            };
+        }
+
+        // 4. Nếu chưa vào tầm ngắm hoặc khoảng cách xa: Di chuyển tiếp cận
+        return this.createCpuPathMove(simX, simY, this.player.x, this.player.y, 2, false);
+    }
+
     getDirectionTowards(dx, dy) {
         if (dx !== 0 && dy !== 0 && Math.random() < 0.6) {
             if (dx > 0 && dy < 0) return 'UP_RIGHT';
@@ -3392,6 +3527,7 @@ class GameEngine {
                 this.createLeapArc(startX, startY, destX, destY, unit.charThemeColor || unit.color);
                 unit.x = destX;
                 unit.y = destY;
+                this.checkFireZones(unit);
 
                 if (extraJump) {
                     this.addFloatingText(this.lang === 'en' ? '🦘 OBSTACLE! EXTRA 2 STEPS!' : '🦘 ĐÍCH CÓ VẬT THỂ/ĐỊCH! NHẢY THÊM 2 BƯỚC!', destX, destY, '#06b6d4');
@@ -3503,6 +3639,7 @@ class GameEngine {
                     unit.x = pos.nx;
                     unit.y = pos.ny;
                     unit.dir = pos.dir;
+                    this.checkFireZones(unit);
                     if (unit.isPlayer && window.soundCtrl) window.soundCtrl.playMove();
                 }
             }
@@ -3633,9 +3770,16 @@ class GameEngine {
                         if (targetAct && targetAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
 
                         this.applyDamage(target, dmg);
-                        this.createHitSparks(target.x, target.y, target.color);
-                        this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} BẮN TRÚNG ${target.name}! Gây ${dmg} sát thương${buffTag}!`, 'hit');
+                        if (act.skillId === 'FIREMAN_GATTLING_FIRE') {
+                            this.applyBurn(target, act.burnTurns || 3, act.burnDmg || 5);
+                            this.createHitSparks(target.x, target.y, '#ea580c');
+                            this.addFloatingText(`-${dmg} HP + 🔥 CHÁY!`, target.x, target.y, '#ea580c');
+                            this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} BẮN TRÚNG ${target.name}! Gây ${dmg} sát thương và thiêu đốt (-5 HP/lượt trong 3 lượt)!`, 'hit');
+                        } else {
+                            this.createHitSparks(target.x, target.y, target.color);
+                            this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
+                            this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} BẮN TRÚNG ${target.name}! Gây ${dmg} sát thương${buffTag}!`, 'hit');
+                        }
 
                         if (target.charId === 'hookman') {
                             target.revealedTurns = 2;
@@ -3648,7 +3792,8 @@ class GameEngine {
             }
 
             let tracerColor = '#34d399';
-            if (act.skillId === 'SMOKE_RIFLE') tracerColor = '#fb923c';
+            if (act.skillId === 'FIREMAN_GATTLING_FIRE') tracerColor = '#ea580c';
+            else if (act.skillId === 'SMOKE_RIFLE') tracerColor = '#fb923c';
             else if (act.skillId === 'RAZOR_PULSE_RIFLE') tracerColor = '#06b6d4';
             else if (act.type === 'RANGED_VARIABLE') tracerColor = '#a78bfa';
             this.createBulletTracer(actor.x, actor.y, endX, endY, tracerColor);
@@ -3716,6 +3861,7 @@ class GameEngine {
                         if (pullX !== actor.x || pullY !== actor.y) {
                             target.x = pullX;
                             target.y = pullY;
+                            this.checkFireZones(target);
                             if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHookPull();
                         }
 
@@ -3856,6 +4002,141 @@ class GameEngine {
             this.addFloatingText('💣 LỰU ĐẠN (ĐẾM 2 LƯỢT)!', targetX, targetY, '#f59e0b');
             this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} ném lựu đạn tới (${targetX}, ${targetY})! Sẽ nổ 3x3 sau 2 lượt!`, 'clash');
         }
+        else if (act.type === 'OIL_BARREL') {
+            const uD = DIRECTIONS[act.dir];
+            const maxRange = act.range || 6;
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playBombLauncher();
+
+            let targetX = actor.x + uD.dx * maxRange;
+            let targetY = actor.y + uD.dy * maxRange;
+
+            // Nổ tung sớm nếu có tương tác vật thể ngay trong phạm vi
+            for (let r = 1; r <= maxRange; r++) {
+                const cx = actor.x + uD.dx * r;
+                const cy = actor.y + uD.dy * r;
+                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
+
+                targetX = cx;
+                targetY = cy;
+
+                const hitUnit = livingOpponents.find(u => u.x === cx && u.y === cy);
+                const hitHazard = this.groundHazards && this.groundHazards.some(h => h.x === cx && h.y === cy);
+                if (hitUnit || hitHazard) break;
+            }
+
+            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
+            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
+
+            this.createRocketTrail(actor.x, actor.y, targetX, targetY, '#d97706');
+            await this.delay(180);
+
+            if (window.soundCtrl) window.soundCtrl.playExplosion();
+            this.createExplosionBurst(targetX, targetY, 35);
+
+            this.addFloatingText('🛢️ DẦU LOANG 3x3!', targetX, targetY, '#d97706');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} ném [${act.name}] phát nổ dầu loang 3x3 tại (${targetX}, ${targetY})!`, 'clash');
+
+            // Kẻ thù trúng dầu sẽ dính debuff isOiled, bốc cháy khi nhận sát thương từ mọi nguồn
+            for (const u of livingOpponents) {
+                if (Math.abs(u.x - targetX) <= 1 && Math.abs(u.y - targetY) <= 1) {
+                    u.isOiled = true;
+                    this.createBuffSparks(u.x, u.y, '#d97706');
+                    this.addFloatingText('🛢️ DÍNH DẦU!', u.x, u.y, '#d97706');
+                    this.addCombatLog(`🛢️ ${u.name} dính Dầu Trơn! Bị bắt lửa cháy (-5 HP/lượt trong 3 lượt) khi nhận sát thương từ bất kỳ nguồn nào!`, 'hit');
+
+                    if (u.charId === 'hookman') {
+                        u.revealedTurns = 2;
+                        if (u.isPlayer) this.playerRevealedTurns = 2;
+                        this.addFloatingText(this.lang === 'en' ? 'REVEALED!' : 'HIỆN HÌNH!', u.x, u.y, '#f43f5e');
+                    }
+                }
+            }
+
+            actor.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 3;
+        }
+        else if (act.type === 'FIRE_CANNON') {
+            const uD = DIRECTIONS[act.dir];
+            const maxRange = act.range || 5;
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playRocketLaunch();
+
+            let targetX = actor.x + uD.dx * maxRange;
+            let targetY = actor.y + uD.dy * maxRange;
+
+            // Nổ tung sớm nếu có tương tác vật thể ngay trong phạm vi
+            for (let r = 1; r <= maxRange; r++) {
+                const cx = actor.x + uD.dx * r;
+                const cy = actor.y + uD.dy * r;
+                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
+
+                targetX = cx;
+                targetY = cy;
+
+                const hitUnit = livingOpponents.find(u => u.x === cx && u.y === cy);
+                const hitHazard = this.groundHazards && this.groundHazards.some(h => h.x === cx && h.y === cy);
+                if (hitUnit || hitHazard) break;
+            }
+
+            targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
+            targetY = Math.max(0, Math.min(GRID_ROWS - 1, targetY));
+
+            this.createRocketTrail(actor.x, actor.y, targetX, targetY, '#dc2626');
+            await this.delay(180);
+
+            if (window.soundCtrl) window.soundCtrl.playExplosion();
+            this.createExplosionBurst(targetX, targetY, 45);
+
+            this.addFloatingText('💥 ĐẠI BÁC LỬA 3x3!', targetX, targetY, '#dc2626');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} bắn [${act.name}] nổ 3x3 tại (${targetX}, ${targetY}) (15 DMG) và tạo VÙNG CHÁY 2 lượt!`, 'clash');
+
+            let baseDmg = act.power || 15;
+            if (hasBuffDmg) baseDmg = Math.round(baseDmg * dmgMult);
+
+            for (const u of allLivingUnits) {
+                if (Math.abs(u.x - targetX) <= 1 && Math.abs(u.y - targetY) <= 1) {
+                    const uAct = u.queue ? u.queue[stepIndex] : null;
+                    let uDmg = (u === actor) ? (act.power || 15) : baseDmg;
+                    if (uAct && uAct.type === 'LEAP') uDmg = Math.round(uDmg * 0.75);
+
+                    this.applyDamage(u, uDmg);
+                    this.createHitSparks(u.x, u.y, '#ea580c');
+                    this.addFloatingText(`-${uDmg} HP!`, u.x, u.y, '#ea580c');
+                    this.addCombatLog(`💥 Vụ nổ Đại Bác Lửa trúng ${u.name}! (-${uDmg} HP)!`, 'hit');
+
+                    if (u.charId === 'hookman') {
+                        u.revealedTurns = 2;
+                        if (u.isPlayer) this.playerRevealedTurns = 2;
+                    }
+                }
+            }
+
+            // Tạo Vùng Cháy tồn tại trong 2 lượt
+            if (!this.fireZones) this.fireZones = [];
+            this.fireZones.push({
+                id: Date.now() + Math.random(),
+                team: actor.team,
+                x: targetX,
+                y: targetY,
+                aoeRadius: 1,
+                turnsLeft: act.fireZoneDuration || 2,
+                creatorName: actor.name
+            });
+
+            // Kẻ địch trong vùng kể từ thời điểm sau khi nổ tung sẽ bị hiệu ứng cháy
+            for (const enemy of livingOpponents) {
+                if (Math.abs(enemy.x - targetX) <= 1 && Math.abs(enemy.y - targetY) <= 1) {
+                    if (enemy.hp > 0) {
+                        this.applyBurn(enemy, 3, 5);
+                        this.addFloatingText('🔥 BỐC CHÁY!', enemy.x, enemy.y, '#ea580c');
+                    }
+                }
+            }
+
+            actor.cooldowns[act.skillId] = act.cooldown || 4;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 4;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 4;
+        }
         else if (act.type === 'RECT_SLASH') {
             if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playCyberBladeSlash();
 
@@ -3971,6 +4252,18 @@ class GameEngine {
                     this.addCombatLog(`⏳ Khói [Thuốc Lá] của ${unit.name} đã tàn, bắt đầu hồi chiêu 3 lượt!`, 'system');
                 }
             }
+
+            // 4. Sát thương Cháy (Burn DOT: -5 HP/lượt, không thể cộng dồn)
+            if (unit.burnTurns > 0) {
+                const burnDmg = unit.burnDmg || 5;
+                this.applyDamage(unit, burnDmg);
+                unit.burnTurns--;
+                this.createHitSparks(unit.x, unit.y, '#ea580c');
+                this.addFloatingText(`-${burnDmg} HP (CHÁY 🔥)`, unit.x, unit.y, '#ea580c');
+                this.addCombatLog(this.lang === 'en'
+                    ? `🔥 Turn end: ${unit.name} suffers -${burnDmg} Burn damage! (${unit.burnTurns} turns left)`
+                    : `🔥 Cuối lượt: ${unit.name} bị thiêu đốt mất -${burnDmg} HP! (Còn ${unit.burnTurns}L cháy)`, 'hit');
+            }
         }
 
         // 4. Kích hoạt kéo Dây Móc Hookman (Hết lượt sau kéo 2 ô)
@@ -3994,6 +4287,10 @@ class GameEngine {
                         victim.x = nextVx;
                         victim.y = nextVy;
                         pulledSteps++;
+                    }
+
+                    if (pulledSteps > 0) {
+                        this.checkFireZones(victim);
                     }
 
                     if (window.soundCtrl) window.soundCtrl.playHookPull();
@@ -4045,6 +4342,19 @@ class GameEngine {
 
         this.groundHazards = this.groundHazards.filter(h => h.turnsLeft > 0);
 
+        // Giảm thời gian tồn tại của Vùng Cháy (Fire Zone: 2 lượt)
+        if (this.fireZones && this.fireZones.length > 0) {
+            for (const zone of this.fireZones) {
+                zone.turnsLeft--;
+                if (zone.turnsLeft === 0) {
+                    this.addCombatLog(this.lang === 'en'
+                        ? `💨 Fire Zone at (${zone.x}, ${zone.y}) has burned out!`
+                        : `💨 Vùng Cháy tại (${zone.x}, ${zone.y}) đã tàn lụi!`, 'system');
+                }
+            }
+            this.fireZones = this.fireZones.filter(z => z.turnsLeft > 0);
+        }
+
         // 6. Xử lý Hồi sinh trong Chế độ KOTH (Áp dụng cho tất cả nhân vật sau 2 lượt)
         if (this.gameMode === 'KOTH') {
             for (const u of allUnits) {
@@ -4056,6 +4366,8 @@ class GameEngine {
                         u.hp = u.maxHp;
                         u.isDead = false;
                         u.alive = true;
+                        u.isOiled = false;
+                        u.burnTurns = 0;
                         const spawnPos = this.getRespawnPosition(u.team, u.index);
                         u.x = spawnPos.x;
                         u.y = spawnPos.y;
@@ -4251,7 +4563,42 @@ class GameEngine {
         this.updateHUD();
     }
 
+    applyBurn(target, turns = 3, dmg = 5) {
+        if (!target || target.hp <= 0) return;
+        target.burnTurns = Math.max(target.burnTurns || 0, turns);
+        target.burnDmg = dmg; // không thể cộng dồn sát thương, duy trì 5 HP/lượt
+    }
+
+    checkFireZones(unit) {
+        if (!unit || unit.hp <= 0 || !this.fireZones || this.fireZones.length === 0) return;
+        for (const zone of this.fireZones) {
+            if (unit.team !== zone.team) {
+                if (Math.abs(unit.x - zone.x) <= (zone.aoeRadius || 1) && Math.abs(unit.y - zone.y) <= (zone.aoeRadius || 1)) {
+                    if (unit.isOiled) {
+                        unit.isOiled = false;
+                    }
+                    this.applyBurn(unit, 3, 5);
+                    this.createHitSparks(unit.x, unit.y, '#ea580c');
+                    this.addFloatingText('🔥 BỐC CHÁY!', unit.x, unit.y, '#ea580c');
+                    this.addCombatLog(this.lang === 'en'
+                        ? `🔥 ${unit.name} entered Fire Zone and caught fire (-5 HP/turn for 3 turns)!`
+                        : `🔥 ${unit.name} đi qua Vùng Cháy và bị thiêu đốt (-5 HP/lượt trong 3 lượt)!`, 'hit');
+                    break;
+                }
+            }
+        }
+    }
+
     applyDamage(entity, amount) {
+        if (entity.isOiled && amount > 0) {
+            entity.isOiled = false;
+            this.applyBurn(entity, 3, 5);
+            this.createHitSparks(entity.x, entity.y, '#ea580c');
+            this.addFloatingText(this.lang === 'en' ? '🔥 OIL IGNITED!' : '🔥 DẦU BỐC CHÁY!', entity.x, entity.y, '#ea580c');
+            this.addCombatLog(this.lang === 'en'
+                ? `🔥 Oil on ${entity.name} ignited upon taking damage! Suffering Burn (-5 HP/turn for 3 turns)!`
+                : `🔥 Lớp dầu trên ${entity.name} bốc cháy khi nhận sát thương! Bị thiêu đốt (-5 HP/lượt trong 3 lượt)!`, 'hit');
+        }
         entity.hp = Math.max(0, entity.hp - amount);
         if (entity.hp === 0 && this.gameMode === 'KOTH' && !entity.isDead) {
             entity.isDead = true;
@@ -4420,6 +4767,7 @@ class GameEngine {
         this.inOvertime = false;
 
         this.groundHazards = [];
+        this.fireZones = [];
         this.playerRevealedTurns = 0;
         this.cpuRevealedTurns = 0;
         this.activeHookTethers = [];
@@ -4895,6 +5243,55 @@ class GameEngine {
             ctx.restore();
         });
 
+        // 2b. Vẽ các Vùng Cháy 3x3 (Fire Zones)
+        if (this.fireZones && this.fireZones.length > 0) {
+            const time = performance.now() * 0.005;
+            this.fireZones.forEach(fz => {
+                const aoeX = (fz.x - 1) * CELL_SIZE;
+                const aoeY = (fz.y - 1) * CELL_SIZE;
+                const aoeSize = 3 * CELL_SIZE;
+
+                ctx.save();
+                const pulse = 0.22 + 0.08 * Math.sin(time + fz.x * 2 + fz.y * 3);
+                ctx.fillStyle = `rgba(234, 88, 12, ${pulse})`;
+                ctx.fillRect(aoeX, aoeY, aoeSize, aoeSize);
+
+                ctx.strokeStyle = '#f97316';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 4]);
+                ctx.strokeRect(aoeX, aoeY, aoeSize, aoeSize);
+                ctx.setLineDash([]);
+
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        const fx = (fz.x + dx) * CELL_SIZE + CELL_SIZE / 2;
+                        const fy = (fz.y + dy) * CELL_SIZE + CELL_SIZE / 2;
+                        if ((dx + dy + Math.floor(time)) % 2 === 0) {
+                            ctx.fillText('🔥', fx, fy);
+                        }
+                    }
+                }
+
+                const cx = fz.x * CELL_SIZE + CELL_SIZE / 2;
+                const cy = fz.y * CELL_SIZE + CELL_SIZE / 2;
+                ctx.fillStyle = '#ea580c';
+                ctx.beginPath();
+                ctx.arc(cx, cy, 13, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.fillText(`${fz.turnsLeft}L`, cx, cy);
+                ctx.restore();
+            });
+        }
+
         // 3. Vẽ Lộ trình đã nạp trong hàng đợi
         this.renderQueuedPaths();
 
@@ -5197,6 +5594,29 @@ class GameEngine {
             tag = `${tag} [🚬]`;
         }
 
+        if (fighter.isOiled) {
+            ctx.save();
+            ctx.strokeStyle = '#d97706';
+            ctx.setLineDash([3, 3]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 24, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            tag = `${tag} [🛢️]`;
+        }
+
+        if (fighter.burnTurns > 0) {
+            ctx.save();
+            ctx.strokeStyle = '#ea580c';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 22, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            tag = `${tag} [🔥${fighter.burnTurns}L]`;
+        }
+
         // Hiệu ứng phát sáng
         const grad = ctx.createRadialGradient(0, 0, 8, 0, 0, 26);
         grad.addColorStop(0, color);
@@ -5314,6 +5734,14 @@ class GameEngine {
         this.groundHazards.forEach(hz => {
             mCtx.fillRect(hz.x * cellW - 1, hz.y * cellH - 1, 3, 3);
         });
+
+        // Vẽ Vùng Cháy trên minimap
+        if (this.fireZones && this.fireZones.length > 0) {
+            mCtx.fillStyle = 'rgba(234, 88, 12, 0.55)';
+            this.fireZones.forEach(fz => {
+                mCtx.fillRect((fz.x - 1) * cellW, (fz.y - 1) * cellH, 3 * cellW, 3 * cellH);
+            });
+        }
 
         // Vẽ toàn bộ chiến binh Đội Xanh
         if (this.blueTeam) {
