@@ -68,6 +68,7 @@ class GameEngine {
         this.gameMode = 'DUEL'; // 'DUEL' (1v1) hoặc 'KOTH' (King of the Hill khi >= 2 người / đội)
         this.kothZone = { minX: 8, maxX: 12, minY: 1, maxY: 5 }; // Khu vực Cứ Điểm 5x5 ở giữa bản đồ 20x7
         this.hillScale = 0; // -2 (Đỏ chiếm), -1 (Đỏ đang chiếm), 0 (Trung lập), +1 (Xanh đang chiếm), +2 (Xanh chiếm)
+        this.hillOwner = null; // 'BLUE' | 'RED' | null (Chuẩn TF2 KOTH: Quyền sở hữu cứ điểm liên tục cộng điểm cho tới khi đối thủ chiếm 100%)
         this.blueScore = 0;
         this.redScore = 0;
         this.SCORE_LIMIT = 15;
@@ -1034,6 +1035,7 @@ class GameEngine {
 
         this.turn = 1;
         this.hillScale = 0;
+        this.hillOwner = null;
         this.blueScore = 0;
         this.redScore = 0;
         this.inOvertime = false;
@@ -2478,20 +2480,54 @@ class GameEngine {
                 if (rScore) rScore.innerText = `🔴 ${this.redScore}/15`;
 
                 if (hBadge) {
+                    const blueInZone = this.blueTeam.filter(u => u.hp > 0 && this.isInCaptureZone(u.x, u.y)).length;
+                    const redInZone = this.redTeam.filter(u => u.hp > 0 && this.isInCaptureZone(u.x, u.y)).length;
+                    const isContested = blueInZone > 0 && redInZone > 0;
+
                     let hillText = t('kothHillNeutral');
                     let badgeClass = 'koth-hill-badge';
-                    if (this.hillScale === 2) {
-                        hillText = t('kothHillCapturedBlue');
-                        badgeClass += ' blue-held';
-                    } else if (this.hillScale === 1) {
-                        hillText = t('kothHillCapturingBlue', { status: 1 });
-                        badgeClass += ' blue-capping';
-                    } else if (this.hillScale === -1) {
-                        hillText = t('kothHillCapturingRed', { status: 1 });
-                        badgeClass += ' red-capping';
-                    } else if (this.hillScale === -2) {
-                        hillText = t('kothHillCapturedRed');
-                        badgeClass += ' red-held';
+
+                    if (isContested) {
+                        badgeClass += ' contested';
+                        if (this.hillOwner === 'BLUE') {
+                            hillText = this.lang === 'en'
+                                ? `⚔️ BLUE POINT [CONTESTED! ${blueInZone}v${redInZone}] [+1 PT]`
+                                : `⚔️ ĐỘI XANH [TRANH CHẤP! ${blueInZone}v${redInZone}] [+1 Đ]`;
+                        } else if (this.hillOwner === 'RED') {
+                            hillText = this.lang === 'en'
+                                ? `⚔️ RED POINT [CONTESTED! ${redInZone}v${blueInZone}] [+1 PT]`
+                                : `⚔️ ĐỘI ĐỎ [TRANH CHẤP! ${redInZone}v${blueInZone}] [+1 Đ]`;
+                        } else {
+                            hillText = t('kothHillContested', { blue: blueInZone, red: redInZone });
+                        }
+                    } else if (this.hillOwner === 'BLUE') {
+                        badgeClass += ' blue-hold';
+                        if (this.hillScale === 2) {
+                            hillText = t('kothHillCapturedBlue');
+                        } else {
+                            hillText = this.lang === 'en'
+                                ? `🔵 BLUE ZONE (RED CAPPING ${Math.abs(this.hillScale - 2)}/4) [+1 PT]`
+                                : `🔵 ĐỘI XANH GIỮ (ĐỎ ĐANG CHIẾM ${Math.abs(this.hillScale - 2)}/4) [+1 Đ]`;
+                        }
+                    } else if (this.hillOwner === 'RED') {
+                        badgeClass += ' red-hold';
+                        if (this.hillScale === -2) {
+                            hillText = t('kothHillCapturedRed');
+                        } else {
+                            hillText = this.lang === 'en'
+                                ? `🔴 RED ZONE (BLUE CAPPING ${Math.abs(-2 - this.hillScale)}/4) [+1 PT]`
+                                : `🔴 ĐỘI ĐỎ GIỮ (XANH ĐANG CHIẾM ${Math.abs(-2 - this.hillScale)}/4) [+1 Đ]`;
+                        }
+                    } else {
+                        if (this.hillScale > 0) {
+                            hillText = t('kothHillCapturingBlue', { status: this.hillScale });
+                            badgeClass += ' blue-hold';
+                        } else if (this.hillScale < 0) {
+                            hillText = t('kothHillCapturingRed', { status: Math.abs(this.hillScale) });
+                            badgeClass += ' red-hold';
+                        } else {
+                            hillText = t('kothHillNeutral');
+                        }
                     }
                     hBadge.innerText = hillText;
                     hBadge.className = badgeClass;
@@ -4391,32 +4427,51 @@ class GameEngine {
             }
         }
 
-        // 7. Đánh giá Cứ Điểm 5x5 & Tích lũy Điểm Chế độ KOTH
+        // 7. Đánh giá Cứ Điểm 5x5 & Tích lũy Điểm Chế độ KOTH (Chuẩn cơ chế Team Fortress 2)
         if (this.gameMode === 'KOTH') {
             const blueInZone = this.blueTeam.filter(u => u.hp > 0 && this.isInCaptureZone(u.x, u.y)).length;
             const redInZone = this.redTeam.filter(u => u.hp > 0 && this.isInCaptureZone(u.x, u.y)).length;
+
+            // Đồng bộ hillOwner nếu hillScale đã ở mốc cực đại (hỗ trợ cả mock test và gameplay)
+            if (this.hillScale >= 2) {
+                this.hillOwner = 'BLUE';
+            } else if (this.hillScale <= -2) {
+                this.hillOwner = 'RED';
+            }
 
             if (blueInZone > 0 && redInZone === 0) {
                 // Đội Xanh chiếm mà không có đối thủ tranh chấp
                 if (this.hillScale < 2) {
                     this.hillScale++;
-                    this.addCombatLog(
-                        this.hillScale === 2
-                            ? (this.lang === 'en' ? '🚩 BLUE SQUAD CAPTURED THE 5x5 HILL! (+1 Point/Turn)' : '🚩 ĐỘI XANH ĐÃ CHIẾM ĐƯỢC CỨ ĐIỂM 5x5! (+1 Điểm/Lượt)')
-                            : (this.lang === 'en' ? `🚩 Blue capturing the Hill (${this.hillScale}/2)` : `🚩 Đội Xanh đang tiến chiếm cứ điểm! (Trạng thái: ${this.hillScale}/2)`),
-                        'hit'
-                    );
+                    if (this.hillScale === 2) {
+                        this.hillOwner = 'BLUE';
+                        this.addCombatLog(
+                            this.lang === 'en' ? '🚩 BLUE SQUAD CAPTURED THE 5x5 HILL! (+1 Point/Turn)' : '🚩 ĐỘI XANH ĐÃ CHIẾM ĐƯỢC CỨ ĐIỂM 5x5! (+1 Điểm/Lượt)',
+                            'hit'
+                        );
+                    } else {
+                        this.addCombatLog(
+                            this.lang === 'en' ? `🚩 Blue capturing the Hill (${this.hillScale}/2)` : `🚩 Đội Xanh đang tiến chiếm cứ điểm! (Trạng thái: ${this.hillScale}/2)`,
+                            'hit'
+                        );
+                    }
                 }
             } else if (redInZone > 0 && blueInZone === 0) {
                 // Đội Đỏ chiếm mà không có đối thủ tranh chấp
                 if (this.hillScale > -2) {
                     this.hillScale--;
-                    this.addCombatLog(
-                        this.hillScale === -2
-                            ? (this.lang === 'en' ? '🚩 RED SQUAD CAPTURED THE 5x5 HILL! (+1 Point/Turn)' : '🚩 ĐỘI ĐỎ ĐÃ CHIẾM ĐƯỢC CỨ ĐIỂM 5x5! (+1 Điểm/Lượt)')
-                            : (this.lang === 'en' ? `🚩 Red capturing the Hill (${Math.abs(this.hillScale)}/2)` : `🚩 Đội Đỏ đang tiến chiếm cứ điểm! (Trạng thái: ${Math.abs(this.hillScale)}/2)`),
-                        'clash'
-                    );
+                    if (this.hillScale === -2) {
+                        this.hillOwner = 'RED';
+                        this.addCombatLog(
+                            this.lang === 'en' ? '🚩 RED SQUAD CAPTURED THE 5x5 HILL! (+1 Point/Turn)' : '🚩 ĐỘI ĐỎ ĐÃ CHIẾM ĐƯỢC CỨ ĐIỂM 5x5! (+1 Điểm/Lượt)',
+                            'clash'
+                        );
+                    } else {
+                        this.addCombatLog(
+                            this.lang === 'en' ? `🚩 Red capturing the Hill (${Math.abs(this.hillScale)}/2)` : `🚩 Đội Đỏ đang tiến chiếm cứ điểm! (Trạng thái: ${Math.abs(this.hillScale)}/2)`,
+                            'clash'
+                        );
+                    }
                 }
             } else if (blueInZone > 0 && redInZone > 0) {
                 this.addCombatLog(
@@ -4425,11 +4480,23 @@ class GameEngine {
                         : `⚔️ TRANH CHẤP! Cả 2 đội đều có người tại Cứ Điểm (${blueInZone} Xanh vs ${redInZone} Đỏ)! Trạng thái bị khóa!`,
                     'system'
                 );
+            } else {
+                // blueInZone === 0 && redInZone === 0: Vắng bóng cả 2 đội
+                // Tiêu biến tiến trình chiếm dở dang (Capture Progress Decay) chuẩn TF2
+                if (this.hillOwner === 'BLUE' && this.hillScale < 2) {
+                    this.hillScale++;
+                } else if (this.hillOwner === 'RED' && this.hillScale > -2) {
+                    this.hillScale--;
+                } else if (!this.hillOwner) {
+                    if (this.hillScale > 0) this.hillScale--;
+                    else if (this.hillScale < 0) this.hillScale++;
+                }
             }
 
-            // Ghi 1 điểm cho mỗi lượt khi status đạt số 2 (hoặc -2 cho Red)
-            if (this.hillScale === 2) {
-                this.blueScore++;
+            // Ghi 1 điểm cho mỗi lượt cho Đội Đang Sở Hữu Cứ Điểm (Chuẩn cơ chế TF2)
+            // Kể cả khi cứ điểm đang bị Tranh Chấp (Contested) hay đối thủ đang lấn chiếm kéo thanh
+            if (this.hillOwner === 'BLUE') {
+                this.blueScore = Math.min(this.SCORE_LIMIT, this.blueScore + 1);
                 this.addFloatingText('+1 ĐIỂM!', 10, 3, '#38bdf8');
                 this.addCombatLog(
                     this.lang === 'en'
@@ -4437,8 +4504,8 @@ class GameEngine {
                         : `⭐ Đội Xanh kiểm soát Cứ Điểm: +1 Điểm! (${this.blueScore}/${this.SCORE_LIMIT})`,
                     'system'
                 );
-            } else if (this.hillScale === -2) {
-                this.redScore++;
+            } else if (this.hillOwner === 'RED') {
+                this.redScore = Math.min(this.SCORE_LIMIT, this.redScore + 1);
                 this.addFloatingText('+1 ĐIỂM!', 10, 3, '#f43f5e');
                 this.addCombatLog(
                     this.lang === 'en'
@@ -4448,31 +4515,44 @@ class GameEngine {
                 );
             }
 
-            // Kiểm tra Điều kiện Thắng & Overtime
+            // Kiểm tra Điều kiện Thắng & Overtime (Chuẩn TF2)
             const blueReached = this.blueScore >= this.SCORE_LIMIT;
             const redReached = this.redScore >= this.SCORE_LIMIT;
 
             if (blueReached && !redReached) {
-                if (redInZone > 0 || this.hillScale !== 2) {
-                    this.inOvertime = true;
-                    this.addCombatLog(t('kothOvertimeNotice'), 'clash');
-                } else {
-                    this.handleGameOver('BLUE_KOTH');
-                    return;
+                if (this.hillOwner === 'BLUE') {
+                    if (redInZone > 0 || this.hillScale < 2) {
+                        this.inOvertime = true;
+                        this.addCombatLog(t('kothOvertimeNotice'), 'clash');
+                    } else {
+                        this.inOvertime = false;
+                        this.handleGameOver('BLUE_KOTH');
+                        return;
+                    }
+                } else if (this.hillOwner === 'RED') {
+                    // Đội Đỏ đã lật ngược chiếm thành công cứ điểm trong hiệp phụ -> Overtime kết thúc, game tiếp diễn với Đỏ giữ điểm
+                    this.inOvertime = false;
                 }
             } else if (redReached && !blueReached) {
-                if (blueInZone > 0 || this.hillScale !== -2) {
-                    this.inOvertime = true;
-                    this.addCombatLog(t('kothOvertimeNotice'), 'clash');
-                } else {
-                    this.handleGameOver('RED_KOTH');
-                    return;
+                if (this.hillOwner === 'RED') {
+                    if (blueInZone > 0 || this.hillScale > -2) {
+                        this.inOvertime = true;
+                        this.addCombatLog(t('kothOvertimeNotice'), 'clash');
+                    } else {
+                        this.inOvertime = false;
+                        this.handleGameOver('RED_KOTH');
+                        return;
+                    }
+                } else if (this.hillOwner === 'BLUE') {
+                    this.inOvertime = false;
                 }
             } else if (blueReached && redReached) {
-                if (this.hillScale === 2 && redInZone === 0) {
+                if (this.hillOwner === 'BLUE' && this.hillScale === 2 && redInZone === 0) {
+                    this.inOvertime = false;
                     this.handleGameOver('BLUE_KOTH');
                     return;
-                } else if (this.hillScale === -2 && blueInZone === 0) {
+                } else if (this.hillOwner === 'RED' && this.hillScale === -2 && blueInZone === 0) {
+                    this.inOvertime = false;
                     this.handleGameOver('RED_KOTH');
                     return;
                 } else {
@@ -4762,6 +4842,7 @@ class GameEngine {
         this.cancelPathPlanning();
         this.setupTeams();
         this.hillScale = 0;
+        this.hillOwner = null;
         this.blueScore = 0;
         this.redScore = 0;
         this.inOvertime = false;
@@ -5176,22 +5257,56 @@ class GameEngine {
             let borderColor = 'rgba(245, 158, 11, 0.8)';
             let statusText = this.lang === 'en' ? 'NEUTRAL (0/2)' : 'TRUNG LẬP (0/2)';
 
-            if (this.hillScale === 2) {
+            const blueInZone = this.blueTeam.filter(u => u.hp > 0 && this.isInCaptureZone(u.x, u.y)).length;
+            const redInZone = this.redTeam.filter(u => u.hp > 0 && this.isInCaptureZone(u.x, u.y)).length;
+            const isContested = blueInZone > 0 && redInZone > 0;
+
+            if (isContested) {
+                borderColor = 'rgba(245, 158, 11, 0.95)';
+                zoneBg = 'rgba(245, 158, 11, 0.18)';
+                if (this.hillOwner === 'BLUE') {
+                    statusText = this.lang === 'en'
+                        ? `⚔️ BLUE POINT [CONTESTED! ${blueInZone}v${redInZone}] [+1/T]`
+                        : `⚔️ ĐỘI XANH [TRANH CHẤP! ${blueInZone}v${redInZone}] [+1/L]`;
+                } else if (this.hillOwner === 'RED') {
+                    statusText = this.lang === 'en'
+                        ? `⚔️ RED POINT [CONTESTED! ${redInZone}v${blueInZone}] [+1/T]`
+                        : `⚔️ ĐỘI ĐỎ [TRANH CHẤP! ${redInZone}v${blueInZone}] [+1/L]`;
+                } else {
+                    statusText = this.lang === 'en'
+                        ? `⚔️ CONTESTED! (${blueInZone}v${redInZone})`
+                        : `⚔️ TRANH CHẤP! (${blueInZone}v${redInZone})`;
+                }
+            } else if (this.hillOwner === 'BLUE') {
                 zoneBg = 'rgba(56, 189, 248, 0.22)';
                 borderColor = 'rgba(56, 189, 248, 0.95)';
-                statusText = this.lang === 'en' ? 'BLUE ZONE (2/2) [+1/T]' : 'ĐỘI XANH KIỂM SOÁT (2/2) [+1/L]';
-            } else if (this.hillScale === 1) {
-                zoneBg = 'rgba(56, 189, 248, 0.12)';
-                borderColor = 'rgba(56, 189, 248, 0.7)';
-                statusText = this.lang === 'en' ? 'BLUE CAPTURING (1/2)' : 'ĐỘI XANH ĐANG CHIẾM (1/2)';
-            } else if (this.hillScale === -1) {
-                zoneBg = 'rgba(244, 63, 94, 0.12)';
-                borderColor = 'rgba(244, 63, 94, 0.7)';
-                statusText = this.lang === 'en' ? 'RED CAPTURING (1/2)' : 'ĐỘI ĐỎ ĐANG CHIẾM (1/2)';
-            } else if (this.hillScale === -2) {
+                if (this.hillScale === 2) {
+                    statusText = this.lang === 'en' ? 'BLUE ZONE (2/2) [+1/T]' : 'ĐỘI XANH KIỂM SOÁT (2/2) [+1/L]';
+                } else {
+                    statusText = this.lang === 'en'
+                        ? `BLUE ZONE [RED CAPPING ${Math.abs(this.hillScale - 2)}/4] [+1/T]`
+                        : `ĐỘI XANH [ĐỎ ĐANG CHIẾM ${Math.abs(this.hillScale - 2)}/4] [+1/L]`;
+                }
+            } else if (this.hillOwner === 'RED') {
                 zoneBg = 'rgba(244, 63, 94, 0.22)';
                 borderColor = 'rgba(244, 63, 94, 0.95)';
-                statusText = this.lang === 'en' ? 'RED ZONE (2/2) [+1/T]' : 'ĐỘI ĐỎ KIỂM SOÁT (2/2) [+1/L]';
+                if (this.hillScale === -2) {
+                    statusText = this.lang === 'en' ? 'RED ZONE (2/2) [+1/T]' : 'ĐỘI ĐỎ KIỂM SOÁT (2/2) [+1/L]';
+                } else {
+                    statusText = this.lang === 'en'
+                        ? `RED ZONE [BLUE CAPPING ${Math.abs(-2 - this.hillScale)}/4] [+1/T]`
+                        : `ĐỘI ĐỎ [XANH ĐANG CHIẾM ${Math.abs(-2 - this.hillScale)}/4] [+1/L]`;
+                }
+            } else {
+                if (this.hillScale === 1) {
+                    zoneBg = 'rgba(56, 189, 248, 0.12)';
+                    borderColor = 'rgba(56, 189, 248, 0.7)';
+                    statusText = this.lang === 'en' ? 'BLUE CAPTURING (1/2)' : 'ĐỘI XANH ĐANG CHIẾM (1/2)';
+                } else if (this.hillScale === -1) {
+                    zoneBg = 'rgba(244, 63, 94, 0.12)';
+                    borderColor = 'rgba(244, 63, 94, 0.7)';
+                    statusText = this.lang === 'en' ? 'RED CAPTURING (1/2)' : 'ĐỘI ĐỎ ĐANG CHIẾM (1/2)';
+                }
             }
 
             ctx.fillStyle = zoneBg;
@@ -5714,10 +5829,10 @@ class GameEngine {
 
             let mColor = 'rgba(245, 158, 11, 0.25)';
             let mBorder = '#f59e0b';
-            if (this.hillScale === 2) {
+            if (this.hillOwner === 'BLUE') {
                 mColor = 'rgba(56, 189, 248, 0.35)';
                 mBorder = '#38bdf8';
-            } else if (this.hillScale === -2) {
+            } else if (this.hillOwner === 'RED') {
                 mColor = 'rgba(244, 63, 94, 0.35)';
                 mBorder = '#f43f5e';
             }

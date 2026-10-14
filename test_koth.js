@@ -160,7 +160,37 @@ function runKothTests() {
     const prevScore = engine.blueScore;
     engine.finishTurn();
     if (engine.hillScale !== prevScale) throw new Error(`Tranh chấp mà hillScale bị đổi: ${engine.hillScale}`);
-    console.log(`✓ Lượt 3: Đội Đỏ tiến vào tranh chấp -> Trạng thái bị khóa (freeze ở ${engine.hillScale}/2)`);
+    if (engine.blueScore !== prevScore + 1) throw new Error(`Tranh chấp mà Đội Xanh không được cộng điểm theo chuẩn TF2! Thực tế: ${engine.blueScore}`);
+    console.log(`✓ Lượt 3: Đội Đỏ tiến vào tranh chấp -> Trạng thái bị khóa (freeze ở ${engine.hillScale}/2) & Đội Xanh TIẾP TỤC nhận điểm (${engine.blueScore}) chuẩn TF2!`);
+
+    // Lượt 4: Đội Xanh rời cứ điểm, Đội Đỏ một mình chiếm (Kéo thanh lấn chiếm)
+    // Chuẩn TF2: Đội Xanh vẫn là chủ sở hữu cho tới khi Đội Đỏ đạt 100% (-2) -> Đội Xanh vẫn nhận điểm!
+    engine.blueTeam[0].x = 2; engine.blueTeam[0].y = 1; // Xanh ra ngoài
+    engine.finishTurn();
+    if (engine.hillScale !== 1) throw new Error(`Lượt 4: hillScale phải giảm về 1, thực tế: ${engine.hillScale}`);
+    if (engine.hillOwner !== 'BLUE') throw new Error(`Lượt 4: Quyền sở hữu phải vẫn thuộc BLUE cho tới khi đối thủ chiếm 100%!`);
+    if (engine.blueScore !== 3) throw new Error(`Lượt 4: Đội Xanh vẫn phải nhận +1 điểm (Tổng: 3), thực tế: ${engine.blueScore}`);
+    if (engine.redScore !== 0) throw new Error(`Lượt 4: Đội Đỏ chưa chiếm xong không được nhận điểm!`);
+    console.log(`✓ Lượt 4: Đội Đỏ kéo thanh xuống 1/2 -> Đội Xanh VẪN LÀ CHỦ SỞ HỮU và nhận +1 Điểm (Tổng: ${engine.blueScore})!`);
+
+    // Lượt 5 & 6: Đội Đỏ tiếp tục kéo thanh về 0 rồi -1
+    engine.finishTurn(); // 1 -> 0
+    if (engine.hillScale !== 0 || engine.hillOwner !== 'BLUE' || engine.blueScore !== 4) {
+        throw new Error(`Lượt 5 sai lệch: scale=${engine.hillScale}, owner=${engine.hillOwner}, blueScore=${engine.blueScore}`);
+    }
+    engine.finishTurn(); // 0 -> -1
+    if (engine.hillScale !== -1 || engine.hillOwner !== 'BLUE' || engine.blueScore !== 5) {
+        throw new Error(`Lượt 6 sai lệch: scale=${engine.hillScale}, owner=${engine.hillOwner}, blueScore=${engine.blueScore}`);
+    }
+    console.log(`✓ Lượt 5-6: Đội Đỏ kéo thanh qua 0 và -1 -> Đội Xanh liên tục nhận điểm (Tổng: ${engine.blueScore})!`);
+
+    // Lượt 7: Đội Đỏ kéo thanh đạt mốc cực đại -2 (Chiếm cứ điểm 100%!)
+    engine.finishTurn(); // -1 -> -2
+    if (engine.hillScale !== -2) throw new Error(`Lượt 7: hillScale phải là -2, thực tế: ${engine.hillScale}`);
+    if (engine.hillOwner !== 'RED') throw new Error(`Lượt 7: Quyền sở hữu phải chính thức chuyển sang RED!`);
+    if (engine.redScore !== 1) throw new Error(`Lượt 7: Đội Đỏ phải bắt đầu nhận điểm (Tổng: 1), thực tế: ${engine.redScore}`);
+    if (engine.blueScore !== 5) throw new Error(`Lượt 7: Đội Xanh phải dừng nhận điểm ở 5! Thực tế: ${engine.blueScore}`);
+    console.log(`✓ Lượt 7: Đội Đỏ hoàn tất chiếm 100% (-2/2) -> Quyền sở hữu CHÍNH THỨC chuyển sang RED, Đội Đỏ nhận +1 Điểm (Tổng: ${engine.redScore})!`);
 
     // TEST 4: Cơ chế hồi sinh sau 2 lượt khi chết (Áp dụng cho mọi nhân vật trong KOTH)
     console.log('\n[TEST 4] Cơ chế Hồi sinh sau 2 lượt:');
@@ -234,7 +264,38 @@ function runKothTests() {
     }
     console.log(`✓ Cứ Điểm được quét sạch bóng đối thủ -> ĐỘI XANH CHIẾN THẮNG CHÍNH THỨC! [${victoryTitle}]`);
 
-    console.log('\n🎉 TẤT CẢ 6/6 BÀI KIỂM THỬ CHẾ ĐỘ KING OF THE HILL & RESPAWN ĐÃ VƯỢT QUA 100%!');
+    // TEST 7: TF2 Overtime Lật Kèo (Comeback) & Chuyển giao Quyền sở hữu
+    console.log('\n[TEST 7] TF2 Overtime Lật Kèo (Comeback) & Chuyển giao Quyền sở hữu:');
+    engine.applyTeamPreset('2v2');
+    engine.startBattle();
+
+    // Giả lập Đội Xanh đạt 14 điểm và đang sở hữu cứ điểm (hillScale = 2)
+    engine.blueScore = 14;
+    engine.hillScale = 2;
+    engine.hillOwner = 'BLUE';
+    // Đặt Đội Đỏ đứng một mình trên cứ điểm để chiếm lật kèo
+    engine.blueTeam[0].x = 2; engine.blueTeam[0].y = 1; // Ngoài cứ điểm
+    engine.redTeam[0].x = 10; engine.redTeam[0].y = 3;  // Trong cứ điểm
+
+    // Hết lượt: Đội Xanh nhận điểm thứ 15, nhưng Đội Đỏ đang kéo thanh (2 -> 1) -> OVERTIME!
+    engine.finishTurn();
+    if (engine.blueScore !== 15) throw new Error(`blueScore phải là 15, actual: ${engine.blueScore}`);
+    if (!engine.inOvertime) throw new Error('inOvertime phải bằng true khi đối thủ đang chiếm dở!');
+    if (engine.phase === 'GAMEOVER') throw new Error('Không được kết thúc game khi đang Overtime!');
+    console.log('✓ Đội Xanh đạt 15 điểm trong lúc Đội Đỏ đang lấn chiếm -> Kích hoạt OVERTIME 🔥');
+
+    // Đội Đỏ tiếp tục kéo thanh từ 1 -> 0 -> -1 -> -2 trong Overtime
+    engine.finishTurn(); // 1 -> 0
+    engine.finishTurn(); // 0 -> -1
+    engine.finishTurn(); // -1 -> -2
+    if (engine.hillScale !== -2 || engine.hillOwner !== 'RED') {
+        throw new Error(`Đội Đỏ phải chiếm xong cứ điểm (-2, RED)! Actual: scale=${engine.hillScale}, owner=${engine.hillOwner}`);
+    }
+    if (engine.inOvertime) throw new Error('Khi Đội Đỏ lật ngược chiếm thành công cứ điểm, Overtime của Đội Xanh phải kết thúc!');
+    if (engine.redScore < 1) throw new Error('Đội Đỏ phải bắt đầu tích lũy điểm sau khi chiếm cứ điểm!');
+    console.log(`✓ Đội Đỏ lật kèo thành công chiếm cứ điểm 100% (-2) trong Overtime -> OVERTIME KẾT THÚC, Đội Đỏ nắm quyền kiểm soát và tích lũy điểm!`);
+
+    console.log('\n🎉 TẤT CẢ 7/7 BÀI KIỂM THỬ CHẾ ĐỘ KING OF THE HILL, RESPAWN & TF2 RULES ĐÃ VƯỢT QUA 100%!');
 }
 
 runKothTests();
