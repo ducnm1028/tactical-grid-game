@@ -2,11 +2,25 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Chrono Clash">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#030712">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
     <title>Chrono Clash - WEGO Tactics 20x7</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Mobile Rotate Screen Overlay (Hiển thị khi cầm dọc máy trên điện thoại) -->
+    <div id="rotateDeviceNotice" class="rotate-device-notice">
+        <div class="rotate-phone-anim">📱</div>
+        <div class="rotate-title">Vui lòng xoay ngang màn hình</div>
+        <div class="rotate-desc">Bản đồ chiến thuật 20x7 được thiết kế tối ưu nhất ở chế độ nằm ngang (Landscape)!</div>
+    </div>
     <header>
         <div class="title-container">
             <h1>Chrono Clash: WEGO 20x7</h1>
@@ -676,5 +690,13 @@
     <script src="i18n.js"></script>
     <script src="characters.js"></script>
     <script src="game.js"></script>
+    <script>
+        // Đăng ký Service Worker cho Android & iOS PWA Offline Play
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
+            });
+        }
+    </script>
 </body>
 </html>

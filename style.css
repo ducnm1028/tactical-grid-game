@@ -2403,5 +2403,222 @@ header {
     box-shadow: 0 0 24px rgba(56, 189, 248, 0.6);
 }
 
+/* ==========================================================================
+   MOBILE & PWA OPTIMIZATIONS (ANDROID & IOS SUPPORT)
+   ========================================================================== */
 
+/* 1. Global Touch Ergonomics & Safe Areas */
+html, body {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
 
+/* 2. Mobile Rotate Screen Overlay (Portrait Warning) */
+.rotate-device-notice {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(3, 7, 18, 0.97);
+    z-index: 999999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    backdrop-filter: blur(12px);
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+    .rotate-device-notice {
+        display: flex;
+    }
+}
+
+.rotate-phone-anim {
+    font-size: 3.8rem;
+    margin-bottom: 16px;
+    animation: rotatePhoneAnim 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.6));
+}
+
+@keyframes rotatePhoneAnim {
+    0%, 15% { transform: rotate(0deg); }
+    50%, 65% { transform: rotate(90deg); }
+    100% { transform: rotate(0deg); }
+}
+
+.rotate-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #38bdf8;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+}
+
+.rotate-desc {
+    font-size: 0.88rem;
+    color: #94a3b8;
+    max-width: 340px;
+    line-height: 1.5;
+}
+
+/* 3. Mobile Responsive UI (Screens <= 960px & Landscape phones) */
+@media (max-width: 960px) {
+    header {
+        flex-direction: column;
+        gap: 8px;
+        padding: 6px 10px;
+        margin-bottom: 6px;
+    }
+
+    .title-container h1 {
+        font-size: 1.15rem;
+    }
+
+    .header-controls {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px !important;
+    }
+
+    .btn-change-char, .key-badge {
+        padding: 4px 8px;
+        font-size: 0.72rem;
+    }
+
+    /* Compact Top HUD */
+    .hud-top {
+        margin-bottom: 6px;
+        gap: 8px;
+    }
+
+    .fighter-card {
+        padding: 6px 10px;
+    }
+
+    .fighter-info {
+        font-size: 0.82rem;
+        margin-bottom: 4px;
+    }
+
+    .hp-bar-bg {
+        height: 10px;
+    }
+
+    .turn-badge {
+        padding: 6px 12px;
+        min-width: 100px;
+    }
+
+    .turn-badge .turn-num {
+        font-size: 0.95rem;
+    }
+
+    /* Responsive Canvas */
+    #gameCanvas {
+        height: auto;
+        aspect-ratio: 960 / 380;
+        max-height: 50vh;
+    }
+
+    .minimap-overlay {
+        top: 6px;
+        right: 6px;
+        padding: 4px 6px;
+    }
+
+    #minimapCanvas {
+        width: 120px;
+        height: 42px;
+    }
+
+    /* Queue & Log section */
+    .queue-section {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .queue-slot {
+        height: 52px;
+    }
+
+    .slot-icon {
+        font-size: 1.1rem;
+    }
+
+    .slot-name {
+        font-size: 0.65rem;
+    }
+
+    .combat-log-box {
+        height: 90px;
+    }
+
+    /* Virtual Direction Compass D-Pad for Touch */
+    .dir-buttons-container {
+        display: grid;
+        grid-template-columns: repeat(3, 44px);
+        gap: 6px;
+        width: auto;
+        max-width: none;
+    }
+
+    .dir-btn {
+        min-width: 44px;
+        height: 44px;
+        font-size: 0.82rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border-radius: 8px;
+        background: #1e293b;
+        touch-action: manipulation;
+    }
+
+    .dir-btn:active {
+        background: #0284c7;
+        color: white;
+        transform: scale(0.94);
+    }
+
+    /* Touch-friendly Action Buttons */
+    .hotkey-guide {
+        padding: 8px 10px;
+        gap: 10px;
+    }
+
+    .hotkey-group {
+        flex-wrap: wrap;
+    }
+
+    #dynamicSkillButtons {
+        flex-wrap: wrap;
+        gap: 6px !important;
+    }
+
+    .skill-btn {
+        min-height: 44px;
+        padding: 6px 12px;
+        font-size: 0.82rem;
+        touch-action: manipulation;
+    }
+
+    .commit-btn {
+        min-height: 44px;
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        touch-action: manipulation;
+    }
+}

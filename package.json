@@ -1,0 +1,33 @@
+{
+  "name": "chrono-clash",
+  "version": "1.0.0",
+  "description": "Chrono Clash: WEGO 20x7 Tactical Grid Game for Web, Android & iOS",
+  "main": "game.js",
+  "scripts": {
+    "test": "node run_all_tests.js",
+    "generate-icons": "node generate_icons.js",
+    "cap:sync": "cap sync",
+    "cap:android": "cap open android",
+    "cap:ios": "cap open ios"
+  },
+  "keywords": [
+    "tactical",
+    "wego",
+    "turn-based",
+    "game",
+    "html5",
+    "canvas",
+    "pwa",
+    "android",
+    "ios",
+    "capacitor"
+  ],
+  "author": "ducnm",
+  "license": "MIT",
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/ios": "^6.2.0"
+  }
+}

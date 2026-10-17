@@ -1646,6 +1646,56 @@ class GameEngine {
                 soundBtn.innerText = window.soundCtrl.enabled ? '🔊 Âm thanh: BẬT' : '🔇 Âm thanh: TẮT';
             }
         });
+
+        // Mobile Touch Pan / Drag trên Canvas (cho phép vuốt xem bản đồ trên điện thoại)
+        let isTouchingCanvas = false;
+        let touchStartX = 0;
+        let cameraStartX = 0;
+        if (this.canvas) {
+            this.canvas.addEventListener('touchstart', (e) => {
+                if (e.touches && e.touches.length === 1) {
+                    isTouchingCanvas = true;
+                    touchStartX = e.touches[0].clientX;
+                    cameraStartX = this.cameraX;
+                    if (window.soundCtrl) window.soundCtrl.init();
+                }
+            }, { passive: true });
+        }
+
+        window.addEventListener('touchmove', (e) => {
+            if (isTouchingCanvas && e.touches && e.touches.length === 1 && this.canvas) {
+                const diffX = e.touches[0].clientX - touchStartX;
+                const totalWorldWidth = GRID_COLS * CELL_SIZE;
+                this.targetCameraX = Math.max(0, Math.min(totalWorldWidth - this.canvas.width, cameraStartX - diffX));
+                this.cameraX = this.targetCameraX;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+            isTouchingCanvas = false;
+        }, { passive: true });
+
+        // Mobile Minimap Tap: Nhấn vào minimap để nhảy camera tức thì
+        const minimap = document.getElementById('minimapCanvas');
+        if (minimap && this.canvas) {
+            const handleMinimapJump = (clientX) => {
+                const rect = minimap.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                const totalWorldWidth = GRID_COLS * CELL_SIZE;
+                this.targetCameraX = Math.max(0, Math.min(totalWorldWidth - this.canvas.width, ratio * totalWorldWidth - this.canvas.width / 2));
+                this.cameraX = this.targetCameraX;
+            };
+            minimap.addEventListener('click', (e) => handleMinimapJump(e.clientX));
+            minimap.addEventListener('touchstart', (e) => {
+                if (e.touches && e.touches.length > 0) handleMinimapJump(e.touches[0].clientX);
+            }, { passive: true });
+        }
+
+        // Tự động mở khóa Web Audio trên Android Chrome & iOS Safari sau tương tác đầu tiên
+        window.addEventListener('touchstart', function unlockAudio() {
+            if (window.soundCtrl) window.soundCtrl.init();
+            window.removeEventListener('touchstart', unlockAudio);
+        }, { passive: true });
     }
 
     // --- Tính toán vị trí mô phỏng tiếp theo trong hàng đợi hiện tại ---
