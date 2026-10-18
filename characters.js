@@ -399,6 +399,83 @@ const CHARACTERS_DATABASE = [
                 color: '#dc2626'
             }
         ]
+    },
+    {
+        id: 'engie',
+        name: 'Engie (Kỹ Sư Cơ Khí)',
+        name_en: 'Engie (Combat Engineer)',
+        title: 'Bậc Thầy Kiến Trúc & Công Nghệ Dịch Chuyển',
+        title_en: 'Master of Sentry Architecture & Teleportation',
+        description: 'Vũ khí Súng Bắn Thanh Sắt (15 DMG, tầm 5). Kỹ năng Xây Sentry tự động (50 HP, 10 DMG, quét 11x11, Hồi 2L). Mở Cổng Dịch Chuyển (60 HP, tầm 5), đưa đồng minh đến cổng ra tức thì.',
+        description_en: 'Equipped with Iron Rod Gun (15 DMG, range 5). Deploys Auto-Sentry (50 HP, 10 DMG, 11x11 zone, CD 2T). Deploys Teleporter (60 HP, range 5), warping allies instantly.',
+        avatar: '🔧',
+        themeColor: '#f59e0b',
+        secondaryColor: '#fbbf24',
+        maxHp: 100,
+        moveBudget: 2,
+        isUnlocked: true,
+        skills: [
+            {
+                slot: 1,
+                id: 'ENGIE_MOVE',
+                name: 'Lộ Trình',
+                name_en: 'Route',
+                icon: '👟',
+                hotkey: '1 / M',
+                type: 'PATH_MOVE',
+                maxSteps: 2,
+                power: 0,
+                desc: 'Di chuyển tự do tối đa 2 bước theo mọi hướng',
+                desc_en: 'Free movement up to 2 steps in all directions',
+                color: '#f59e0b'
+            },
+            {
+                slot: 2,
+                id: 'ENGIE_NAILGUN',
+                name: 'Súng Thanh Sắt',
+                name_en: 'Iron Rod Gun',
+                icon: '🔩',
+                hotkey: '2 / J',
+                type: 'RANGED_LINE',
+                range: 5,
+                power: 15,
+                desc: 'Bắn thanh sắt tầm xa 5 ô (15 Sát thương)',
+                desc_en: 'Fires high-velocity iron rods up to 5 tiles (15 DMG)',
+                color: '#fbbf24'
+            },
+            {
+                slot: 3,
+                id: 'ENGIE_SENTRY',
+                name: 'Xây Sentry',
+                name_en: 'Deploy Sentry',
+                icon: '🤖',
+                hotkey: '3 / K',
+                type: 'DEPLOY_SENTRY',
+                range: 1,
+                power: 10,
+                sentryHp: 50,
+                sentryRange: 5,
+                cooldown: 2,
+                desc: 'Xây Sentry tự động phía trước (50 HP, 10 DMG, Hồi: 2L). Tự động nã đạn vào kẻ địch gần nhất trong phạm vi 11x11',
+                desc_en: 'Deploys an Auto-Sentry ahead (50 HP, 10 DMG, CD: 2T). Automatically fires at nearest enemy in 11x11 zone',
+                color: '#ea580c'
+            },
+            {
+                slot: 4,
+                id: 'ENGIE_TELEPORTER',
+                name: 'Cổng Dịch Chuyển',
+                name_en: 'Teleporter',
+                icon: '🌀',
+                hotkey: '4 / L',
+                type: 'DEPLOY_TELEPORTER',
+                range: 5,
+                portalHp: 60,
+                cooldown: 3,
+                desc: 'Tạo cổng vào tại chỗ và cổng ra tại đích phạm vi 5 (60 HP, Hồi: 3L). Mọi đồng minh khi đến ô cổng vào sẽ lập tức xuất hiện tại cổng ra',
+                desc_en: 'Creates an Entrance portal at current tile and Exit portal up to 5 tiles (60 HP, CD: 3T). Any ally reaching Entrance instantly warps to Exit',
+                color: '#06b6d4'
+            }
+        ]
     }
 ];
 

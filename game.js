@@ -49,6 +49,8 @@ class GameEngine {
         this.skillAmmo = {}; // { [skillId]: currentAmmo }
         this.groundHazards = []; // [{ id, type: 'GRENADE', x, y, turnsLeft: 2, power: 50, aoeRadius: 1 }]
         this.fireZones = []; // [{ id, team, x, y, aoeRadius: 1, turnsLeft: 2, creatorName }]
+        this.sentries = []; // [{ id, team, owner, ownerName, x, y, hp: 50, maxHp: 50, power: 10, range: 5, color }]
+        this.teleporters = []; // [{ id, team, owner, ownerName, inX, inY, outX, outY, hp: 60, maxHp: 60, color }]
 
         // Trạng thái Lộ diện khi trúng đạn (Hookman Stealth Break)
         this.playerRevealedTurns = 0;
@@ -1016,6 +1018,8 @@ class GameEngine {
 
         if (this.isTwoPlayerMode) {
             this.setupTeams();
+            this.sentries = [];
+            this.teleporters = [];
             this.activePlanningPlayer = 1;
             this.p1Queue = [];
             this.p2Queue = [];
@@ -1457,6 +1461,8 @@ class GameEngine {
         this.setupTeams();
         this.groundHazards = [];
         this.fireZones = [];
+        this.sentries = [];
+        this.teleporters = [];
         this.activeHookTethers = [];
 
         const pBadge = document.getElementById('playerNameBadge');
@@ -2182,6 +2188,9 @@ class GameEngine {
             burnTurns: skill.burnTurns,
             burnDmg: skill.burnDmg,
             fireZoneDuration: skill.fireZoneDuration,
+            sentryHp: skill.sentryHp,
+            sentryRange: skill.sentryRange,
+            portalHp: skill.portalHp,
             color: skill.color || '#38bdf8'
         };
 
@@ -2802,6 +2811,8 @@ class GameEngine {
                 action = this.generateCpuActionRazor(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else if (charId === 'fireman') {
                 action = this.generateCpuActionFireman(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
+            } else if (charId === 'engie') {
+                action = this.generateCpuActionEngie(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else {
                 action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             }
@@ -3338,6 +3349,76 @@ class GameEngine {
         return this.createCpuPathMove(simX, simY, this.player.x, this.player.y, 2, false);
     }
 
+    generateCpuActionEngie(stepIdx, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs) {
+        const moveBudget = 2;
+        const targetDir = this.getDirectionTowards(dx, dy);
+
+        // 1. Xây Sentry tự động (DEPLOY_SENTRY) nếu chưa hồi chiêu
+        if (!simCooldowns['ENGIE_SENTRY'] && Math.random() < 0.75) {
+            simCooldowns['ENGIE_SENTRY'] = 2;
+            return {
+                type: 'DEPLOY_SENTRY',
+                skillId: 'ENGIE_SENTRY',
+                name: 'Xây Sentry',
+                icon: '🤖',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                power: 10,
+                sentryHp: 50,
+                sentryRange: 5,
+                cooldown: 2
+            };
+        }
+
+        // 2. Mở Cổng Dịch Chuyển (DEPLOY_TELEPORTER) nếu ở xa (dist >= 4) và chưa hồi chiêu
+        if (!simCooldowns['ENGIE_TELEPORTER'] && dist >= 4 && Math.random() < 0.7) {
+            simCooldowns['ENGIE_TELEPORTER'] = 3;
+            return {
+                type: 'DEPLOY_TELEPORTER',
+                skillId: 'ENGIE_TELEPORTER',
+                name: 'Cổng Dịch Chuyển',
+                icon: '🌀',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                range: 5,
+                portalHp: 60,
+                cooldown: 3
+            };
+        }
+
+        // 3. Bắn Súng Thanh Sắt (ENGIE_NAILGUN) nếu thẳng hàng tầm 5 hoặc trong tầm 5
+        const alignedDir5 = this.getAlignedRangedDirection(simX, simY, simX + dx, simY + dy, 5);
+        if (alignedDir5 && Math.random() < 0.8) {
+            return {
+                type: 'RANGED_LINE',
+                skillId: 'ENGIE_NAILGUN',
+                name: 'Súng Thanh Sắt',
+                icon: '🔩',
+                dir: alignedDir5,
+                dirSymbol: DIRECTIONS[alignedDir5].symbol,
+                power: 15,
+                range: 5
+            };
+        }
+
+        // 4. Di chuyển tiếp cận hoặc giữ cự ly bằng Lộ Trình (PATH_MOVE)
+        if (dist > 3 || Math.random() < 0.6) {
+            return this.createCpuPathMove(simX, simY, simX + dx, simY + dy, moveBudget, false);
+        }
+
+        // Bắn ngắm
+        return {
+            type: 'RANGED_LINE',
+            skillId: 'ENGIE_NAILGUN',
+            name: 'Súng Thanh Sắt',
+            icon: '🔩',
+            dir: targetDir,
+            dirSymbol: DIRECTIONS[targetDir].symbol,
+            power: 15,
+            range: 5
+        };
+    }
+
     getDirectionTowards(dx, dy) {
         if (dx !== 0 && dy !== 0 && Math.random() < 0.6) {
             if (dx > 0 && dy < 0) return 'UP_RIGHT';
@@ -3614,6 +3695,7 @@ class GameEngine {
                 unit.x = destX;
                 unit.y = destY;
                 this.checkFireZones(unit);
+                this.checkTeleporters(unit);
 
                 if (extraJump) {
                     this.addFloatingText(this.lang === 'en' ? '🦘 OBSTACLE! EXTRA 2 STEPS!' : '🦘 ĐÍCH CÓ VẬT THỂ/ĐỊCH! NHẢY THÊM 2 BƯỚC!', destX, destY, '#06b6d4');
@@ -3726,6 +3808,7 @@ class GameEngine {
                     unit.y = pos.ny;
                     unit.dir = pos.dir;
                     this.checkFireZones(unit);
+                    this.checkTeleporters(unit);
                     if (unit.isPlayer && window.soundCtrl) window.soundCtrl.playMove();
                 }
             }
@@ -3743,6 +3826,9 @@ class GameEngine {
 
             await this.resolveUnitAttack(actor, act, stepIndex);
         }
+
+        // --- BƯỚC 4.5: Sentry Tự Động Quét & Khai Hỏa (11x11, 10 DMG) ---
+        await this.resolveSentryAttacks(stepIndex);
 
         this.updateHUD();
 
@@ -3812,14 +3898,24 @@ class GameEngine {
                     }
                 }
             } else {
-                if (window.soundCtrl && actor.isPlayer) window.soundCtrl.playAttack();
-                this.addFloatingText(this.lang === 'en' ? 'MISS!' : 'HỤT!', targetX, targetY, '#94a3b8');
+                const enemyDep = this.getEnemyDeployableAt(targetX, targetY, actor.team);
+                if (enemyDep) {
+                    if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playHit();
+                    let dmg = act.power || 25;
+                    if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
+                    this.damageDeployable(enemyDep, dmg, actor);
+                } else {
+                    if (window.soundCtrl && actor.isPlayer) window.soundCtrl.playAttack();
+                    this.addFloatingText(this.lang === 'en' ? 'MISS!' : 'HỤT!', targetX, targetY, '#94a3b8');
+                }
             }
         }
         else if (act.type === 'RANGED_LINE' || act.type === 'RANGED_VARIABLE') {
             const uD = DIRECTIONS[act.dir];
             const maxRange = act.range || 5;
-            if (act.skillId === 'RAZOR_PULSE_RIFLE') {
+            if (act.skillId === 'ENGIE_NAILGUN') {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playNailgun();
+            } else if (act.skillId === 'RAZOR_PULSE_RIFLE') {
                 if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playPulseRifle();
             } else if (act.type === 'RANGED_VARIABLE') {
                 if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playSilencedPistol();
@@ -3875,10 +3971,23 @@ class GameEngine {
                     }
                     break;
                 }
+
+                const enemyDep = this.getEnemyDeployableAt(cx, cy, actor.team);
+                if (enemyDep) {
+                    hit = true;
+                    if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playHit();
+                    let dmg = (act.type === 'RANGED_VARIABLE') 
+                        ? Math.floor(Math.random() * ((act.maxPower || 20) - (act.minPower || 15) + 1)) + (act.minPower || 15)
+                        : (act.power || 20);
+                    if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
+                    this.damageDeployable(enemyDep, dmg, actor);
+                    break;
+                }
             }
 
             let tracerColor = '#34d399';
-            if (act.skillId === 'FIREMAN_GATTLING_FIRE') tracerColor = '#ea580c';
+            if (act.skillId === 'ENGIE_NAILGUN') tracerColor = '#fbbf24';
+            else if (act.skillId === 'FIREMAN_GATTLING_FIRE') tracerColor = '#ea580c';
             else if (act.skillId === 'SMOKE_RIFLE') tracerColor = '#fb923c';
             else if (act.skillId === 'RAZOR_PULSE_RIFLE') tracerColor = '#06b6d4';
             else if (act.type === 'RANGED_VARIABLE') tracerColor = '#a78bfa';
@@ -3948,6 +4057,7 @@ class GameEngine {
                             target.x = pullX;
                             target.y = pullY;
                             this.checkFireZones(target);
+                            this.checkTeleporters(target);
                             if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHookPull();
                         }
 
@@ -4013,7 +4123,8 @@ class GameEngine {
                 targetY = cy;
 
                 const hitUnit = livingOpponents.find(u => u.x === cx && u.y === cy);
-                if (hitUnit) break;
+                const hitDep = this.getEnemyDeployableAt(cx, cy, actor.team);
+                if (hitUnit || hitDep) break;
             }
 
             targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
@@ -4048,6 +4159,7 @@ class GameEngine {
                     }
                 }
             }
+            this.damageDeployablesInArea(targetX, targetY, 1, baseDmg, actor.team, actor);
         }
         else if (act.type === 'GRENADE') {
             const uD = DIRECTIONS[act.dir];
@@ -4107,7 +4219,8 @@ class GameEngine {
 
                 const hitUnit = livingOpponents.find(u => u.x === cx && u.y === cy);
                 const hitHazard = this.groundHazards && this.groundHazards.some(h => h.x === cx && h.y === cy);
-                if (hitUnit || hitHazard) break;
+                const hitDep = this.getEnemyDeployableAt(cx, cy, actor.team);
+                if (hitUnit || hitHazard || hitDep) break;
             }
 
             targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
@@ -4161,7 +4274,8 @@ class GameEngine {
 
                 const hitUnit = livingOpponents.find(u => u.x === cx && u.y === cy);
                 const hitHazard = this.groundHazards && this.groundHazards.some(h => h.x === cx && h.y === cy);
-                if (hitUnit || hitHazard) break;
+                const hitDep = this.getEnemyDeployableAt(cx, cy, actor.team);
+                if (hitUnit || hitHazard || hitDep) break;
             }
 
             targetX = Math.max(0, Math.min(GRID_COLS - 1, targetX));
@@ -4196,6 +4310,7 @@ class GameEngine {
                     }
                 }
             }
+            this.damageDeployablesInArea(targetX, targetY, 1, baseDmg, actor.team, actor);
 
             // Tạo Vùng Cháy tồn tại trong 2 lượt
             if (!this.fireZones) this.fireZones = [];
@@ -4272,9 +4387,108 @@ class GameEngine {
                 }
             }
 
+            for (const tile of slashTiles) {
+                const enemyDep = this.getEnemyDeployableAt(tile.x, tile.y, actor.team);
+                if (enemyDep) {
+                    hitAny = true;
+                    let dmg = act.power || 60;
+                    if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
+                    this.damageDeployable(enemyDep, dmg, actor);
+                }
+            }
+
             if (!hitAny) {
                 this.addFloatingText(this.lang === 'en' ? 'MISS!' : 'CHÉM HỤT!', actor.x, actor.y, '#94a3b8');
             }
+        }
+        else if (act.type === 'DEPLOY_SENTRY') {
+            const uD = DIRECTIONS[act.dir];
+            let sx = actor.x + (uD ? uD.dx : 1);
+            let sy = actor.y + (uD ? uD.dy : 0);
+            sx = Math.max(0, Math.min(GRID_COLS - 1, sx));
+            sy = Math.max(0, Math.min(GRID_ROWS - 1, sy));
+
+            if (!this.sentries) this.sentries = [];
+            // Quy tắc sở hữu: Mỗi Engie chỉ duy trì tối đa 1 Sentry. Đặt mới tự động thay thế cái cũ
+            this.sentries = this.sentries.filter(s => s.owner !== actor);
+
+            const sentry = {
+                id: Date.now() + Math.random(),
+                team: actor.team,
+                owner: actor,
+                ownerName: actor.name,
+                x: sx,
+                y: sy,
+                hp: act.sentryHp || 50,
+                maxHp: act.sentryHp || 50,
+                power: act.power || 10,
+                range: act.sentryRange || 5,
+                color: actor.charThemeColor || '#f59e0b'
+            };
+            this.sentries.push(sentry);
+
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playWrench();
+            this.createBuffSparks(sx, sy, '#f59e0b');
+            this.addFloatingText(this.lang === 'en' ? '🤖 SENTRY (50 HP)!' : '🤖 XÂY SENTRY (50 HP)!', sx, sy, '#f59e0b');
+            this.addCombatLog(
+                this.lang === 'en'
+                    ? `Nhịp #${stepIndex + 1}: ${actor.name} deployed [Auto-Sentry] at (${sx}, ${sy}) (50 HP, 11x11 Zone, 10 DMG)!`
+                    : `Nhịp #${stepIndex + 1}: ${actor.name} triển khai [Auto-Sentry] tại (${sx}, ${sy}) (50 HP, Quét 11x11, 10 DMG)!`,
+                'buff'
+            );
+
+            actor.cooldowns[act.skillId] = act.cooldown || 2;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 2;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 2;
+        }
+        else if (act.type === 'DEPLOY_TELEPORTER') {
+            const uD = DIRECTIONS[act.dir];
+            const maxRange = act.range || 5;
+            const inX = actor.x;
+            const inY = actor.y;
+            let outX = actor.x + (uD ? uD.dx : 1) * maxRange;
+            let outY = actor.y + (uD ? uD.dy : 0) * maxRange;
+            outX = Math.max(0, Math.min(GRID_COLS - 1, outX));
+            outY = Math.max(0, Math.min(GRID_ROWS - 1, outY));
+
+            if (outX === inX && outY === inY) {
+                const altDx = (uD && uD.dx !== 0) ? -uD.dx : 1;
+                outX = Math.max(0, Math.min(GRID_COLS - 1, inX + altDx * maxRange));
+            }
+
+            if (!this.teleporters) this.teleporters = [];
+            // Quy tắc sở hữu: Mỗi Engie chỉ duy trì tối đa 1 cặp Teleporter. Đặt mới tự động thay thế cái cũ
+            this.teleporters = this.teleporters.filter(t => t.owner !== actor);
+
+            const tele = {
+                id: Date.now() + Math.random(),
+                team: actor.team,
+                owner: actor,
+                ownerName: actor.name,
+                inX: inX,
+                inY: inY,
+                outX: outX,
+                outY: outY,
+                hp: act.portalHp || 60,
+                maxHp: act.portalHp || 60,
+                color: '#06b6d4'
+            };
+            this.teleporters.push(tele);
+
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playPortalOpen();
+            this.createBuffSparks(inX, inY, '#06b6d4');
+            this.createBuffSparks(outX, outY, '#06b6d4');
+            this.addFloatingText(this.lang === 'en' ? '🌀 TELEPORTER (60 HP)!' : '🌀 CỔNG DỊCH CHUYỂN (60 HP)!', inX, inY, '#06b6d4');
+            this.addCombatLog(
+                this.lang === 'en'
+                    ? `Nhịp #${stepIndex + 1}: ${actor.name} opened Teleporter Entrance at (${inX}, ${inY}) and Exit at (${outX}, ${outY}) (60 HP)!`
+                    : `Nhịp #${stepIndex + 1}: ${actor.name} mở Cổng Vào tại (${inX}, ${inY}) và Cổng Ra tại (${outX}, ${outY}) (60 HP)!`,
+                'buff'
+            );
+
+            actor.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 3;
         }
     }
 
@@ -4424,6 +4638,7 @@ class GameEngine {
                     }
                 }
             }
+            this.damageDeployablesInArea(h.x, h.y, 1, h.power, (h.owner === 'PLAYER' ? this.player.team : 'RED'), { name: h.ownerName || 'Lựu Đạn' });
         });
 
         this.groundHazards = this.groundHazards.filter(h => h.turnsLeft > 0);
@@ -4899,6 +5114,8 @@ class GameEngine {
 
         this.groundHazards = [];
         this.fireZones = [];
+        this.sentries = [];
+        this.teleporters = [];
         this.playerRevealedTurns = 0;
         this.cpuRevealedTurns = 0;
         this.activeHookTethers = [];
@@ -5218,6 +5435,226 @@ class GameEngine {
         }
     }
 
+    createTeleportBurst(x1, y1, x2, y2) {
+        for (let i = 0; i < 20; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 6 + 2;
+            this.particles.push({
+                x: x1 * CELL_SIZE + CELL_SIZE / 2,
+                y: y1 * CELL_SIZE + CELL_SIZE / 2,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                color: '#06b6d4',
+                size: Math.random() * 4 + 2,
+                life: 0.45,
+                maxLife: 0.45
+            });
+            this.particles.push({
+                x: x2 * CELL_SIZE + CELL_SIZE / 2,
+                y: y2 * CELL_SIZE + CELL_SIZE / 2,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                color: '#06b6d4',
+                size: Math.random() * 4 + 2,
+                life: 0.45,
+                maxLife: 0.45
+            });
+        }
+    }
+
+    getEnemyDeployableAt(x, y, attackerTeam) {
+        if (this.sentries) {
+            const s = this.sentries.find(s => s.x === x && s.y === y && s.team !== attackerTeam && s.hp > 0);
+            if (s) return { type: 'SENTRY', obj: s, team: s.team, x: s.x, y: s.y, hp: s.hp, maxHp: s.maxHp };
+        }
+        if (this.teleporters) {
+            const tIn = this.teleporters.find(t => t.inX === x && t.inY === y && t.team !== attackerTeam && t.hp > 0);
+            if (tIn) return { type: 'TELE_IN', obj: tIn, team: tIn.team, x: tIn.inX, y: tIn.inY, hp: tIn.hp, maxHp: tIn.maxHp };
+            const tOut = this.teleporters.find(t => t.outX === x && t.outY === y && t.team !== attackerTeam && t.hp > 0);
+            if (tOut) return { type: 'TELE_OUT', obj: tOut, team: tOut.team, x: tOut.outX, y: tOut.outY, hp: tOut.hp, maxHp: tOut.maxHp };
+        }
+        return null;
+    }
+
+    damageDeployable(dep, dmg, attacker) {
+        if (!dep || !dep.obj || dep.obj.hp <= 0) return;
+        dep.obj.hp -= dmg;
+        const isSentry = (dep.type === 'SENTRY');
+        const label = isSentry ? 'Sentry 🤖' : 'Cổng Dịch Chuyển 🌀';
+        const ownerName = dep.obj.ownerName || 'Engie';
+
+        this.createHitSparks(dep.x, dep.y, '#f59e0b');
+        this.addFloatingText(`-${dmg} HP (${label})`, dep.x, dep.y, '#f87171');
+        this.addCombatLog(
+            this.lang === 'en'
+                ? `💥 ${attacker ? attacker.name : 'Attack'} deals ${dmg} damage to ${label} of ${ownerName}! (${Math.max(0, dep.obj.hp)}/${dep.obj.maxHp} HP)`
+                : `💥 ${attacker ? attacker.name : 'Đòn đánh'} gây ${dmg} sát thương lên ${label} của ${ownerName}! (${Math.max(0, dep.obj.hp)}/${dep.obj.maxHp} HP)`,
+            'hit'
+        );
+
+        if (dep.obj.hp <= 0) {
+            dep.obj.hp = 0;
+            this.createExplosionBurst(dep.x, dep.y, 30);
+            if (window.soundCtrl) window.soundCtrl.playExplosion();
+            this.addFloatingText(this.lang === 'en' ? `💥 DESTROYED!` : `💥 BỊ PHÁ HỦY!`, dep.x, dep.y, '#ef4444');
+            this.addCombatLog(
+                this.lang === 'en'
+                    ? `💥 ${label} of ${ownerName} has been destroyed!`
+                    : `💥 ${label} của ${ownerName} đã bị phá hủy tan tành!`,
+                'clash'
+            );
+
+            if (isSentry) {
+                this.sentries = this.sentries.filter(s => s.hp > 0);
+            } else {
+                this.teleporters = this.teleporters.filter(t => t.hp > 0);
+            }
+        }
+    }
+
+    damageDeployablesInArea(centerX, centerY, radius, dmg, attackerTeam, attacker) {
+        if (this.sentries) {
+            const sentriesToDamage = this.sentries.filter(s =>
+                s.hp > 0 &&
+                (!attackerTeam || s.team !== attackerTeam) &&
+                Math.abs(s.x - centerX) <= radius && Math.abs(s.y - centerY) <= radius
+            );
+            for (const s of sentriesToDamage) {
+                this.damageDeployable({ type: 'SENTRY', obj: s, team: s.team, x: s.x, y: s.y, hp: s.hp, maxHp: s.maxHp }, dmg, attacker);
+            }
+        }
+        if (this.teleporters) {
+            const telesToDamage = this.teleporters.filter(t =>
+                t.hp > 0 &&
+                (!attackerTeam || t.team !== attackerTeam) &&
+                ((Math.abs(t.inX - centerX) <= radius && Math.abs(t.inY - centerY) <= radius) ||
+                 (Math.abs(t.outX - centerX) <= radius && Math.abs(t.outY - centerY) <= radius))
+            );
+            for (const t of telesToDamage) {
+                const hitIn = Math.abs(t.inX - centerX) <= radius && Math.abs(t.inY - centerY) <= radius;
+                const depType = hitIn ? 'TELE_IN' : 'TELE_OUT';
+                const depX = hitIn ? t.inX : t.outX;
+                const depY = hitIn ? t.inY : t.outY;
+                this.damageDeployable({ type: depType, obj: t, team: t.team, x: depX, y: depY, hp: t.hp, maxHp: t.maxHp }, dmg, attacker);
+            }
+        }
+    }
+
+    checkTeleporters(unit) {
+        if (!this.teleporters || this.teleporters.length === 0 || unit.hp <= 0) return;
+        for (const tele of this.teleporters) {
+            if (tele.hp <= 0) continue;
+            // Chỉ áp dụng cho thành viên cùng đội (Mọi thành viên thuộc đội)
+            if (unit.team !== tele.team) continue;
+
+            if (unit.x === tele.inX && unit.y === tele.inY) {
+                let destX = tele.outX;
+                let destY = tele.outY;
+
+                const allAlive = [...this.blueTeam, ...this.redTeam].filter(u => u.hp > 0 && u !== unit);
+                const isOccupied = allAlive.some(u => u.x === destX && u.y === destY);
+                if (isOccupied) {
+                    const offsets = [
+                        { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
+                        { dx: 1, dy: 1 }, { dx: -1, dy: -1 }, { dx: 1, dy: -1 }, { dx: -1, dy: 1 }
+                    ];
+                    for (const off of offsets) {
+                        const nx = destX + off.dx;
+                        const ny = destY + off.dy;
+                        if (nx >= 0 && nx < GRID_COLS && ny >= 0 && ny < GRID_ROWS) {
+                            if (!allAlive.some(u => u.x === nx && u.y === ny)) {
+                                destX = nx;
+                                destY = ny;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                unit.x = destX;
+                unit.y = destY;
+                unit.renderX = destX;
+                unit.renderY = destY;
+
+                if (window.soundCtrl) window.soundCtrl.playTeleport();
+                this.createBuffSparks(destX, destY, '#06b6d4');
+                this.createTeleportBurst(tele.inX, tele.inY, destX, destY);
+                this.addFloatingText(this.lang === 'en' ? '🌀 WARPED!' : '🌀 DỊCH CHUYỂN!', destX, destY, '#06b6d4');
+                this.addCombatLog(
+                    this.lang === 'en'
+                        ? `🌀 ${unit.name} stepped into Teleporter and warped to (${destX}, ${destY})!`
+                        : `🌀 ${unit.name} bước vào Cổng Dịch Chuyển và tức thì xuất hiện tại (${destX}, ${destY})!`,
+                    'system'
+                );
+                this.checkFireZones(unit);
+                break;
+            }
+        }
+    }
+
+    async resolveSentryAttacks(stepIndex) {
+        if (!this.sentries || this.sentries.length === 0) return;
+        const allLivingUnits = [...this.blueTeam, ...this.redTeam].filter(u => u.hp > 0);
+
+        for (const sentry of this.sentries) {
+            if (sentry.hp <= 0) continue;
+            const opposingTeam = (sentry.team === 'BLUE') ? this.redTeam : this.blueTeam;
+            const livingOpponents = opposingTeam.filter(u => u.hp > 0);
+            if (livingOpponents.length === 0) continue;
+
+            // Quét 11x11 quanh nó (bán kính Chebyshev <= 5)
+            const sRange = sentry.range || 5;
+            const enemiesInRange = livingOpponents.filter(e =>
+                Math.abs(e.x - sentry.x) <= sRange &&
+                Math.abs(e.y - sentry.y) <= sRange
+            );
+            if (enemiesInRange.length === 0) continue;
+
+            // Bắn kẻ địch gần nhất
+            enemiesInRange.sort((a, b) => {
+                const distA = Math.abs(a.x - sentry.x) + Math.abs(a.y - sentry.y);
+                const distB = Math.abs(b.x - sentry.x) + Math.abs(b.y - sentry.y);
+                return distA - distB;
+            });
+            const target = enemiesInRange[0];
+
+            if (window.soundCtrl) window.soundCtrl.playSentryShot();
+            this.createBulletTracer(sentry.x, sentry.y, target.x, target.y, '#f59e0b');
+
+            // Kiểm tra khiên
+            let blocked = false;
+            if (target.shieldDir) {
+                const sD = DIRECTIONS[target.shieldDir];
+                const dxToSentry = sentry.x - target.x;
+                const dyToSentry = sentry.y - target.y;
+                if ((sD.dx !== 0 && Math.sign(sD.dx) === Math.sign(dxToSentry)) ||
+                    (sD.dy !== 0 && Math.sign(sD.dy) === Math.sign(dyToSentry))) {
+                    blocked = true;
+                }
+            }
+
+            if (blocked) {
+                if (window.soundCtrl && (target.isPlayer || allLivingUnits.some(u => u.isPlayer))) window.soundCtrl.playShield();
+                this.addFloatingText(this.lang === 'en' ? 'BLOCKED SENTRY!' : 'CHẶN ĐẠN SENTRY!', target.x, target.y, '#60a5fa');
+                this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn loạt đạn Sentry của ${sentry.ownerName}!`, 'block');
+            } else {
+                if (window.soundCtrl && (target.isPlayer || allLivingUnits.some(u => u.isPlayer))) window.soundCtrl.playHit();
+                const dmg = sentry.power || 10;
+                this.applyDamage(target, dmg);
+                this.createHitSparks(target.x, target.y, target.color);
+                this.addFloatingText(`-${dmg} HP (SENTRY 🤖)`, target.x, target.y, '#ea580c');
+                this.addCombatLog(`Nhịp #${stepIndex + 1}: 🤖 Sentry của ${sentry.ownerName} tự động nã đạn vào ${target.name}! (-${dmg} HP)!`, 'hit');
+
+                if (target.charId === 'hookman') {
+                    target.revealedTurns = 2;
+                    if (target.isPlayer) this.playerRevealedTurns = 2;
+                    this.addFloatingText(this.lang === 'en' ? 'REVEALED!' : 'HIỆN HÌNH!', target.x, target.y, '#f43f5e');
+                }
+            }
+            await this.delay(100);
+        }
+    }
+
     addFloatingText(text, gridX, gridY, color = '#ffffff') {
         this.floatingTexts.push({
             text: text,
@@ -5453,6 +5890,138 @@ class GameEngine {
                 ctx.fillStyle = '#ffffff';
                 ctx.font = 'bold 11px sans-serif';
                 ctx.fillText(`${fz.turnsLeft}L`, cx, cy);
+                ctx.restore();
+            });
+        }
+
+        // 2c. Vẽ Cổng Dịch Chuyển (Teleporters)
+        if (this.teleporters && this.teleporters.length > 0) {
+            const time = performance.now() * 0.004;
+            this.teleporters.forEach(tele => {
+                if (tele.hp <= 0) return;
+                const inPx = tele.inX * CELL_SIZE + CELL_SIZE / 2;
+                const inPy = tele.inY * CELL_SIZE + CELL_SIZE / 2;
+                const outPx = tele.outX * CELL_SIZE + CELL_SIZE / 2;
+                const outPy = tele.outY * CELL_SIZE + CELL_SIZE / 2;
+
+                ctx.save();
+                // Đường kết nối không gian giữa Cổng Vào và Cổng Ra
+                ctx.strokeStyle = tele.team === 'BLUE' ? 'rgba(6, 182, 212, 0.4)' : 'rgba(244, 63, 94, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(inPx, inPy);
+                ctx.lineTo(outPx, outPy);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Vẽ Cổng Vào (IN)
+                const pulseIn = 20 + 3 * Math.sin(time * 3);
+                const gradIn = ctx.createRadialGradient(inPx, inPy, 5, inPx, inPy, pulseIn);
+                gradIn.addColorStop(0, '#06b6d4');
+                gradIn.addColorStop(0.7, 'rgba(6, 182, 212, 0.45)');
+                gradIn.addColorStop(1, 'rgba(6, 182, 212, 0)');
+                ctx.fillStyle = gradIn;
+                ctx.beginPath();
+                ctx.arc(inPx, inPy, pulseIn, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#22d3ee';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(inPx, inPy, 16, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🌀', inPx, inPy - 2);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 9px monospace';
+                ctx.fillText('IN', inPx, inPy + 12);
+
+                // Thanh máu Cổng Vào
+                const hpPct = Math.max(0, tele.hp / tele.maxHp);
+                const barW = 32;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(inPx - barW / 2, inPy - 26, barW, 4);
+                ctx.fillStyle = hpPct > 0.4 ? '#06b6d4' : '#ef4444';
+                ctx.fillRect(inPx - barW / 2, inPy - 26, barW * hpPct, 4);
+
+                // Vẽ Cổng Ra (OUT)
+                const pulseOut = 20 + 3 * Math.cos(time * 3);
+                const gradOut = ctx.createRadialGradient(outPx, outPy, 5, outPx, outPy, pulseOut);
+                gradOut.addColorStop(0, '#3b82f6');
+                gradOut.addColorStop(0.7, 'rgba(59, 130, 246, 0.45)');
+                gradOut.addColorStop(1, 'rgba(59, 130, 246, 0)');
+                ctx.fillStyle = gradOut;
+                ctx.beginPath();
+                ctx.arc(outPx, outPy, pulseOut, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#60a5fa';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(outPx, outPy, 16, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🌀', outPx, outPy - 2);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 9px monospace';
+                ctx.fillText('OUT', outPx, outPy + 12);
+
+                // Thanh máu Cổng Ra
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(outPx - barW / 2, outPy - 26, barW, 4);
+                ctx.fillStyle = hpPct > 0.4 ? '#3b82f6' : '#ef4444';
+                ctx.fillRect(outPx - barW / 2, outPy - 26, barW * hpPct, 4);
+
+                ctx.restore();
+            });
+        }
+
+        // 2d. Vẽ Sentry tự động (Auto-Sentries)
+        if (this.sentries && this.sentries.length > 0) {
+            this.sentries.forEach(sentry => {
+                if (sentry.hp <= 0) return;
+                const sx = sentry.x * CELL_SIZE + CELL_SIZE / 2;
+                const sy = sentry.y * CELL_SIZE + CELL_SIZE / 2;
+
+                ctx.save();
+                // Bệ ụ súng
+                ctx.fillStyle = sentry.team === 'BLUE' ? 'rgba(56, 189, 248, 0.25)' : 'rgba(244, 63, 94, 0.25)';
+                ctx.strokeStyle = sentry.team === 'BLUE' ? '#38bdf8' : '#f43f5e';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(sx, sy, 20, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.font = '20px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🤖', sx, sy - 2);
+
+                // Thanh máu Sentry
+                const hpPct = Math.max(0, sentry.hp / sentry.maxHp);
+                const barW = 34;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                ctx.fillRect(sx - barW / 2, sy - 28, barW, 5);
+                ctx.fillStyle = hpPct > 0.5 ? '#10b981' : (hpPct > 0.25 ? '#f59e0b' : '#ef4444');
+                ctx.fillRect(sx - barW / 2, sy - 28, barW * hpPct, 5);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(sx - barW / 2, sy - 28, barW, 5);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 9px sans-serif';
+                ctx.fillText(`${sentry.hp}/${sentry.maxHp}`, sx, sy - 34);
+
                 ctx.restore();
             });
         }
@@ -5905,6 +6474,27 @@ class GameEngine {
             mCtx.fillStyle = 'rgba(234, 88, 12, 0.55)';
             this.fireZones.forEach(fz => {
                 mCtx.fillRect((fz.x - 1) * cellW, (fz.y - 1) * cellH, 3 * cellW, 3 * cellH);
+            });
+        }
+
+        // Vẽ Cổng Dịch Chuyển trên minimap
+        if (this.teleporters && this.teleporters.length > 0) {
+            mCtx.fillStyle = '#06b6d4';
+            this.teleporters.forEach(t => {
+                if (t.hp > 0) {
+                    mCtx.fillRect(t.inX * cellW - 1, t.inY * cellH - 1, 3, 3);
+                    mCtx.fillRect(t.outX * cellW - 1, t.outY * cellH - 1, 3, 3);
+                }
+            });
+        }
+
+        // Vẽ Sentry trên minimap
+        if (this.sentries && this.sentries.length > 0) {
+            mCtx.fillStyle = '#f59e0b';
+            this.sentries.forEach(s => {
+                if (s.hp > 0) {
+                    mCtx.fillRect(s.x * cellW - 1, s.y * cellH - 1, 3, 3);
+                }
             });
         }
 
