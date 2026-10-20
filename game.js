@@ -711,8 +711,11 @@ class GameEngine {
             skillAmmo: {},
             buffs: {
                 adrenaline: { turnsLeft: 0, healPerTurn: 5, dmgBonusPercent: 20 },
-                cigarette: { turnsLeft: 0, dmgBonusPercent: 30, moveBonus: 1 }
+                cigarette: { turnsLeft: 0, dmgBonusPercent: 30, moveBonus: 1 },
+                destructiveShot: false,
+                thermalVision: { active: false, rangeBonus: 0 }
             },
+            isScoped: false,
             queue: [],
             alive: true,
             isDead: false,
@@ -1541,6 +1544,20 @@ class GameEngine {
         this.addCombatLog(`🎮 [P2] ${this.p2Unit.name} bắt đầu lên 4 lệnh!`, 'system');
     }
 
+    isUnitScoped(unit, queue = null) {
+        if (!unit) return false;
+        let scoped = Boolean(unit.isScoped);
+        const q = queue || (this.getActivePlanningQueue ? this.getActivePlanningQueue() : []);
+        for (const act of q) {
+            if (act.type === 'SNIPER_SCOPE') {
+                scoped = true;
+            } else if (act.type === 'SNIPER_SHOT') {
+                scoped = false;
+            }
+        }
+        return scoped;
+    }
+
     updateSkillButtons() {
         const unit = this.getActivePlanningUnit();
         if (!unit) return;
@@ -1558,6 +1575,8 @@ class GameEngine {
             return;
         }
 
+        const isScoped = this.isUnitScoped(unit, currentQueue);
+
         skillContainer.innerHTML = char.skills.map((s, idx) => {
             const cd = unit.cooldowns[s.id] || 0;
             const isCooldown = cd > 0;
@@ -1565,8 +1584,38 @@ class GameEngine {
             const isAdrenalineActive = s.id === 'HOOKMAN_ADRENALINE' && unit.buffs && unit.buffs.adrenaline && unit.buffs.adrenaline.turnsLeft > 0;
             const isCigaretteActive = s.id === 'SMOKE_CIGARETTE' && unit.buffs && unit.buffs.cigarette && unit.buffs.cigarette.turnsLeft > 0;
 
+            let sName = s.name;
+            let sIcon = s.icon;
+            let sDesc = s.desc;
+            let sColor = s.color;
             let statusLabel = '';
             let isAmmoEmpty = false;
+
+            if (s.type === 'SNIPER_WEAPON') {
+                if (isScoped) {
+                    sName = this.lang === 'en' ? 'Fire Sniper' : 'Bắn Súng Tỉa';
+                    sIcon = '💥';
+                    sDesc = this.lang === 'en' ? '2nd tap: Fire sniper shot (25-50 DMG scales with distance)' : 'Lần bấm 2: Bắn phát súng tỉa (25-50 Sát thương, cự ly càng xa DMG càng cao)';
+                    sColor = '#6366f1';
+                    statusLabel = `<span class="cd-tag" style="background:#6366f1; color:white;">[${this.lang === 'en' ? 'SCOPED' : 'ĐÃ NGẮM'}]</span>`;
+                } else {
+                    sName = this.lang === 'en' ? 'Aim / Scope' : 'Ngắm Bắn';
+                    sIcon = '🎯';
+                    sDesc = this.lang === 'en' ? '1st tap: Scope in mode (lose 1 move step on movement)' : 'Lần bấm 1: Vào chế độ ngắm bắn (giảm 1 bước di chuyển mỗi lần chọn di chuyển)';
+                }
+            } else if (s.id === 'SNIPER_MOVE' && isScoped) {
+                statusLabel = `<span class="cd-tag" style="background:#818cf8; color:white;">[${this.lang === 'en' ? '1 STEP' : '1 BƯỚC'}]</span>`;
+            } else if (s.id === 'SNIPER_DESTRUCTIVE') {
+                const isDestrActive = (unit.buffs && unit.buffs.destructiveShot) || currentQueue.some(act => act.skillId === 'SNIPER_DESTRUCTIVE');
+                if (isDestrActive && !isCooldown) {
+                    statusLabel = `<span class="cd-tag" style="background:#ec4899; color:white;">[+30% XUYÊN]</span>`;
+                }
+            } else if (s.id === 'SNIPER_THERMAL') {
+                const isThermalActive = (unit.buffs && unit.buffs.thermalVision && unit.buffs.thermalVision.active) || currentQueue.some(act => act.skillId === 'SNIPER_THERMAL');
+                if (isThermalActive && !isCooldown) {
+                    statusLabel = `<span class="cd-tag" style="background:#06b6d4; color:white;">[+1 TẦM]</span>`;
+                }
+            }
 
             if (s.maxAmmo) {
                 const totalAmmo = unit.skillAmmo[s.id] !== undefined ? unit.skillAmmo[s.id] : s.maxAmmo;
@@ -1576,7 +1625,7 @@ class GameEngine {
                     statusLabel = `<span class="cd-tag">[Hồi: ${cd}L]</span>`;
                 } else {
                     const ammoText = s.type === 'RECT_SLASH' ? 'DÙNG' : 'ĐẠN';
-                    const tagBg = availableAmmo > 0 ? (s.color || '#f97316') : '#ef4444';
+                    const tagBg = availableAmmo > 0 ? (sColor || '#f97316') : '#ef4444';
                     statusLabel = `<span class="cd-tag" style="background:${tagBg}; color:white;">[${ammoText}: ${availableAmmo}/${s.maxAmmo}]</span>`;
                 }
                 if (availableAmmo <= 0) {
@@ -1599,9 +1648,9 @@ class GameEngine {
             return `
                 <button class="key-badge ${isBlocked ? 'cooldown' : ''}" 
                         data-skill-idx="${idx}" 
-                        style="border-color: ${isBlocked ? '#ef4444' : (s.color || '#475569')}" 
-                        title="${s.desc}${dirReminder} ${isCooldown ? `(Đang hồi ${cd} lượt)` : (isTethered ? '(Dây móc đang găm vào đối thủ, cuối lượt sau sẽ giật 2 ô)' : '')}">
-                    <b>[${idx + 1}]</b> ${s.icon} ${s.name}${statusLabel}
+                        style="border-color: ${isBlocked ? '#ef4444' : (sColor || '#475569')}" 
+                        title="${sDesc}${dirReminder} ${isCooldown ? `(Đang hồi ${cd} lượt)` : (isTethered ? '(Dây móc đang găm vào đối thủ, cuối lượt sau sẽ giật 2 ô)' : '')}">
+                    <b>[${idx + 1}]</b> ${sIcon} ${sName}${statusLabel}
                 </button>
             `;
         }).join('');
@@ -1758,11 +1807,17 @@ class GameEngine {
         this.activePath = [];
         const isCigaretteActive = (unit && unit.buffs && unit.buffs.cigarette && unit.buffs.cigarette.turnsLeft > 0) ||
                                   currentQueue.some(act => act.skillId === 'SMOKE_CIGARETTE');
-        this.activePathMaxSteps = ((unit && unit.character.moveBudget) || 2) + (isCigaretteActive ? 1 : 0);
+        const isScoped = this.isUnitScoped(unit, currentQueue);
+        let maxSteps = ((unit && unit.character.moveBudget) || 2) + (isCigaretteActive ? 1 : 0);
+        if (isScoped) {
+            maxSteps = Math.max(1, maxSteps - 1);
+        }
+        this.activePathMaxSteps = maxSteps;
 
         this.updatePathNoticeUI();
         if (window.soundCtrl) window.soundCtrl.playSelect();
-        this.addCombatLog(`Vẽ lộ trình (tối đa ${this.activePathMaxSteps} bước): Nhấn phím hướng để nối bước!`, 'system');
+        const scopedNote = isScoped ? (this.lang === 'en' ? ' (Scoped: -1 step)' : ' (Đang ngắm: -1 bước)') : '';
+        this.addCombatLog(`Vẽ lộ trình (tối đa ${this.activePathMaxSteps} bước${scopedNote}): Nhấn phím hướng để nối bước!`, 'system');
     }
 
     updatePathNoticeUI() {
@@ -2159,6 +2214,75 @@ class GameEngine {
             return;
         }
 
+        // Xử lý Vũ khí Súng Tỉa Snipeman: Lần 1 Ngắm Bắn, Lần 2 Bắn Súng Tỉa
+        if (skill.type === 'SNIPER_WEAPON') {
+            const isScoped = this.isUnitScoped(unit, currentQueue);
+            if (!isScoped) {
+                const action = {
+                    skillId: 'SNIPER_SCOPE',
+                    type: 'SNIPER_SCOPE',
+                    name: this.lang === 'en' ? 'Scope In' : 'Ngắm Bắn',
+                    icon: '🎯',
+                    dir: this.currentSelectedDir,
+                    dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
+                    range: 0,
+                    power: 0,
+                    color: '#818cf8'
+                };
+                currentQueue.push(action);
+                if (window.soundCtrl) window.soundCtrl.playSniperScope();
+                const playerPrefix = this.isTwoPlayerMode ? `[P${this.activePlanningPlayer}] ` : '';
+                this.addCombatLog(
+                    this.lang === 'en'
+                        ? `${playerPrefix}Queued [Scope In]! Next movement is reduced by 1 step.`
+                        : `${playerPrefix}Đã nạp [Ngắm Bắn] vào hàng đợi! Bước di chuyển tiếp theo bị giảm 1.`,
+                    'system'
+                );
+                this.updateQueueDisplay();
+                if (currentQueue.length === 4) {
+                    if (this.isTwoPlayerMode && this.activePlanningPlayer === 1) {
+                        this.addCombatLog(this.lang === 'en' ? 'P1 queue full (4/4)! Press [SPACE] to pass to P2!' : 'P1 đã đủ 4 lệnh. Bấm [SPACE] để xác nhận và chuyển P2!', 'system');
+                    } else {
+                        this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
+                    }
+                }
+                return;
+            } else {
+                const action = {
+                    skillId: 'SNIPER_SHOT',
+                    type: 'SNIPER_SHOT',
+                    name: this.lang === 'en' ? 'Sniper Shot' : 'Bắn Súng Tỉa',
+                    icon: '💥',
+                    dir: this.currentSelectedDir,
+                    dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
+                    range: 6,
+                    minPower: 25,
+                    maxPower: 50,
+                    color: '#6366f1'
+                };
+                currentQueue.push(action);
+                if (window.soundCtrl) window.soundCtrl.playSelect();
+                const dirObj = DIRECTIONS[action.dir];
+                const dirLabel = this.lang === 'en' ? (dirObj.label_en || dirObj.label) : dirObj.label;
+                const playerPrefix = this.isTwoPlayerMode ? `[P${this.activePlanningPlayer}] ` : '';
+                this.addCombatLog(
+                    this.lang === 'en'
+                        ? `${playerPrefix}Queued [Sniper Shot] facing [${dirLabel} ${action.dirSymbol}]!`
+                        : `${playerPrefix}Đã nạp [Bắn Súng Tỉa] hướng [${dirLabel} ${action.dirSymbol}] vào hàng đợi!`,
+                    'system'
+                );
+                this.updateQueueDisplay();
+                if (currentQueue.length === 4) {
+                    if (this.isTwoPlayerMode && this.activePlanningPlayer === 1) {
+                        this.addCombatLog(this.lang === 'en' ? 'P1 queue full (4/4)! Press [SPACE] to pass to P2!' : 'P1 đã đủ 4 lệnh. Bấm [SPACE] để xác nhận và chuyển P2!', 'system');
+                    } else {
+                        this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
+                    }
+                }
+                return;
+            }
+        }
+
         const action = {
             skillId: skill.id,
             type: skill.type,
@@ -2191,6 +2315,7 @@ class GameEngine {
             sentryHp: skill.sentryHp,
             sentryRange: skill.sentryRange,
             portalHp: skill.portalHp,
+            rangeBonus: skill.rangeBonus,
             color: skill.color || '#38bdf8'
         };
 
@@ -2745,7 +2870,9 @@ class GameEngine {
         const simSkillAmmo = { ...unit.skillAmmo };
         const simBuffs = {
             adrenaline: { turnsLeft: (unit.buffs && unit.buffs.adrenaline) ? unit.buffs.adrenaline.turnsLeft : 0 },
-            cigarette: { turnsLeft: (unit.buffs && unit.buffs.cigarette) ? unit.buffs.cigarette.turnsLeft : 0 }
+            cigarette: { turnsLeft: (unit.buffs && unit.buffs.cigarette) ? unit.buffs.cigarette.turnsLeft : 0 },
+            destructiveShot: (unit.buffs && unit.buffs.destructiveShot) || false,
+            thermalVision: (unit.buffs && unit.buffs.thermalVision && unit.buffs.thermalVision.active) || false
         };
 
         const opposingTeam = unit.team === 'BLUE' ? this.redTeam : this.blueTeam;
@@ -2813,6 +2940,8 @@ class GameEngine {
                 action = this.generateCpuActionFireman(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else if (charId === 'engie') {
                 action = this.generateCpuActionEngie(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
+            } else if (charId === 'snipeman') {
+                action = this.generateCpuActionSnipeman(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit);
             } else {
                 action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             }
@@ -3419,6 +3548,122 @@ class GameEngine {
         };
     }
 
+    generateCpuActionSnipeman(stepIdx, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit) {
+        let isScoped = (unit && unit.isScoped) || false;
+        if (queue) {
+            for (const a of queue) {
+                if (a.type === 'SNIPER_SCOPE') isScoped = true;
+                else if (a.type === 'SNIPER_SHOT') isScoped = false;
+            }
+        }
+        const hasDestructive = Boolean(simBuffs.destructiveShot);
+        const hasThermal = Boolean(simBuffs.thermalVision);
+        const sniperRange = 6 + (hasThermal ? 1 : 0);
+        const targetDir = this.getDirectionTowards(dx, dy);
+
+        // 1. Tầm Nhìn Dò Nhiệt (BUFF_THERMAL): hỗ trợ toàn đội nếu chưa hồi chiêu
+        if (!simCooldowns['SNIPER_THERMAL'] && Math.random() < 0.6) {
+            simCooldowns['SNIPER_THERMAL'] = 4;
+            simBuffs.thermalVision = true;
+            return {
+                type: 'BUFF_THERMAL',
+                skillId: 'SNIPER_THERMAL',
+                name: 'Tầm Nhìn Dò Nhiệt',
+                icon: '🔭',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                rangeBonus: 1,
+                cooldown: 4
+            };
+        }
+
+        // 2. Phát Bắn Hủy Diệt (BUFF_DESTRUCTIVE): cường hóa súng tỉa +30% và xuyên thấu
+        if (!simCooldowns['SNIPER_DESTRUCTIVE'] && !hasDestructive && Math.random() < 0.75) {
+            simCooldowns['SNIPER_DESTRUCTIVE'] = 3;
+            simBuffs.destructiveShot = true;
+            return {
+                type: 'BUFF_DESTRUCTIVE',
+                skillId: 'SNIPER_DESTRUCTIVE',
+                name: 'Phát Bắn Hủy Diệt',
+                icon: '⚡',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                dmgBonusPercent: 30,
+                cooldown: 3
+            };
+        }
+
+        // 3. Kiểm tra mục tiêu có thẳng hàng trong tầm sniperRange không
+        const alignedDir = this.getAlignedRangedDirection(simX, simY, simX + dx, simY + dy, sniperRange);
+        if (alignedDir) {
+            if (isScoped) {
+                // Đã ngắm -> BẮN SÚNG TỈA
+                simBuffs.destructiveShot = false;
+                simBuffs.thermalVision = false;
+                return {
+                    type: 'SNIPER_SHOT',
+                    skillId: 'SNIPER_SHOT',
+                    name: 'Bắn Súng Tỉa',
+                    icon: '💥',
+                    dir: alignedDir,
+                    dirSymbol: DIRECTIONS[alignedDir].symbol,
+                    range: 6,
+                    minPower: 25,
+                    maxPower: 50
+                };
+            } else {
+                // Chưa ngắm -> VÀO CHẾ ĐỘ NGẮM BẮN
+                return {
+                    type: 'SNIPER_SCOPE',
+                    skillId: 'SNIPER_SCOPE',
+                    name: 'Ngắm Bắn',
+                    icon: '🎯',
+                    dir: alignedDir,
+                    dirSymbol: DIRECTIONS[alignedDir].symbol,
+                    range: 0,
+                    power: 0
+                };
+            }
+        }
+
+        // 4. Di chuyển giữ cự ly sniping (cự ly 3-6)
+        const moveBudget = isScoped ? 1 : 2;
+        if (dist < 3) {
+            // Quá gần! Lùi lại để tăng sát thương tầm xa
+            return this.createCpuPathMove(simX, simY, simX - dx, simY - dy, moveBudget, false);
+        } else if (dist > sniperRange || Math.random() < 0.6) {
+            // Tiếp cận vào tầm bắn
+            return this.createCpuPathMove(simX, simY, simX + dx, simY + dy, moveBudget, false);
+        }
+
+        // 5. Nếu chưa ngắm và đã ở vị trí tốt: Ngắm bắn
+        if (!isScoped) {
+            return {
+                type: 'SNIPER_SCOPE',
+                skillId: 'SNIPER_SCOPE',
+                name: 'Ngắm Bắn',
+                icon: '🎯',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                range: 0,
+                power: 0
+            };
+        }
+
+        // 6. Đã ngắm nhưng không thẳng hàng: bắn thăm dò theo hướng mục tiêu
+        return {
+            type: 'SNIPER_SHOT',
+            skillId: 'SNIPER_SHOT',
+            name: 'Bắn Súng Tỉa',
+            icon: '💥',
+            dir: targetDir,
+            dirSymbol: DIRECTIONS[targetDir].symbol,
+            range: 6,
+            minPower: 25,
+            maxPower: 50
+        };
+    }
+
     getDirectionTowards(dx, dy) {
         if (dx !== 0 && dy !== 0 && Math.random() < 0.6) {
             if (dx > 0 && dy < 0) return 'UP_RIGHT';
@@ -3912,7 +4157,12 @@ class GameEngine {
         }
         else if (act.type === 'RANGED_LINE' || act.type === 'RANGED_VARIABLE') {
             const uD = DIRECTIONS[act.dir];
-            const maxRange = act.range || 5;
+            let thermalBonus = 0;
+            if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
+                thermalBonus = actor.buffs.thermalVision.rangeBonus || 1;
+                actor.buffs.thermalVision.active = false;
+            }
+            const maxRange = (act.range || 5) + thermalBonus;
             if (act.skillId === 'ENGIE_NAILGUN') {
                 if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playNailgun();
             } else if (act.skillId === 'RAZOR_PULSE_RIFLE') {
@@ -4020,9 +4270,136 @@ class GameEngine {
             this.addFloatingText(this.lang === 'en' ? '🚬 SMOKING! (+30% DMG & +1 SPEED)' : '🚬 HÚT THUỐC! (+30% DMG & +1 BƯỚC)', actor.x, actor.y, '#f97316');
             this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} châm [Thuốc Lá]! Tăng +30% Sát thương và +1 Tốc độ di chuyển!`, 'hit');
         }
+        else if (act.type === 'BUFF_DESTRUCTIVE') {
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playDestructiveShot();
+            if (!actor.buffs) actor.buffs = {};
+            actor.buffs.destructiveShot = true;
+            this.createBuffSparks(actor.x, actor.y, '#ec4899');
+            this.addFloatingText(this.lang === 'en' ? '⚡ DESTRUCTIVE (+30% & PIERCE)!' : '⚡ PHÁT BẮN HỦY DIỆT (+30% & XUYÊN)!', actor.x, actor.y, '#ec4899');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} kích hoạt [Phát Bắn Hủy Diệt]! Phát súng tỉa tiếp theo +30% sát thương và xuyên thấu mọi kẻ địch!`, 'buff');
+            actor.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 3;
+        }
+        else if (act.type === 'BUFF_THERMAL') {
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playThermalVision();
+            const allies = (actor.team === 'BLUE' ? this.blueTeam : this.redTeam).filter(u => u.hp > 0);
+            for (const ally of allies) {
+                if (!ally.buffs) ally.buffs = {};
+                ally.buffs.thermalVision = { active: true, rangeBonus: act.rangeBonus || 1 };
+                this.createBuffSparks(ally.x, ally.y, '#06b6d4');
+                this.addFloatingText(this.lang === 'en' ? '🔭 THERMAL (+1 RANGE)!' : '🔭 TẦM NHIỆT (+1 TẦM)!', ally.x, ally.y, '#06b6d4');
+            }
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} kích hoạt [Tầm Nhìn Dò Nhiệt]! Toàn bộ đồng đội nhận +1 phạm vi cho lần dùng kế tiếp!`, 'buff');
+            actor.cooldowns[act.skillId] = act.cooldown || 4;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 4;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 4;
+        }
+        else if (act.type === 'SNIPER_SCOPE') {
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playSniperScope();
+            actor.isScoped = true;
+            this.createBuffSparks(actor.x, actor.y, '#818cf8');
+            this.addFloatingText(this.lang === 'en' ? '🎯 SCOPE ON!' : '🎯 CHẾ ĐỘ NGẮM BẮN!', actor.x, actor.y, '#818cf8');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} vào [Chế độ Ngắm Bắn]! Sẵn sàng tung đòn bắn tỉa tầm xa.`, 'system');
+        }
+        else if (act.type === 'SNIPER_SHOT') {
+            const isDestructive = Boolean(actor.buffs && actor.buffs.destructiveShot);
+            if (isDestructive) {
+                actor.buffs.destructiveShot = false;
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playDestructiveShot();
+            } else {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playSniperShot();
+            }
+            actor.isScoped = false;
+
+            let thermalBonus = 0;
+            if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
+                thermalBonus = actor.buffs.thermalVision.rangeBonus || 1;
+                actor.buffs.thermalVision.active = false;
+            }
+
+            const maxRange = (act.range || 6) + thermalBonus;
+            const uD = DIRECTIONS[act.dir];
+            let hitAny = false;
+            let endX = actor.x + uD.dx * maxRange;
+            let endY = actor.y + uD.dy * maxRange;
+
+            for (let r = 1; r <= maxRange; r++) {
+                const cx = actor.x + uD.dx * r;
+                const cy = actor.y + uD.dy * r;
+                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
+
+                endX = cx;
+                endY = cy;
+
+                const target = livingOpponents.find(u => u.x === cx && u.y === cy);
+                if (target) {
+                    hitAny = true;
+                    if (target.shieldDir) {
+                        if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
+                        this.addFloatingText(this.lang === 'en' ? 'BLOCKED SNIPER!' : 'CHẶN ĐƯỢC BẮN TỈA!', target.x, target.y, '#60a5fa');
+                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn phát súng tỉa từ ${actor.name}!`, 'block');
+                    } else {
+                        if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
+                        // Công thức sát thương theo cự ly: 20 + 5 * d (25, 30, 35, 40, 45, 50, 55)
+                        let dmg = 20 + 5 * r;
+                        if (isDestructive) dmg = Math.round(dmg * 1.3);
+                        if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
+                        const targetAct = target.queue ? target.queue[stepIndex] : null;
+                        if (targetAct && targetAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
+
+                        this.applyDamage(target, dmg);
+                        this.createHitSparks(target.x, target.y, isDestructive ? '#ec4899' : '#818cf8');
+                        this.addFloatingText(`-${dmg} HP!`, target.x, target.y, isDestructive ? '#ec4899' : '#f87171');
+
+                        const destructiveTag = isDestructive ? ' [⚡HỦY DIỆT +30%]' : '';
+                        const distTag = ` (Cự ly: ${r} ô)`;
+                        this.addCombatLog(
+                            `Nhịp #${stepIndex + 1}: 🎯 [Súng Tỉa] ${actor.name} BẮN TRÚNG ${target.name}! (-${dmg} HP${destructiveTag}${distTag}${buffTag})!`,
+                            'hit'
+                        );
+
+                        if (target.charId === 'hookman') {
+                            target.revealedTurns = 2;
+                            if (target.isPlayer) this.playerRevealedTurns = 2;
+                            this.addFloatingText(this.lang === 'en' ? 'REVEALED!' : 'HIỆN HÌNH!', target.x, target.y, '#f43f5e');
+                        }
+                    }
+
+                    if (!isDestructive) {
+                        break;
+                    }
+                }
+
+                const enemyDep = this.getEnemyDeployableAt(cx, cy, actor.team);
+                if (enemyDep) {
+                    hitAny = true;
+                    if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playHit();
+                    let dmg = 20 + 5 * r;
+                    if (isDestructive) dmg = Math.round(dmg * 1.3);
+                    if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
+                    this.damageDeployable(enemyDep, dmg, actor);
+                    if (!isDestructive) {
+                        break;
+                    }
+                }
+            }
+
+            const tracerColor = isDestructive ? '#ec4899' : '#818cf8';
+            this.createBulletTracer(actor.x, actor.y, endX, endY, tracerColor);
+
+            if (!hitAny) {
+                this.addFloatingText(this.lang === 'en' ? 'SNIPER MISS!' : 'BẮN TỈA TRƯỢT!', endX, endY, '#94a3b8');
+            }
+        }
         else if (act.type === 'HOOK_PULL') {
             const uD = DIRECTIONS[act.dir];
-            const maxRange = act.range || 5;
+            let thermalBonus = 0;
+            if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
+                thermalBonus = actor.buffs.thermalVision.rangeBonus || 1;
+                actor.buffs.thermalVision.active = false;
+            }
+            const maxRange = (act.range || 5) + thermalBonus;
             if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playHookThrow();
 
             let hit = false;
@@ -4092,7 +4469,12 @@ class GameEngine {
         else if (act.type === 'ROCKET' || act.type === 'BOMB_LAUNCHER') {
             const isBombLauncher = (act.type === 'BOMB_LAUNCHER');
             const uD = DIRECTIONS[act.dir];
-            const maxRange = act.range || 6;
+            let thermalBonus = 0;
+            if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
+                thermalBonus = actor.buffs.thermalVision.rangeBonus || 1;
+                actor.buffs.thermalVision.active = false;
+            }
+            const maxRange = (act.range || 6) + thermalBonus;
 
             if (isBombLauncher) {
                 if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playBombLauncher();
@@ -4163,7 +4545,12 @@ class GameEngine {
         }
         else if (act.type === 'GRENADE') {
             const uD = DIRECTIONS[act.dir];
-            const maxRange = act.range || 5;
+            let thermalBonus = 0;
+            if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
+                thermalBonus = actor.buffs.thermalVision.rangeBonus || 1;
+                actor.buffs.thermalVision.active = false;
+            }
+            const maxRange = (act.range || 5) + thermalBonus;
             let targetX = (act.targetX !== undefined) ? act.targetX : actor.x + uD.dx * maxRange;
             let targetY = (act.targetY !== undefined) ? act.targetY : actor.y + uD.dy * maxRange;
 
@@ -4202,7 +4589,12 @@ class GameEngine {
         }
         else if (act.type === 'OIL_BARREL') {
             const uD = DIRECTIONS[act.dir];
-            const maxRange = act.range || 6;
+            let thermalBonus = 0;
+            if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
+                thermalBonus = actor.buffs.thermalVision.rangeBonus || 1;
+                actor.buffs.thermalVision.active = false;
+            }
+            const maxRange = (act.range || 6) + thermalBonus;
             if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playBombLauncher();
 
             let targetX = actor.x + uD.dx * maxRange;
@@ -4257,7 +4649,12 @@ class GameEngine {
         }
         else if (act.type === 'FIRE_CANNON') {
             const uD = DIRECTIONS[act.dir];
-            const maxRange = act.range || 5;
+            let thermalBonus = 0;
+            if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
+                thermalBonus = actor.buffs.thermalVision.rangeBonus || 1;
+                actor.buffs.thermalVision.active = false;
+            }
+            const maxRange = (act.range || 5) + thermalBonus;
             if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playRocketLaunch();
 
             let targetX = actor.x + uD.dx * maxRange;
@@ -4443,7 +4840,12 @@ class GameEngine {
         }
         else if (act.type === 'DEPLOY_TELEPORTER') {
             const uD = DIRECTIONS[act.dir];
-            const maxRange = act.range || 5;
+            let thermalBonus = 0;
+            if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
+                thermalBonus = actor.buffs.thermalVision.rangeBonus || 1;
+                actor.buffs.thermalVision.active = false;
+            }
+            const maxRange = (act.range || 5) + thermalBonus;
             const inX = actor.x;
             const inY = actor.y;
             let outX = actor.x + (uD ? uD.dx : 1) * maxRange;
@@ -4669,6 +5071,11 @@ class GameEngine {
                         u.alive = true;
                         u.isOiled = false;
                         u.burnTurns = 0;
+                        u.isScoped = false;
+                        if (u.buffs) {
+                            u.buffs.destructiveShot = false;
+                            u.buffs.thermalVision = { active: false, rangeBonus: 0 };
+                        }
                         const spawnPos = this.getRespawnPosition(u.team, u.index);
                         u.x = spawnPos.x;
                         u.y = spawnPos.y;
@@ -6349,6 +6756,48 @@ class GameEngine {
             ctx.stroke();
             ctx.restore();
             tag = `${tag} [🔥${fighter.burnTurns}L]`;
+        }
+
+        // Kiểm tra Chế độ Ngắm Bắn (Snipeman)
+        const isFighterScoped = fighter.isScoped || (this.phase === 'PLANNING' && this.isUnitScoped(fighter));
+        if (isFighterScoped) {
+            ctx.save();
+            ctx.strokeStyle = '#818cf8';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 25, 0, Math.PI * 2);
+            ctx.moveTo(-29, 0); ctx.lineTo(-19, 0);
+            ctx.moveTo(19, 0); ctx.lineTo(29, 0);
+            ctx.moveTo(0, -29); ctx.lineTo(0, -19);
+            ctx.moveTo(0, 19); ctx.lineTo(0, 29);
+            ctx.stroke();
+            ctx.restore();
+            tag = `${tag} [🎯]`;
+        }
+
+        // Kiểm tra Buff Phát Bắn Hủy Diệt (Snipeman: +30% DMG & Xuyên Thấu)
+        if (fighter.buffs && fighter.buffs.destructiveShot) {
+            ctx.save();
+            ctx.strokeStyle = '#ec4899';
+            ctx.setLineDash([2, 3]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 27, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            tag = `${tag} [⚡]`;
+        }
+
+        // Kiểm tra Buff Tầm Nhìn Dò Nhiệt (Snipeman: +1 Tầm)
+        if (fighter.buffs && fighter.buffs.thermalVision && fighter.buffs.thermalVision.active) {
+            ctx.save();
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 30, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            tag = `${tag} [🔭]`;
         }
 
         // Hiệu ứng phát sáng

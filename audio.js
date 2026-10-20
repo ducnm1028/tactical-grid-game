@@ -637,6 +637,98 @@ class SoundController {
             osc.stop(now + 0.18);
         } catch (e) {}
     }
+
+    // --- Snipeman SFX: Ngắm Bắn, Bắn Tỉa, Phát Bắn Hủy Diệt, Tầm Nhìn Dò Nhiệt ---
+    playSniperScope() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng cơ khí kéo kính ngắm và xoay thấu kính tinh chỉnh
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(420, now);
+            osc.frequency.setValueAtTime(980, now + 0.04);
+            osc.frequency.setValueAtTime(1450, now + 0.09);
+            gain.gain.setValueAtTime(0.28, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+        } catch (e) {}
+    }
+
+    playSniperShot() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng nổ súng bắn tỉa vang dội uy lực cự ly xa
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(750, now);
+            osc.frequency.exponentialRampToValueAtTime(65, now + 0.35);
+            gain.gain.setValueAtTime(0.45, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.35);
+
+            // Tiếng dội âm vang
+            const noise = this.ctx.createBufferSource();
+            const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.22, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < buffer.length; i++) data[i] = (Math.random() * 2 - 1) * 0.25;
+            noise.buffer = buffer;
+            const nGain = this.ctx.createGain();
+            nGain.gain.setValueAtTime(0.3, now);
+            nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+            noise.connect(nGain);
+            nGain.connect(this.ctx.destination);
+            noise.start(now);
+        } catch (e) {}
+    }
+
+    playDestructiveShot() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng nạp năng lượng huỷ diệt và bắn xuyên phá siêu âm
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(1100, now);
+            osc.frequency.exponentialRampToValueAtTime(80, now + 0.42);
+            gain.gain.setValueAtTime(0.5, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.42);
+        } catch (e) {}
+    }
+
+    playThermalVision() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng quét sóng hồng ngoại dò nhiệt âm vang
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, now);
+            osc.frequency.linearRampToValueAtTime(1760, now + 0.12);
+            osc.frequency.linearRampToValueAtTime(2200, now + 0.28);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        } catch (e) {}
+    }
 }
 
 window.soundCtrl = new SoundController();

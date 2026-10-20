@@ -476,6 +476,80 @@ const CHARACTERS_DATABASE = [
                 color: '#06b6d4'
             }
         ]
+    },
+    {
+        id: 'snipeman',
+        name: 'Snipeman (Xạ Thủ Bắn Tỉa)',
+        name_en: 'Snipeman (Sniper Specialist)',
+        title: 'Bậc Thầy Ngắm Bắn Tầm Xa & Hỗ Trợ Tầm Nhiệt',
+        title_en: 'Master of Long-Range Marksmanship & Thermal Support',
+        description: 'Vũ khí Súng Tỉa: Lần 1 ngắm bắn (giảm 1 bước di chuyển), Lần 2 bắn (25-50 DMG tầm 6, khoảng cách càng xa sát thương càng tăng). Chiêu 1: Phát Bắn Hủy Diệt (+30% DMG & xuyên thấu, Hồi: 3L). Chiêu 2: Tầm Nhìn Dò Nhiệt (+1 phạm vi cho toàn đội lần dùng kế tiếp, Hồi: 4L).',
+        description_en: 'Equipped with Sniper Rifle: 1st tap scopes in (reduces 1 movement step), 2nd tap fires (25-50 DMG up to 6 tiles, damage scales with distance). Skill 1: Destructive Shot (+30% DMG & pierces all enemies, CD: 3T). Skill 2: Thermal Vision (+1 range to all allies on next ability, CD: 4T).',
+        avatar: '🎯',
+        themeColor: '#6366f1',
+        secondaryColor: '#818cf8',
+        maxHp: 100,
+        moveBudget: 2,
+        isUnlocked: true,
+        skills: [
+            {
+                slot: 1,
+                id: 'SNIPER_MOVE',
+                name: 'Lộ Trình',
+                name_en: 'Route',
+                icon: '👟',
+                hotkey: '1 / M',
+                type: 'PATH_MOVE',
+                maxSteps: 2,
+                power: 0,
+                desc: 'Di chuyển tự do tối đa 2 bước (khi đang ngắm bắn chỉ di chuyển tối đa 1 bước)',
+                desc_en: 'Free movement up to 2 steps (limited to 1 step while scoped)',
+                color: '#6366f1'
+            },
+            {
+                slot: 2,
+                id: 'SNIPER_RIFLE',
+                name: 'Súng Tỉa',
+                name_en: 'Sniper Rifle',
+                icon: '🎯',
+                hotkey: '2 / J',
+                type: 'SNIPER_WEAPON',
+                range: 6,
+                minPower: 25,
+                maxPower: 50,
+                desc: 'Lần bấm 1: Ngắm bắn (mất 1 bước di chuyển). Lần bấm 2: Bắn tỉa tầm 6 (25-30-35-40-45-50 DMG tỉ lệ thuận cự ly xa)',
+                desc_en: '1st tap: Aim/Scope (lose 1 move step). 2nd tap: Fire sniper shot range 6 (25-50 DMG scales with distance)',
+                color: '#818cf8'
+            },
+            {
+                slot: 3,
+                id: 'SNIPER_DESTRUCTIVE',
+                name: 'Phát Bắn Hủy Diệt',
+                name_en: 'Destructive Shot',
+                icon: '⚡',
+                hotkey: '3 / K',
+                type: 'BUFF_DESTRUCTIVE',
+                cooldown: 3,
+                dmgBonusPercent: 30,
+                desc: 'Cường hóa phát súng tỉa tiếp theo: +30% sát thương và bắn xuyên thấu toàn bộ kẻ địch trên đường đạn (Hồi: 3L)',
+                desc_en: 'Empowers next sniper shot: +30% DMG and pierces through all enemies along bullet path (CD: 3T)',
+                color: '#ec4899'
+            },
+            {
+                slot: 4,
+                id: 'SNIPER_THERMAL',
+                name: 'Tầm Nhìn Dò Nhiệt',
+                name_en: 'Thermal Vision',
+                icon: '🔭',
+                hotkey: '4 / L',
+                type: 'BUFF_THERMAL',
+                cooldown: 4,
+                rangeBonus: 1,
+                desc: 'Kích hoạt tầm nhiệt: Toàn bộ đồng đội được cộng +1 phạm vi cho lần thi triển vũ khí/kỹ năng kế tiếp (Hồi: 4L)',
+                desc_en: 'Activates thermal scan: All allies gain +1 range for their next weapon/ability cast (CD: 4T)',
+                color: '#06b6d4'
+            }
+        ]
     }
 ];
 
