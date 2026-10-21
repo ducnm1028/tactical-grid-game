@@ -12,11 +12,12 @@ const testFiles = [
     'test_two_player_mode.js',
     'test_fireman.js',
     'test_engie.js',
-    'test_snipeman.js'
+    'test_snipeman.js',
+    'test_hat_boom_man.js'
 ];
 
 console.log('====================================================');
-console.log('🚀 CHRONO CLASH - CHẠY TẤT CẢ 9 TEST SUITES');
+console.log('🚀 CHRONO CLASH - CHẠY TẤT CẢ 10 TEST SUITES');
 console.log('====================================================\n');
 
 let totalPassed = 0;

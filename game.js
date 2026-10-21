@@ -713,9 +713,11 @@ class GameEngine {
                 adrenaline: { turnsLeft: 0, healPerTurn: 5, dmgBonusPercent: 20 },
                 cigarette: { turnsLeft: 0, dmgBonusPercent: 30, moveBonus: 1 },
                 destructiveShot: false,
-                thermalVision: { active: false, rangeBonus: 0 }
+                thermalVision: { active: false, rangeBonus: 0 },
+                chaosShot: false
             },
             isScoped: false,
+            isImmune: false,
             queue: [],
             alive: true,
             isDead: false,
@@ -1549,9 +1551,9 @@ class GameEngine {
         let scoped = Boolean(unit.isScoped);
         const q = queue || (this.getActivePlanningQueue ? this.getActivePlanningQueue() : []);
         for (const act of q) {
-            if (act.type === 'SNIPER_SCOPE') {
+            if (act.type === 'SNIPER_SCOPE' || act.type === 'TANK_SCOPE') {
                 scoped = true;
-            } else if (act.type === 'SNIPER_SHOT') {
+            } else if (act.type === 'SNIPER_SHOT' || act.type === 'TANK_SHOT') {
                 scoped = false;
             }
         }
@@ -1603,7 +1605,19 @@ class GameEngine {
                     sIcon = '🎯';
                     sDesc = this.lang === 'en' ? '1st tap: Scope in mode (lose 1 move step on movement)' : 'Lần bấm 1: Vào chế độ ngắm bắn (giảm 1 bước di chuyển mỗi lần chọn di chuyển)';
                 }
-            } else if (s.id === 'SNIPER_MOVE' && isScoped) {
+            } else if (s.type === 'TANK_WEAPON') {
+                if (isScoped) {
+                    sName = this.lang === 'en' ? 'Fire Tank Cannon' : 'Bắn Nòng Xe Tăng';
+                    sIcon = '💥';
+                    sDesc = this.lang === 'en' ? '2nd tap: Fire cannon (15-45 DMG scales with distance, 3x3 blast 10 DMG)' : 'Lần bấm 2: Bắn đại bác (15-45 Sát thương theo cự ly, nổ 3x3 gây 10 DMG xung quanh trừ tâm)';
+                    sColor = '#e11d48';
+                    statusLabel = `<span class="cd-tag" style="background:#e11d48; color:white;">[${this.lang === 'en' ? 'SCOPED' : 'ĐÃ NGẮM'}]</span>`;
+                } else {
+                    sName = this.lang === 'en' ? 'Scope In' : 'Ngắm Nòng Pháo';
+                    sIcon = '🎯';
+                    sDesc = this.lang === 'en' ? '1st tap: Scope in mode (lose 1 move step on movement)' : 'Lần bấm 1: Vào chế độ ngắm bắn (giảm 1 bước di chuyển mỗi lần chọn di chuyển)';
+                }
+            } else if ((s.id === 'SNIPER_MOVE' || s.id === 'BOOM_MOVE') && isScoped) {
                 statusLabel = `<span class="cd-tag" style="background:#818cf8; color:white;">[${this.lang === 'en' ? '1 STEP' : '1 BƯỚC'}]</span>`;
             } else if (s.id === 'SNIPER_DESTRUCTIVE') {
                 const isDestrActive = (unit.buffs && unit.buffs.destructiveShot) || currentQueue.some(act => act.skillId === 'SNIPER_DESTRUCTIVE');
@@ -1614,6 +1628,11 @@ class GameEngine {
                 const isThermalActive = (unit.buffs && unit.buffs.thermalVision && unit.buffs.thermalVision.active) || currentQueue.some(act => act.skillId === 'SNIPER_THERMAL');
                 if (isThermalActive && !isCooldown) {
                     statusLabel = `<span class="cd-tag" style="background:#06b6d4; color:white;">[+1 TẦM]</span>`;
+                }
+            } else if (s.id === 'BOOM_CHAOS_SHOT') {
+                const isChaosActive = (unit.buffs && unit.buffs.chaosShot) || currentQueue.some(act => act.skillId === 'BOOM_CHAOS_SHOT');
+                if (isChaosActive && !isCooldown) {
+                    statusLabel = `<span class="cd-tag" style="background:#a855f7; color:white;">[+30% & 5x5]</span>`;
                 }
             }
 
@@ -2283,6 +2302,77 @@ class GameEngine {
             }
         }
 
+        // Xử lý Vũ khí Nòng Xe Tăng Hat Boom Man: Lần 1 Ngắm Bắn, Lần 2 Bắn Nòng Xe Tăng
+        if (skill.type === 'TANK_WEAPON') {
+            const isScoped = this.isUnitScoped(unit, currentQueue);
+            if (!isScoped) {
+                const action = {
+                    skillId: 'TANK_SCOPE',
+                    type: 'TANK_SCOPE',
+                    name: this.lang === 'en' ? 'Scope In' : 'Ngắm Nòng Pháo',
+                    icon: '🎯',
+                    dir: this.currentSelectedDir,
+                    dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
+                    range: 0,
+                    power: 0,
+                    color: '#e11d48'
+                };
+                currentQueue.push(action);
+                if (window.soundCtrl) window.soundCtrl.playTankScope();
+                const playerPrefix = this.isTwoPlayerMode ? `[P${this.activePlanningPlayer}] ` : '';
+                this.addCombatLog(
+                    this.lang === 'en'
+                        ? `${playerPrefix}Queued [Scope In]! Next movement is reduced by 1 step.`
+                        : `${playerPrefix}Đã nạp [Ngắm Nòng Pháo] vào hàng đợi! Bước di chuyển tiếp theo bị giảm 1.`,
+                    'system'
+                );
+                this.updateQueueDisplay();
+                if (currentQueue.length === 4) {
+                    if (this.isTwoPlayerMode && this.activePlanningPlayer === 1) {
+                        this.addCombatLog(this.lang === 'en' ? 'P1 queue full (4/4)! Press [SPACE] to pass to P2!' : 'P1 đã đủ 4 lệnh. Bấm [SPACE] để xác nhận và chuyển P2!', 'system');
+                    } else {
+                        this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
+                    }
+                }
+                return;
+            } else {
+                const action = {
+                    skillId: 'TANK_SHOT',
+                    type: 'TANK_SHOT',
+                    name: this.lang === 'en' ? 'Tank Cannon Shot' : 'Bắn Nòng Xe Tăng',
+                    icon: '💥',
+                    dir: this.currentSelectedDir,
+                    dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
+                    range: 6,
+                    minPower: 15,
+                    maxPower: 45,
+                    aoeRadius: 1,
+                    splashPower: 10,
+                    color: '#e11d48'
+                };
+                currentQueue.push(action);
+                if (window.soundCtrl) window.soundCtrl.playSelect();
+                const dirObj = DIRECTIONS[action.dir];
+                const dirLabel = this.lang === 'en' ? (dirObj.label_en || dirObj.label) : dirObj.label;
+                const playerPrefix = this.isTwoPlayerMode ? `[P${this.activePlanningPlayer}] ` : '';
+                this.addCombatLog(
+                    this.lang === 'en'
+                        ? `${playerPrefix}Queued [Tank Cannon Shot] facing [${dirLabel} ${action.dirSymbol}]!`
+                        : `${playerPrefix}Đã nạp [Bắn Nòng Xe Tăng] hướng [${dirLabel} ${action.dirSymbol}] vào hàng đợi!`,
+                    'system'
+                );
+                this.updateQueueDisplay();
+                if (currentQueue.length === 4) {
+                    if (this.isTwoPlayerMode && this.activePlanningPlayer === 1) {
+                        this.addCombatLog(this.lang === 'en' ? 'P1 queue full (4/4)! Press [SPACE] to pass to P2!' : 'P1 đã đủ 4 lệnh. Bấm [SPACE] để xác nhận và chuyển P2!', 'system');
+                    } else {
+                        this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Đã nạp đủ 4 lệnh. Bấm [SPACE] để BẮT ĐẦU ĐẤU!', 'system');
+                    }
+                }
+                return;
+            }
+        }
+
         const action = {
             skillId: skill.id,
             type: skill.type,
@@ -2872,7 +2962,8 @@ class GameEngine {
             adrenaline: { turnsLeft: (unit.buffs && unit.buffs.adrenaline) ? unit.buffs.adrenaline.turnsLeft : 0 },
             cigarette: { turnsLeft: (unit.buffs && unit.buffs.cigarette) ? unit.buffs.cigarette.turnsLeft : 0 },
             destructiveShot: (unit.buffs && unit.buffs.destructiveShot) || false,
-            thermalVision: (unit.buffs && unit.buffs.thermalVision && unit.buffs.thermalVision.active) || false
+            thermalVision: (unit.buffs && unit.buffs.thermalVision && unit.buffs.thermalVision.active) || false,
+            chaosShot: (unit.buffs && unit.buffs.chaosShot) || false
         };
 
         const opposingTeam = unit.team === 'BLUE' ? this.redTeam : this.blueTeam;
@@ -2942,6 +3033,8 @@ class GameEngine {
                 action = this.generateCpuActionEngie(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             } else if (charId === 'snipeman') {
                 action = this.generateCpuActionSnipeman(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit);
+            } else if (charId === 'hat_boom_man') {
+                action = this.generateCpuActionHatBoomMan(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit);
             } else {
                 action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             }
@@ -2951,14 +3044,17 @@ class GameEngine {
                 const lastStep = action.path[action.path.length - 1];
                 simX = lastStep.x;
                 simY = lastStep.y;
-            } else if (action.type === 'LEAP') {
+            } else if (action.type === 'LEAP' || action.type === 'BOOM_LEAP') {
                 const lD = DIRECTIONS[action.dir];
-                let destX = Math.max(0, Math.min(GRID_COLS - 1, simX + lD.dx * (action.range || 3)));
-                let destY = Math.max(0, Math.min(GRID_ROWS - 1, simY + lD.dy * (action.range || 3)));
-                const hasObstacle = livingOpponents.some(e => e.x === destX && e.y === destY) || this.groundHazards.some(h => h.x === destX && h.y === destY);
-                if (hasObstacle) {
-                    destX = Math.max(0, Math.min(GRID_COLS - 1, destX + lD.dx * 2));
-                    destY = Math.max(0, Math.min(GRID_ROWS - 1, destY + lD.dy * 2));
+                const jumpDist = action.type === 'BOOM_LEAP' ? (action.range || 2) : (action.range || 3);
+                let destX = Math.max(0, Math.min(GRID_COLS - 1, simX + lD.dx * jumpDist));
+                let destY = Math.max(0, Math.min(GRID_ROWS - 1, simY + lD.dy * jumpDist));
+                if (action.type === 'LEAP') {
+                    const hasObstacle = livingOpponents.some(e => e.x === destX && e.y === destY) || this.groundHazards.some(h => h.x === destX && h.y === destY);
+                    if (hasObstacle) {
+                        destX = Math.max(0, Math.min(GRID_COLS - 1, destX + lD.dx * 2));
+                        destY = Math.max(0, Math.min(GRID_ROWS - 1, destY + lD.dy * 2));
+                    }
                 }
                 simX = destX;
                 simY = destY;
@@ -3664,6 +3760,123 @@ class GameEngine {
         };
     }
 
+    generateCpuActionHatBoomMan(stepIdx, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit) {
+        let isScoped = (unit && unit.isScoped) || false;
+        if (queue) {
+            for (const a of queue) {
+                if (a.type === 'TANK_SCOPE') isScoped = true;
+                else if (a.type === 'TANK_SHOT') isScoped = false;
+            }
+        }
+        const hasChaos = Boolean(simBuffs.chaosShot);
+        const cannonRange = 6;
+        const targetDir = this.getDirectionTowards(dx, dy);
+
+        // 1. Cú Bật Nhảy (BOOM_LEAP): Bật nhảy thoát hiểm hoặc tiếp cận nếu bị áp sát (dist <= 2) hoặc né đòn
+        if (!simCooldowns['BOOM_LEAP'] && (dist <= 2 || Math.random() < 0.35)) {
+            simCooldowns['BOOM_LEAP'] = 2;
+            const leapDir = dist <= 2 ? this.getDirectionAway(dx, dy, simX, simY) : targetDir;
+            return {
+                type: 'BOOM_LEAP',
+                skillId: 'BOOM_LEAP',
+                name: 'Cú Bật Nhảy',
+                icon: '🦘',
+                dir: leapDir,
+                dirSymbol: DIRECTIONS[leapDir].symbol,
+                range: 2,
+                cooldown: 2
+            };
+        }
+
+        // 2. Phát Bắn Rối Loạn (BUFF_CHAOS_SHOT): Cường hóa đại bác +30% & nổ 5x5
+        if (!simCooldowns['BOOM_CHAOS_SHOT'] && !hasChaos && Math.random() < 0.75) {
+            simCooldowns['BOOM_CHAOS_SHOT'] = 3;
+            simBuffs.chaosShot = true;
+            return {
+                type: 'BUFF_CHAOS_SHOT',
+                skillId: 'BOOM_CHAOS_SHOT',
+                name: 'Phát Bắn Rối Loạn',
+                icon: '🌀',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                dmgBonusPercent: 30,
+                aoeRadius: 2,
+                cooldown: 3
+            };
+        }
+
+        // 3. Kiểm tra mục tiêu có thẳng hàng trong tầm 6 không
+        const alignedDir = this.getAlignedRangedDirection(simX, simY, simX + dx, simY + dy, cannonRange);
+        if (alignedDir) {
+            if (isScoped) {
+                // Đã ngắm -> BẮN ĐẠI BÁC
+                simBuffs.chaosShot = false;
+                return {
+                    type: 'TANK_SHOT',
+                    skillId: 'TANK_SHOT',
+                    name: 'Bắn Nòng Xe Tăng',
+                    icon: '💥',
+                    dir: alignedDir,
+                    dirSymbol: DIRECTIONS[alignedDir].symbol,
+                    range: 6,
+                    minPower: 15,
+                    maxPower: 45,
+                    aoeRadius: 1,
+                    splashPower: 10
+                };
+            } else {
+                // Chưa ngắm -> VÀO CHẾ ĐỘ NGẮM BẮN
+                return {
+                    type: 'TANK_SCOPE',
+                    skillId: 'TANK_SCOPE',
+                    name: 'Ngắm Nòng Pháo',
+                    icon: '🎯',
+                    dir: alignedDir,
+                    dirSymbol: DIRECTIONS[alignedDir].symbol,
+                    range: 0,
+                    power: 0
+                };
+            }
+        }
+
+        // 4. Di chuyển giữ cự ly sniping 3-6 ô
+        const moveBudget = isScoped ? 1 : 2;
+        if (dist < 3) {
+            return this.createCpuPathMove(simX, simY, simX - dx, simY - dy, moveBudget, false);
+        } else if (dist > cannonRange || Math.random() < 0.6) {
+            return this.createCpuPathMove(simX, simY, simX + dx, simY + dy, moveBudget, false);
+        }
+
+        // 5. Nếu chưa ngắm và đã ở vị trí tốt: Ngắm bắn
+        if (!isScoped) {
+            return {
+                type: 'TANK_SCOPE',
+                skillId: 'TANK_SCOPE',
+                name: 'Ngắm Nòng Pháo',
+                icon: '🎯',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                range: 0,
+                power: 0
+            };
+        }
+
+        // 6. Đã ngắm: Bắn theo hướng mục tiêu
+        return {
+            type: 'TANK_SHOT',
+            skillId: 'TANK_SHOT',
+            name: 'Bắn Nòng Xe Tăng',
+            icon: '💥',
+            dir: targetDir,
+            dirSymbol: DIRECTIONS[targetDir].symbol,
+            range: 6,
+            minPower: 15,
+            maxPower: 45,
+            aoeRadius: 1,
+            splashPower: 10
+        };
+    }
+
     getDirectionTowards(dx, dy) {
         if (dx !== 0 && dy !== 0 && Math.random() < 0.6) {
             if (dx > 0 && dy < 0) return 'UP_RIGHT';
@@ -3915,11 +4128,28 @@ class GameEngine {
 
         await this.delay(180);
 
-        // --- BƯỚC 2: Xử lý Nhảy Đột Kích (Leap Resolution) ---
+        // --- BƯỚC 2: Xử lý Nhảy Đột Kích & Bật Nhảy Miễn Nhiễm (Leap Resolution) ---
         for (const unit of allAlive) {
             if (unit.hp <= 0) continue;
             const act = unit.queue ? unit.queue[stepIndex] : null;
-            if (act && act.type === 'LEAP') {
+            if (act && act.type === 'BOOM_LEAP') {
+                unit.isImmune = true;
+                const uD = DIRECTIONS[act.dir];
+                const startX = unit.x;
+                const startY = unit.y;
+                const leapDist = act.range || 2;
+                let destX = Math.max(0, Math.min(GRID_COLS - 1, startX + uD.dx * leapDist));
+                let destY = Math.max(0, Math.min(GRID_ROWS - 1, startY + uD.dy * leapDist));
+
+                if (window.soundCtrl && (unit.isPlayer || allAlive.length <= 4)) window.soundCtrl.playBoomLeap();
+                this.createLeapArc(startX, startY, destX, destY, '#f59e0b');
+                unit.x = destX;
+                unit.y = destY;
+                this.checkFireZones(unit);
+                this.checkTeleporters(unit);
+                this.addFloatingText(this.lang === 'en' ? '🛡️ LEAP (IMMUNE)!' : '🛡️ BẬT NHẢY (MIỄN NHIỄM)!', destX, destY, '#eab308');
+                this.addCombatLog(`Nhịp #${stepIndex + 1}: ${unit.name} [${act.name}] bật nhảy 2 ô tới (${destX}, ${destY}) và miễn nhiễm mọi sát thương!`, 'buff');
+            } else if (act && act.type === 'LEAP') {
                 const uD = DIRECTIONS[act.dir];
                 const startX = unit.x;
                 const startY = unit.y;
@@ -4067,7 +4297,7 @@ class GameEngine {
         for (const actor of allAlive) {
             if (actor.hp <= 0) continue;
             const act = actor.queue ? actor.queue[stepIndex] : null;
-            if (!act || act.type === 'SHIELD' || act.type === 'PATH_MOVE' || act.type === 'DASH' || act.type === 'LEAP') continue;
+            if (!act || act.type === 'SHIELD' || act.type === 'PATH_MOVE' || act.type === 'DASH' || act.type === 'LEAP' || act.type === 'BOOM_LEAP') continue;
 
             await this.resolveUnitAttack(actor, act, stepIndex);
         }
@@ -4085,6 +4315,10 @@ class GameEngine {
                 this.handleGameOver();
                 return;
             }
+        }
+
+        for (const u of allAlive) {
+            u.isImmune = false;
         }
 
         await this.delay(450);
@@ -4390,6 +4624,173 @@ class GameEngine {
 
             if (!hitAny) {
                 this.addFloatingText(this.lang === 'en' ? 'SNIPER MISS!' : 'BẮN TỈA TRƯỢT!', endX, endY, '#94a3b8');
+            }
+        }
+        else if (act.type === 'BUFF_CHAOS_SHOT') {
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playChaosCharge();
+            if (!actor.buffs) actor.buffs = {};
+            actor.buffs.chaosShot = true;
+            this.createBuffSparks(actor.x, actor.y, '#a855f7');
+            this.addFloatingText(this.lang === 'en' ? '🌀 CHAOS SHOT (+30% & 5x5)!' : '🌀 PHÁT BẮN RỐI LOẠN (+30% & 5x5)!', actor.x, actor.y, '#a855f7');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} kích hoạt [Phát Bắn Rối Loạn]! Phát bắn Nòng Xe Tăng tiếp theo tăng +30% sát thương trực diện và nổ 5x5!`, 'buff');
+            actor.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 3;
+        }
+        else if (act.type === 'TANK_SCOPE') {
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playTankScope();
+            actor.isScoped = true;
+            this.createBuffSparks(actor.x, actor.y, '#e11d48');
+            this.addFloatingText(this.lang === 'en' ? '🎯 TANK SCOPE ON!' : '🎯 NGẮM NÒNG PHÁO!', actor.x, actor.y, '#e11d48');
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} vào [Chế độ Ngắm Nòng Pháo]! Chuẩn bị khai hỏa đại bác tầm xa.`, 'system');
+        }
+        else if (act.type === 'TANK_SHOT') {
+            const hasChaos = Boolean(actor.buffs && actor.buffs.chaosShot);
+            if (hasChaos) {
+                actor.buffs.chaosShot = false;
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playChaosCharge();
+            }
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playTankShot();
+
+            actor.isScoped = false;
+
+            let thermalBonus = 0;
+            if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
+                thermalBonus = actor.buffs.thermalVision.rangeBonus || 1;
+                actor.buffs.thermalVision.active = false;
+            }
+
+            const maxRange = (act.range || 6) + thermalBonus;
+            const uD = DIRECTIONS[act.dir];
+            let detX = actor.x + uD.dx * maxRange;
+            let detY = actor.y + uD.dy * maxRange;
+            let directTarget = null;
+            let hitDep = null;
+            let hitDist = maxRange;
+
+            for (let r = 1; r <= maxRange; r++) {
+                const cx = actor.x + uD.dx * r;
+                const cy = actor.y + uD.dy * r;
+                if (cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS) break;
+
+                detX = cx;
+                detY = cy;
+                hitDist = r;
+
+                const enemy = livingOpponents.find(u => u.x === cx && u.y === cy);
+                const dep = this.getEnemyDeployableAt(cx, cy, actor.team);
+                const haz = this.groundHazards && this.groundHazards.some(h => h.x === cx && h.y === cy);
+
+                if (enemy) {
+                    directTarget = enemy;
+                    break;
+                }
+                if (dep) {
+                    hitDep = dep;
+                    break;
+                }
+                if (haz) {
+                    break;
+                }
+            }
+
+            detX = Math.max(0, Math.min(GRID_COLS - 1, detX));
+            detY = Math.max(0, Math.min(GRID_ROWS - 1, detY));
+
+            const tracerColor = hasChaos ? '#a855f7' : '#e11d48';
+            this.createRocketTrail(actor.x, actor.y, detX, detY, tracerColor);
+            await this.delay(180);
+
+            const aoeRadius = hasChaos ? 2 : 1;
+            const blastSizeStr = hasChaos ? '5x5' : '3x3';
+            if (window.soundCtrl) window.soundCtrl.playExplosion();
+            this.createExplosionBurst(detX, detY, hasChaos ? 60 : 35);
+
+            // Bảng sát thương trực tiếp: 15-20-30-35-40-45
+            const TANK_CANNON_DMG = [0, 15, 20, 30, 35, 40, 45];
+            let directDmg = hitDist <= 6 ? TANK_CANNON_DMG[hitDist] : (45 + (hitDist - 6) * 5);
+            if (hasChaos) directDmg = Math.round(directDmg * 1.3);
+            if (hasBuffDmg) directDmg = Math.round(directDmg * dmgMult);
+
+            const chaosTag = hasChaos ? ' [🌀RỐI LOẠN +30% & 5x5]' : '';
+            this.addFloatingText(`💥 NỔ ${blastSizeStr}!`, detX, detY, tracerColor);
+            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} bắn [Nòng Xe Tăng] nổ ${blastSizeStr} tại (${detX}, ${detY})!${chaosTag}`, 'clash');
+
+            // 1. Sát thương chính tại tâm
+            if (directTarget) {
+                const targetAct = directTarget.queue ? directTarget.queue[stepIndex] : null;
+                if (directTarget.isImmune || (targetAct && targetAct.type === 'BOOM_LEAP')) {
+                    this.addFloatingText(this.lang === 'en' ? 'IMMUNE!' : 'MIỄN NHIỄM!', directTarget.x, directTarget.y, '#eab308');
+                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${directTarget.name} bật nhảy miễn nhiễm hoàn toàn phát bắn Nòng Xe Tăng!`, 'block');
+                } else if (directTarget.shieldDir) {
+                    if (window.soundCtrl && (actor.isPlayer || directTarget.isPlayer)) window.soundCtrl.playShield();
+                    this.addFloatingText(this.lang === 'en' ? 'BLOCKED SHELL!' : 'CHẶN ĐƯỢC ĐẠN PHÁO!', directTarget.x, directTarget.y, '#60a5fa');
+                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${directTarget.name} giương Khiên chặn trực tiếp đạn pháo từ ${actor.name}!`, 'block');
+                } else {
+                    let dDmg = directDmg;
+                    if (targetAct && targetAct.type === 'LEAP') dDmg = Math.round(dDmg * 0.75);
+
+                    this.applyDamage(directTarget, dDmg);
+                    this.createHitSparks(directTarget.x, directTarget.y, tracerColor);
+                    this.addFloatingText(`-${dDmg} HP!`, directTarget.x, directTarget.y, '#f87171');
+                    this.addCombatLog(`Nhịp #${stepIndex + 1}: 🎯 [Nòng Xe Tăng] ${actor.name} BẮN TRÚNG TRỰC DIỆN ${directTarget.name}! (-${dDmg} HP${chaosTag}, cự ly: ${hitDist} ô)!`, 'hit');
+
+                    if (directTarget.charId === 'hookman') {
+                        directTarget.revealedTurns = 2;
+                        if (directTarget.isPlayer) this.playerRevealedTurns = 2;
+                        this.addFloatingText(this.lang === 'en' ? 'REVEALED!' : 'HIỆN HÌNH!', directTarget.x, directTarget.y, '#f43f5e');
+                    }
+                }
+            } else if (hitDep) {
+                this.damageDeployable(hitDep, directDmg, actor);
+            }
+
+            // 2. Sát thương nổ lan 10 DMG ở mọi chỗ trừ chính giữa
+            for (const u of allLivingUnits) {
+                if (Math.abs(u.x - detX) <= aoeRadius && Math.abs(u.y - detY) <= aoeRadius) {
+                    if (u.x === detX && u.y === detY) continue;
+
+                    const uAct = u.queue ? u.queue[stepIndex] : null;
+                    if (u.isImmune || (uAct && uAct.type === 'BOOM_LEAP')) {
+                        this.addFloatingText(this.lang === 'en' ? 'IMMUNE!' : 'MIỄN NHIỄM!', u.x, u.y, '#eab308');
+                        continue;
+                    }
+
+                    let splashDmg = 10;
+                    if (uAct && uAct.type === 'LEAP') splashDmg = Math.round(splashDmg * 0.75);
+
+                    this.applyDamage(u, splashDmg);
+                    this.createHitSparks(u.x, u.y, u.color);
+                    this.addFloatingText(`-${splashDmg} HP!`, u.x, u.y, '#f87171');
+                    this.addCombatLog(`💥 Vụ nổ ${blastSizeStr} Nòng Xe Tăng gây -${splashDmg} HP nổ lan lên ${u.name}!`, 'hit');
+
+                    if (u.charId === 'hookman') {
+                        u.revealedTurns = 2;
+                        if (u.isPlayer) this.playerRevealedTurns = 2;
+                    }
+                }
+            }
+
+            // Sát thương nổ lan lên Deployables trong vùng nổ trừ tâm
+            if (this.sentries) {
+                for (const s of this.sentries) {
+                    if (Math.abs(s.x - detX) <= aoeRadius && Math.abs(s.y - detY) <= aoeRadius) {
+                        if (s.x === detX && s.y === detY) continue;
+                        if (s.team !== actor.team) this.damageDeployable({ type: 'SENTRY', obj: s }, 10, actor);
+                    }
+                }
+            }
+            if (this.teleporters) {
+                for (const t of this.teleporters) {
+                    if (t.team !== actor.team) {
+                        if (Math.abs(t.inX - detX) <= aoeRadius && Math.abs(t.inY - detY) <= aoeRadius && !(t.inX === detX && t.inY === detY)) {
+                            this.damageDeployable({ type: 'TELE_IN', obj: t }, 10, actor);
+                        }
+                        if (Math.abs(t.outX - detX) <= aoeRadius && Math.abs(t.outY - detY) <= aoeRadius && !(t.outX === detX && t.outY === detY)) {
+                            this.damageDeployable({ type: 'TELE_OUT', obj: t }, 10, actor);
+                        }
+                    }
+                }
             }
         }
         else if (act.type === 'HOOK_PULL') {
@@ -5072,9 +5473,11 @@ class GameEngine {
                         u.isOiled = false;
                         u.burnTurns = 0;
                         u.isScoped = false;
+                        u.isImmune = false;
                         if (u.buffs) {
                             u.buffs.destructiveShot = false;
                             u.buffs.thermalVision = { active: false, rangeBonus: 0 };
+                            u.buffs.chaosShot = false;
                         }
                         const spawnPos = this.getRespawnPosition(u.team, u.index);
                         u.x = spawnPos.x;
@@ -5342,6 +5745,10 @@ class GameEngine {
     }
 
     applyDamage(entity, amount) {
+        if (entity.isImmune) return;
+        const curAct = (entity.queue && this.currentStep >= 0) ? entity.queue[this.currentStep] : null;
+        if (curAct && curAct.type === 'BOOM_LEAP') return;
+
         if (entity.isOiled && amount > 0) {
             entity.isOiled = false;
             this.applyBurn(entity, 3, 5);
@@ -6798,6 +7205,31 @@ class GameEngine {
             ctx.stroke();
             ctx.restore();
             tag = `${tag} [🔭]`;
+        }
+
+        // Kiểm tra Buff Phát Bắn Rối Loạn (Hat Boom Man: +30% & Nổ 5x5)
+        if (fighter.buffs && fighter.buffs.chaosShot) {
+            ctx.save();
+            ctx.strokeStyle = '#a855f7';
+            ctx.setLineDash([3, 2]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 27, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            tag = `${tag} [🌀]`;
+        }
+
+        // Hiệu ứng Miễn Nhiễm Sát Thương (Hat Boom Man Bật Nhảy)
+        if (fighter.isImmune) {
+            ctx.save();
+            ctx.strokeStyle = '#eab308';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, 24, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            tag = `${tag} [🛡️]`;
         }
 
         // Hiệu ứng phát sáng

@@ -729,6 +729,110 @@ class SoundController {
             osc.stop(now + 0.3);
         } catch (e) {}
     }
+
+    // --- Hat Boom Man SFX: Ngắm Nòng Pháo, Bắn Đại Bác, Bật Nhảy Miễn Nhiễm, Phát Bắn Rối Loạn ---
+    playTankScope() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng bánh răng nâng nòng pháo kim loại nặng
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.exponentialRampToValueAtTime(580, now + 0.08);
+            osc.frequency.setValueAtTime(880, now + 0.1);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.18);
+        } catch (e) {}
+    }
+
+    playTankShot() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng nổ trầm vang uy lực của nòng pháo xe tăng
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(320, now);
+            osc.frequency.exponentialRampToValueAtTime(35, now + 0.45);
+            gain.gain.setValueAtTime(0.6, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.45);
+
+            // Dư chấn rung nổ khói áp lực
+            const noise = this.ctx.createBufferSource();
+            const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.3, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < buffer.length; i++) data[i] = (Math.random() * 2 - 1) * 0.35;
+            noise.buffer = buffer;
+            const nGain = this.ctx.createGain();
+            nGain.gain.setValueAtTime(0.4, now);
+            nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+            noise.connect(nGain);
+            nGain.connect(this.ctx.destination);
+            noise.start(now);
+        } catch (e) {}
+    }
+
+    playBoomLeap() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Cú bật phản lực lò xo kèm chuông bảo hộ miễn nhiễm
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(260, now);
+            osc.frequency.exponentialRampToValueAtTime(1100, now + 0.22);
+            gain.gain.setValueAtTime(0.35, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.25);
+
+            const shieldOsc = this.ctx.createOscillator();
+            const sGain = this.ctx.createGain();
+            shieldOsc.type = 'triangle';
+            shieldOsc.frequency.setValueAtTime(1400, now + 0.05);
+            shieldOsc.frequency.exponentialRampToValueAtTime(700, now + 0.25);
+            sGain.gain.setValueAtTime(0.2, now + 0.05);
+            sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+            shieldOsc.connect(sGain);
+            sGain.connect(this.ctx.destination);
+            shieldOsc.start(now + 0.05);
+            shieldOsc.stop(now + 0.25);
+        } catch (e) {}
+    }
+
+    playChaosCharge() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Nạp năng lượng hỗn loạn (Phát bắn rối loạn 5x5)
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(440, now);
+            osc.frequency.linearRampToValueAtTime(880, now + 0.1);
+            osc.frequency.linearRampToValueAtTime(1320, now + 0.25);
+            gain.gain.setValueAtTime(0.35, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.32);
+        } catch (e) {}
+    }
 }
 
 window.soundCtrl = new SoundController();

@@ -550,6 +550,81 @@ const CHARACTERS_DATABASE = [
                 color: '#06b6d4'
             }
         ]
+    },
+    {
+        id: 'hat_boom_man',
+        name: 'Hat Boom Man (Chuyên Gia Pháo & Mũ Bom)',
+        name_en: 'Hat Boom Man (Cannonier & Bomb Hat)',
+        title: 'Bậc Thầy Nòng Xe Tăng & Nhảy Bật Miễn Nhiễm',
+        title_en: 'Master of Tank Cannons & Invulnerable Leaps',
+        description: 'Vũ khí Nòng Xe Tăng: Lần 1 ngắm bắn (giảm 1 bước di chuyển), Lần 2 bắn (15-45 DMG tầm 6 theo khoảng cách, nổ 3x3 gây 10 DMG xung quanh trừ tâm). Chiêu 1: Cú Bật Nhảy 2 ô miễn nhiễm mọi sát thương (Hồi: 2L). Chiêu 2: Phát Bắn Rối Loạn (+30% DMG & nổ 5x5, Hồi: 3L).',
+        description_en: 'Equipped with Tank Cannon: 1st tap scopes (loses 1 move step), 2nd tap fires (15-45 DMG up to 6 tiles scales with distance, 3x3 blast deals 10 splash DMG except center). Skill 1: Invulnerable Leap 2 tiles (CD: 2T). Skill 2: Chaos Shot (+30% DMG & 5x5 explosion, CD: 3T).',
+        avatar: '🎩',
+        themeColor: '#e11d48',
+        secondaryColor: '#fb7185',
+        maxHp: 100,
+        moveBudget: 2,
+        isUnlocked: true,
+        skills: [
+            {
+                slot: 1,
+                id: 'BOOM_MOVE',
+                name: 'Lộ Trình',
+                name_en: 'Route',
+                icon: '👟',
+                hotkey: '1 / M',
+                type: 'PATH_MOVE',
+                maxSteps: 2,
+                power: 0,
+                desc: 'Di chuyển tự do tối đa 2 bước (khi đang ngắm bắn chỉ di chuyển tối đa 1 bước)',
+                desc_en: 'Free movement up to 2 steps (limited to 1 step while scoped)',
+                color: '#e11d48'
+            },
+            {
+                slot: 2,
+                id: 'TANK_CANNON',
+                name: 'Nòng Xe Tăng',
+                name_en: 'Tank Cannon',
+                icon: '🎯',
+                hotkey: '2 / J',
+                type: 'TANK_WEAPON',
+                range: 6,
+                minPower: 15,
+                maxPower: 45,
+                desc: 'Lần bấm 1: Ngắm bắn (mất 1 bước di chuyển). Lần bấm 2: Bắn đại bác tầm 6 (15-20-30-35-40-45 DMG theo cự ly, nổ 3x3 gây 10 DMG xung quanh trừ tâm)',
+                desc_en: '1st tap: Aim/Scope (lose 1 move step). 2nd tap: Fire cannon range 6 (15-45 DMG scales with distance, 3x3 blast deals 10 splash DMG except center)',
+                color: '#fb7185'
+            },
+            {
+                slot: 3,
+                id: 'BOOM_LEAP',
+                name: 'Cú Bật Nhảy',
+                name_en: 'Invulnerable Leap',
+                icon: '🦘',
+                hotkey: '3 / K',
+                type: 'BOOM_LEAP',
+                range: 2,
+                cooldown: 2,
+                desc: 'Tạo cú bật nhảy phạm vi 2 ô vượt địa hình và miễn nhiễm hoàn toàn mọi sát thương nhận phải trong nhịp nhảy (Hồi: 2L)',
+                desc_en: 'Performs an invulnerable leap up to 2 tiles across obstacles, immune to all incoming damage during leap (CD: 2T)',
+                color: '#f59e0b'
+            },
+            {
+                slot: 4,
+                id: 'BOOM_CHAOS_SHOT',
+                name: 'Phát Bắn Rối Loạn',
+                name_en: 'Chaos Shot',
+                icon: '🌀',
+                hotkey: '4 / L',
+                type: 'BUFF_CHAOS_SHOT',
+                cooldown: 3,
+                dmgBonusPercent: 30,
+                aoeRadius: 2,
+                desc: 'Cường hóa phát bắn tiếp theo với sát thương +30% và biến phạm vi nổ thành 5x5 cực đại (Hồi: 3L)',
+                desc_en: 'Empowers next cannon shot: +30% direct damage and expands blast radius to a massive 5x5 zone (CD: 3T)',
+                color: '#a855f7'
+            }
+        ]
     }
 ];
 
