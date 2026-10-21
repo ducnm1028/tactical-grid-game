@@ -12,7 +12,7 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
     <title>Chrono Clash - WEGO Tactics 20x7</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.3.0">
 </head>
 <body>
     <!-- Mobile Rotate Screen Overlay (Hiển thị khi cầm dọc máy trên điện thoại) -->
@@ -38,6 +38,9 @@
             </button>
             <button id="btnOpenCharSelect" class="btn-change-char" title="Mở màn hình chọn tướng">
                 👤 Đổi Tướng
+            </button>
+            <button id="btnHeaderUpdate" class="btn-change-char btn-update-badge" title="Tải phiên bản mới nhất & Làm mới bộ nhớ đệm (v2.3.0)">
+                🔄 Bản mới v2.3
             </button>
             <button id="soundToggleBtn" class="key-badge" style="cursor:pointer;" title="Bật/Tắt âm thanh">
                 🔊 Âm thanh: BẬT
@@ -306,7 +309,7 @@
 
             <div class="menu-feature-pills">
                 <div class="pill">⚡ WEGO 4 Lệnh / Lượt</div>
-                <div class="pill">👥 4 Tướng Đặc Sắc</div>
+                <div class="pill">👥 8 Tướng Đặc Sắc</div>
                 <div class="pill">👟 Lập Lộ Trình Tự Do</div>
                 <div class="pill">🤖 Trí Tuệ Nhân Tạo CPU</div>
             </div>
@@ -400,11 +403,11 @@
                     </div>
                 </div>
 
-                <!-- Mục 4: Bộ 4 Nhân Vật -->
+                <!-- Mục 4: Bộ 8 Nhân Vật -->
                 <div class="guide-section-card">
                     <div class="section-card-title">
                         <span class="sec-icon">👥</span>
-                        <span>4. HỒ SƠ 5 CHIẾN BINH ĐẶC NHIỆM</span>
+                        <span>4. HỒ SƠ 8 CHIẾN BINH ĐẶC NHIỆM</span>
                     </div>
                     <div class="section-card-body">
                         <div class="char-guide-cards">
@@ -485,6 +488,54 @@
                                     <li><b>🔥 Gattling Fire:</b> Sát thương 15, tầm 5 ô. Gây cháy mỗi lượt trừ 5 HP trong 3 lượt (không cộng dồn).</li>
                                     <li><b>🛢️ Thùng Dầu:</b> Tầm 6 ô, nổ 3x3 sớm nếu chạm vật thể. Kẻ địch dính dầu sẽ bốc cháy khi nhận sát thương từ mọi nguồn.</li>
                                     <li><b>💥 Đại Bác Lửa:</b> Tầm 5 ô (15 DMG), nổ 3x3 sớm nếu chạm vật thể. Tạo Vùng Cháy trong 2 lượt, thiêu đốt kẻ địch đi qua.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Engie -->
+                            <div class="cg-card">
+                                <div class="cg-header">
+                                    <span class="cg-avatar">🔧</span>
+                                    <div>
+                                        <h4 class="cg-name" style="color: #06b6d4;">ENGIE</h4>
+                                        <div class="cg-sub">Kỹ Sư Cơ Khí • 100 HP</div>
+                                    </div>
+                                </div>
+                                <ul class="cg-skills">
+                                    <li><b>🔩 Súng Bắn Thanh Sắt:</b> Sát thương 15, tầm bắn 5 ô đường thẳng.</li>
+                                    <li><b>🤖 Xây Sentry:</b> Đặt trụ súng 50 HP (Hồi: 2L), tự động bắn 10 DMG vào mọi kẻ địch trong vùng 11x11 quanh nó.</li>
+                                    <li><b>🌀 Cổng Dịch Chuyển:</b> 60 HP, tầm 5 ô (Hồi: 3L). Tạo cổng Vào tại chỗ và cổng Ra ở đích. Đồng minh bước vào lập tức dịch chuyển tới cổng Ra.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Snipeman -->
+                            <div class="cg-card">
+                                <div class="cg-header">
+                                    <span class="cg-avatar">🎯</span>
+                                    <div>
+                                        <h4 class="cg-name" style="color: #6366f1;">SNIPEMAN</h4>
+                                        <div class="cg-sub">Xạ Thủ Bắn Tỉa • 100 HP</div>
+                                    </div>
+                                </div>
+                                <ul class="cg-skills">
+                                    <li><b>🎯 Súng Tỉa:</b> Lần bấm 1 ngắm bắn (giảm 1 bước di chuyển). Lần bấm 2 bắn tỉa tầm 6 ô (25-30-35-40-45-50 DMG càng xa sát thương càng tăng).</li>
+                                    <li><b>⚡ Phát Bắn Hủy Diệt:</b> Cường hóa phát bắn tiếp theo +30% sát thương và bắn xuyên thấu toàn bộ mục tiêu trên đường đạn (Hồi: 3L).</li>
+                                    <li><b>🔭 Tầm Nhìn Dò Nhiệt:</b> Quét nhiệt toàn đấu trường, cộng +1 phạm vi thi triển cho mọi đồng minh lần dùng kế tiếp (Hồi: 4L).</li>
+                                </ul>
+                            </div>
+
+                            <!-- Hat Boom Man -->
+                            <div class="cg-card">
+                                <div class="cg-header">
+                                    <span class="cg-avatar">🎩</span>
+                                    <div>
+                                        <h4 class="cg-name" style="color: #e11d48;">HAT BOOM MAN</h4>
+                                        <div class="cg-sub">Chuyên Gia Pháo & Mũ Bom • 100 HP</div>
+                                    </div>
+                                </div>
+                                <ul class="cg-skills">
+                                    <li><b>💥 Nòng Xe Tăng:</b> Lần bấm 1 ngắm bắn (giảm 1 bước di chuyển). Lần bấm 2 bắn đại bác tầm 6 ô (15-45 DMG theo khoảng cách, nổ 3x3 gây 10 DMG lan trừ tâm).</li>
+                                    <li><b>🦘 Cú Bật Nhảy:</b> Nhảy 2 ô vượt chướng ngại vật, miễn nhiễm 100% mọi nguồn sát thương trong lượt nhảy (Hồi: 2L).</li>
+                                    <li><b>🌀 Phát Bắn Rối Loạn:</b> Cường hóa phát bắn tiếp theo +30% sát thương và mở rộng bán kính nổ thành 5x5 cực đại (Hồi: 3L).</li>
                                 </ul>
                             </div>
                         </div>
@@ -695,15 +746,57 @@
         </div>
     </div>
 
-    <script src="audio.js"></script>
-    <script src="i18n.js"></script>
-    <script src="characters.js"></script>
-    <script src="game.js"></script>
+    <script src="audio.js?v=2.3.0"></script>
+    <script src="i18n.js?v=2.3.0"></script>
+    <script src="characters.js?v=2.3.0"></script>
+    <script src="game.js?v=2.3.0"></script>
     <script>
         // Đăng ký Service Worker cho Android & iOS PWA Offline Play
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(() => {});
+                navigator.serviceWorker.register('./sw.js?v=2.3.0').then((reg) => {
+                    reg.update();
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        if (newWorker) {
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('[PWA] Phiên bản mới đã sẵn sàng. Tự động tải lại...');
+                                    window.location.reload();
+                                }
+                            });
+                        }
+                    });
+                }).catch(() => {});
+
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!refreshing) {
+                        refreshing = true;
+                        window.location.reload();
+                    }
+                });
+            });
+        }
+
+        // Nút Cập nhật & Làm mới bộ nhớ đệm lập tức cho người dùng
+        const btnHeaderUpdate = document.getElementById('btnHeaderUpdate');
+        if (btnHeaderUpdate) {
+            btnHeaderUpdate.addEventListener('click', async () => {
+                btnHeaderUpdate.innerText = '⏳ Đang làm mới...';
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const reg of registrations) {
+                        await reg.unregister();
+                    }
+                }
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    for (const key of keys) {
+                        await caches.delete(key);
+                    }
+                }
+                window.location.href = window.location.pathname + '?reload=' + Date.now();
             });
         }
     </script>

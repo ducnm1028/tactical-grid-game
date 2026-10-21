@@ -1,5 +1,6 @@
 // Chrono Clash - PWA Service Worker for Offline Play on Android & iOS
-const CACHE_NAME = 'chrono-clash-v1';
+// Updated to v2.3.0: Network-First strategy to guarantee fresh updates for new operatives
+const CACHE_NAME = 'chrono-clash-v2.3.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -15,10 +16,11 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (e) => {
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -28,6 +30,7 @@ self.addEventListener('activate', (e) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('[SW] Purging outdated cache:', key);
             return caches.delete(key);
           }
         })
@@ -36,15 +39,30 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Network-First for core code (HTML, JS, CSS) to guarantee users always receive latest characters and fixes
 self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(e.request).then((networkResponse) => {
-        // Optionally cache new successful GET requests
-        if (networkResponse && networkResponse.status === 200 && e.request.method === 'GET') {
+  if (e.request.method !== 'GET') return;
+
+  const url = new URL(e.request.url);
+
+  // Check if request is for web pages, scripts, or stylesheets
+  const isCoreAsset = e.request.mode === 'navigate' ||
+                      url.pathname.endsWith('.html') ||
+                      url.pathname.endsWith('.js') ||
+                      url.pathname.endsWith('.css') ||
+                      url.pathname.endsWith('/') ||
+                      url.pathname.endsWith('/tactical-grid-game');
+
+  if (isCoreAsset) {
+    e.respondWith(
+      fetch(e.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(e.request, responseClone);
@@ -52,8 +70,27 @@ self.addEventListener('fetch', (e) => {
         }
         return networkResponse;
       }).catch(() => {
-        // Fallback if offline
-        return caches.match('./index.html');
+        // Offline fallback
+        return caches.match(e.request).then((cached) => cached || caches.match('./index.html'));
+      })
+    );
+    return;
+  }
+
+  // Cache-First with Network fallback for media and static assets (icons, images)
+  e.respondWith(
+    caches.match(e.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(e.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseClone);
+          });
+        }
+        return networkResponse;
       });
     })
   );
