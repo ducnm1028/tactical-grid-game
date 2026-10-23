@@ -51,6 +51,7 @@ class GameEngine {
         this.fireZones = []; // [{ id, team, x, y, aoeRadius: 1, turnsLeft: 2, creatorName }]
         this.sentries = []; // [{ id, team, owner, ownerName, x, y, hp: 50, maxHp: 50, power: 10, range: 5, color }]
         this.teleporters = []; // [{ id, team, owner, ownerName, inX, inY, outX, outY, hp: 60, maxHp: 60, color }]
+        this.zombies = []; // [{ id, team, owner, ownerName, name, avatar, x, y, hp: 40, maxHp: 40, power: 35, range: 1, attackedThisTurn: false, color }]
 
         // Trạng thái Lộ diện khi trúng đạn (Hookman Stealth Break)
         this.playerRevealedTurns = 0;
@@ -3035,6 +3036,8 @@ class GameEngine {
                 action = this.generateCpuActionSnipeman(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit);
             } else if (charId === 'hat_boom_man') {
                 action = this.generateCpuActionHatBoomMan(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit);
+            } else if (charId === 'fake_savior') {
+                action = this.generateCpuActionFakeSavior(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit);
             } else {
                 action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             }
@@ -3760,6 +3763,74 @@ class GameEngine {
         };
     }
 
+    generateCpuActionFakeSavior(stepIdx, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit) {
+        const targetDir = this.getDirectionTowards(dx, dy);
+
+        // 1. Necromancy: Triệu hồi 2 thây ma CPU nếu chưa có thây ma sống hoặc chưa hồi chiêu
+        const hasLiveZombies = this.zombies && this.zombies.some(z => z.owner === unit && z.hp > 0);
+        if (!simCooldowns['SAVIOR_NECROMANCY'] && (!hasLiveZombies || Math.random() < 0.35)) {
+            simCooldowns['SAVIOR_NECROMANCY'] = 4;
+            return {
+                type: 'NECROMANCY',
+                skillId: 'SAVIOR_NECROMANCY',
+                name: 'Necromancy',
+                icon: '🧟',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                zombieHp: 40,
+                zombiePower: 35,
+                cooldown: 4
+            };
+        }
+
+        // 2. Telekinesis: Nếu kẻ địch trong vùng 5x5 (Chebyshev <= 2)
+        if (!simCooldowns['SAVIOR_TELEKINESIS'] && Math.abs(dx) <= 2 && Math.abs(dy) <= 2) {
+            simCooldowns['SAVIOR_TELEKINESIS'] = 3;
+            return {
+                type: 'TELEKINESIS',
+                skillId: 'SAVIOR_TELEKINESIS',
+                name: 'Telekinesis',
+                icon: '🔮',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                range: 2,
+                power: 20,
+                comboPower: 30,
+                knockback: 3,
+                cooldown: 3
+            };
+        }
+
+        // 3. Revolver: Bắn súng ổ xoay tầm 4 nếu thẳng hàng
+        const alignedDir = this.getAlignedRangedDirection(simX, simY, simX + dx, simY + dy, 4);
+        if (alignedDir && (!playerInvisible || dist <= 3)) {
+            return {
+                type: 'REVOLVER',
+                skillId: 'SAVIOR_REVOLVER',
+                name: 'Revolver',
+                icon: '🔫',
+                dir: alignedDir,
+                dirSymbol: DIRECTIONS[alignedDir].symbol,
+                range: 4,
+                power: 25
+            };
+        }
+
+        // 4. Di chuyển tiếp cận hoặc căn chỉnh góc bắn bằng Lộ Trình (PATH_MOVE 2 bước)
+        const moveBudget = (unit && unit.moveBudget) || 2;
+        const path = this.findBestPathTowards(simX, simY, simX + dx, simY + dy, moveBudget);
+        return {
+            type: 'PATH_MOVE',
+            skillId: 'SAVIOR_MOVE',
+            name: `Lộ Trình (${path.length}b)`,
+            icon: '👟',
+            path: path,
+            steps: path.length,
+            dir: path.length > 0 ? path[path.length - 1].dir : targetDir,
+            dirSymbol: DIRECTIONS[path.length > 0 ? path[path.length - 1].dir : targetDir].symbol
+        };
+    }
+
     generateCpuActionHatBoomMan(stepIdx, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit) {
         let isScoped = (unit && unit.isScoped) || false;
         if (queue) {
@@ -4109,6 +4180,10 @@ class GameEngine {
         // Đặt lại trạng thái Khiên và hướng nhìn
         for (const unit of allAlive) {
             unit.shieldDir = null;
+            unit.stepStartX = unit.x;
+            unit.stepStartY = unit.y;
+            unit.lastMoveDx = 0;
+            unit.lastMoveDy = 0;
             const act = unit.queue ? unit.queue[stepIndex] : null;
             if (act && act.dir) {
                 unit.dir = act.dir;
@@ -4291,6 +4366,11 @@ class GameEngine {
             await this.delay(200);
         }
 
+        for (const unit of allAlive) {
+            unit.lastMoveDx = unit.x - unit.stepStartX;
+            unit.lastMoveDy = unit.y - unit.stepStartY;
+        }
+
         await this.delay(120);
 
         // --- BƯỚC 4: Thực thi Tấn công & Kỹ năng (Attacks & Abilities) ---
@@ -4304,6 +4384,10 @@ class GameEngine {
 
         // --- BƯỚC 4.5: Sentry Tự Động Quét & Khai Hỏa (11x11, 10 DMG) ---
         await this.resolveSentryAttacks(stepIndex);
+
+        // --- BƯỚC 4.6: Thây Ma CPU Tự Động Quét & Tấn Công (3x3, 35 DMG vào 1 kẻ địch ngẫu nhiên) ---
+        await this.resolveZombieAttacks(stepIndex);
+        if (this.zombies) this.zombies = this.zombies.filter(z => z.hp > 0);
 
         this.updateHUD();
 
@@ -4389,7 +4473,7 @@ class GameEngine {
                 }
             }
         }
-        else if (act.type === 'RANGED_LINE' || act.type === 'RANGED_VARIABLE') {
+        else if (act.type === 'RANGED_LINE' || act.type === 'RANGED_VARIABLE' || act.type === 'REVOLVER') {
             const uD = DIRECTIONS[act.dir];
             let thermalBonus = 0;
             if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
@@ -4397,7 +4481,9 @@ class GameEngine {
                 actor.buffs.thermalVision.active = false;
             }
             const maxRange = (act.range || 5) + thermalBonus;
-            if (act.skillId === 'ENGIE_NAILGUN') {
+            if (act.type === 'REVOLVER' || act.skillId === 'SAVIOR_REVOLVER') {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playRevolver();
+            } else if (act.skillId === 'ENGIE_NAILGUN') {
                 if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playNailgun();
             } else if (act.skillId === 'RAZOR_PULSE_RIFLE') {
                 if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playPulseRifle();
@@ -4470,7 +4556,8 @@ class GameEngine {
             }
 
             let tracerColor = '#34d399';
-            if (act.skillId === 'ENGIE_NAILGUN') tracerColor = '#fbbf24';
+            if (act.type === 'REVOLVER' || act.skillId === 'SAVIOR_REVOLVER') tracerColor = '#c084fc';
+            else if (act.skillId === 'ENGIE_NAILGUN') tracerColor = '#fbbf24';
             else if (act.skillId === 'FIREMAN_GATTLING_FIRE') tracerColor = '#ea580c';
             else if (act.skillId === 'SMOKE_RIFLE') tracerColor = '#fb923c';
             else if (act.skillId === 'RAZOR_PULSE_RIFLE') tracerColor = '#06b6d4';
@@ -5293,10 +5380,211 @@ class GameEngine {
             if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 3;
             if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 3;
         }
+        else if (act.type === 'TELEKINESIS') {
+            // Phạm vi quét 5x5 quanh Fake Savior (bán kính Chebyshev <= 2)
+            const scanRadius = 2;
+            const inRangeEnemies = livingOpponents.filter(e =>
+                Math.abs(e.x - actor.x) <= scanRadius &&
+                Math.abs(e.y - actor.y) <= scanRadius
+            );
+
+            if (inRangeEnemies.length === 0) {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playTelekinesis();
+                this.addFloatingText(this.lang === 'en' ? 'NO TARGET (5x5)!' : 'HỤT (KHÔNG CÓ ĐỊCH 5x5)!', actor.x, actor.y, '#94a3b8');
+                this.addCombatLog(
+                    this.lang === 'en'
+                        ? `Nhịp #${stepIndex + 1}: ${actor.name} used Telekinesis, but no enemies within 5x5 range!`
+                        : `Nhịp #${stepIndex + 1}: ${actor.name} thi triển Telekinesis, nhưng không có kẻ địch trong phạm vi 5x5!`,
+                    'system'
+                );
+            } else {
+                // Tìm kẻ địch gần nhất (theo khoảng cách Euclid)
+                inRangeEnemies.sort((a, b) => {
+                    const distA = Math.hypot(a.x - actor.x, a.y - actor.y);
+                    const distB = Math.hypot(b.x - actor.x, b.y - actor.y);
+                    return distA - distB;
+                });
+                const primaryTarget = inRangeEnemies[0];
+
+                // Xác định hướng di chuyển gần nhất của kẻ thù
+                let moveDx = 0;
+                let moveDy = 0;
+                if (primaryTarget.lastMoveDx !== undefined && primaryTarget.lastMoveDy !== undefined && (primaryTarget.lastMoveDx !== 0 || primaryTarget.lastMoveDy !== 0)) {
+                    moveDx = primaryTarget.lastMoveDx;
+                    moveDy = primaryTarget.lastMoveDy;
+                } else if (primaryTarget.prevX !== undefined && primaryTarget.prevY !== undefined && (primaryTarget.x !== primaryTarget.prevX || primaryTarget.y !== primaryTarget.prevY)) {
+                    moveDx = primaryTarget.x - primaryTarget.prevX;
+                    moveDy = primaryTarget.y - primaryTarget.prevY;
+                } else if (primaryTarget.dir && DIRECTIONS[primaryTarget.dir]) {
+                    moveDx = DIRECTIONS[primaryTarget.dir].dx;
+                    moveDy = DIRECTIONS[primaryTarget.dir].dy;
+                } else {
+                    moveDx = Math.sign(primaryTarget.x - actor.x) || 1;
+                    moveDy = Math.sign(primaryTarget.y - actor.y) || 0;
+                }
+
+                // Hướng hất văng ngược lại:
+                let kbDx = -Math.sign(moveDx);
+                let kbDy = -Math.sign(moveDy);
+                if (kbDx === 0 && kbDy === 0) {
+                    kbDx = -Math.sign(primaryTarget.x - actor.x) || -1;
+                    kbDy = -Math.sign(primaryTarget.y - actor.y) || 0;
+                }
+
+                const affected = [primaryTarget];
+
+                // Hất văng mục tiêu chính 3 ô theo (kbDx, kbDy)
+                let curX = primaryTarget.x;
+                let curY = primaryTarget.y;
+
+                for (let step = 1; step <= 3; step++) {
+                    const nextX = Math.max(0, Math.min(GRID_COLS - 1, curX + kbDx));
+                    const nextY = Math.max(0, Math.min(GRID_ROWS - 1, curY + kbDy));
+
+                    if (this.isObstacle && this.isObstacle(nextX, nextY)) break;
+
+                    // Nếu trong 3 ô có một kẻ địch khác thì kẻ địch đó cũng bị ảnh hưởng
+                    const otherEnemy = livingOpponents.find(e => e !== primaryTarget && !affected.includes(e) && e.x === nextX && e.y === nextY);
+                    if (otherEnemy) {
+                        affected.push(otherEnemy);
+                    }
+
+                    curX = nextX;
+                    curY = nextY;
+                }
+
+                // Cập nhật vị trí mới cho mục tiêu chính
+                primaryTarget.prevX = primaryTarget.x;
+                primaryTarget.prevY = primaryTarget.y;
+                primaryTarget.x = curX;
+                primaryTarget.y = curY;
+                primaryTarget.renderX = curX;
+                primaryTarget.renderY = curY;
+                this.checkFireZones(primaryTarget);
+                this.checkTeleporters(primaryTarget);
+
+                // Nếu có kẻ địch khác trong 3 ô thì đẩy xa 3 ô theo cùng hướng
+                for (let i = 1; i < affected.length; i++) {
+                    const collateralEnemy = affected[i];
+                    let colX = collateralEnemy.x;
+                    let colY = collateralEnemy.y;
+                    for (let s = 1; s <= 3; s++) {
+                        const nX = Math.max(0, Math.min(GRID_COLS - 1, colX + kbDx));
+                        const nY = Math.max(0, Math.min(GRID_ROWS - 1, colY + kbDy));
+                        if (this.isObstacle && this.isObstacle(nX, nY)) break;
+                        colX = nX;
+                        colY = nY;
+                    }
+                    collateralEnemy.prevX = collateralEnemy.x;
+                    collateralEnemy.prevY = collateralEnemy.y;
+                    collateralEnemy.x = colX;
+                    collateralEnemy.y = colY;
+                    collateralEnemy.renderX = colX;
+                    collateralEnemy.renderY = colY;
+                    this.checkFireZones(collateralEnemy);
+                    this.checkTeleporters(collateralEnemy);
+                }
+
+                // Sát thương: 1 kẻ thù -> 20 DMG. Nhiều kẻ thù -> 30 DMG mỗi người
+                const baseDmg = (affected.length === 1) ? 20 : 30;
+                let finalDmg = baseDmg;
+                if (hasBuffDmg) finalDmg = Math.round(baseDmg * dmgMult);
+
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playTelekinesis();
+                this.createHitSparks(actor.x, actor.y, '#c084fc');
+
+                for (const target of affected) {
+                    this.applyDamage(target, finalDmg);
+                    this.createHitSparks(target.x, target.y, '#c084fc');
+                    this.addFloatingText(`🔮 TELEKINESIS -${finalDmg} HP!`, target.x, target.y, '#c084fc');
+                    this.addCombatLog(
+                        this.lang === 'en'
+                            ? `Nhịp #${stepIndex + 1}: ${actor.name} Telekinesis knocked back ${target.name} for ${finalDmg} DMG${affected.length > 1 ? ' (Chain hit 30 DMG/each!)' : ''}!`
+                            : `Nhịp #${stepIndex + 1}: ${actor.name} [Telekinesis] hất văng ${target.name} và gây ${finalDmg} sát thương${affected.length > 1 ? ' (Trúng nhiều mục tiêu: 30 DMG/người!)' : ''}!`,
+                        'hit'
+                    );
+                }
+            }
+
+            actor.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 3;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 3;
+        }
+        else if (act.type === 'NECROMANCY') {
+            if (!this.zombies) this.zombies = [];
+            // Mỗi Fake Savior duy trì tối đa 2 thây ma. Đặt mới tự động dọn thây ma cũ của chủ nhân
+            this.zombies = this.zombies.filter(z => z.owner !== actor);
+
+            const spawnOffsets = [
+                { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
+                { dx: 1, dy: 1 }, { dx: -1, dy: -1 }, { dx: 1, dy: -1 }, { dx: -1, dy: 1 },
+                { dx: 2, dy: 0 }, { dx: -2, dy: 0 }, { dx: 0, dy: 2 }, { dx: 0, dy: -2 }
+            ];
+
+            const isOccupied = (x, y) => {
+                if (x < 0 || x >= GRID_COLS || y < 0 || y >= GRID_ROWS) return true;
+                if (this.isObstacle && this.isObstacle(x, y)) return true;
+                if (this.blueTeam.some(u => u.hp > 0 && u.x === x && u.y === y)) return true;
+                if (this.redTeam.some(u => u.hp > 0 && u.x === x && u.y === y)) return true;
+                if (this.sentries && this.sentries.some(s => s.hp > 0 && s.x === x && s.y === y)) return true;
+                if (this.teleporters && this.teleporters.some(t => t.hp > 0 && ((t.inX === x && t.inY === y) || (t.outX === x && t.outY === y)))) return true;
+                if (this.zombies && this.zombies.some(z => z.hp > 0 && z.x === x && z.y === y)) return true;
+                return false;
+            };
+
+            const createdZombies = [];
+            for (const offset of spawnOffsets) {
+                if (createdZombies.length >= 2) break;
+                const zx = actor.x + offset.dx;
+                const zy = actor.y + offset.dy;
+                if (!isOccupied(zx, zy)) {
+                    const z = {
+                        id: Date.now() + Math.random(),
+                        team: actor.team,
+                        owner: actor,
+                        ownerName: actor.name,
+                        name: `${actor.team === 'BLUE' ? (this.lang === 'en' ? 'Blue Zombie' : 'Thây Ma Xanh') : (this.lang === 'en' ? 'Red Zombie' : 'Thây Ma Đỏ')}`,
+                        avatar: '🧟',
+                        x: zx,
+                        y: zy,
+                        hp: act.zombieHp || 40,
+                        maxHp: act.zombieHp || 40,
+                        power: act.zombiePower || 35,
+                        range: 1, // 3x3
+                        attackedThisTurn: false,
+                        color: actor.team === 'BLUE' ? '#38bdf8' : '#f43f5e'
+                    };
+                    this.zombies.push(z);
+                    createdZombies.push(z);
+                }
+            }
+
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playNecromancy();
+            for (const z of createdZombies) {
+                this.createBuffSparks(z.x, z.y, '#10b981');
+                this.addFloatingText('🧟 THÂY MA (40 HP)!', z.x, z.y, '#10b981');
+            }
+
+            this.addCombatLog(
+                this.lang === 'en'
+                    ? `Nhịp #${stepIndex + 1}: ${actor.name} cast Necromancy, summoning 2 CPU Zombies (40 HP, 3x3 35 DMG)!`
+                    : `Nhịp #${stepIndex + 1}: ${actor.name} thi triển [Necromancy], triệu hồi 2 thây ma CPU (40 HP, Quét 3x3 gây 35 DMG)!`,
+                'buff'
+            );
+
+            actor.cooldowns[act.skillId] = act.cooldown || 4;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 4;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 4;
+        }
     }
 
     finishTurn() {
         this.addCombatLog(`${this.lang === 'en' ? 'Completed Turn' : 'Hoàn thành Lượt'} ${this.turn}!`, 'system');
+
+        if (this.zombies) {
+            this.zombies.forEach(z => z.attackedThisTurn = false);
+            this.zombies = this.zombies.filter(z => z.hp > 0);
+        }
 
         const allUnits = [...this.blueTeam, ...this.redTeam];
 
@@ -6287,15 +6575,20 @@ class GameEngine {
             const tOut = this.teleporters.find(t => t.outX === x && t.outY === y && t.team !== attackerTeam && t.hp > 0);
             if (tOut) return { type: 'TELE_OUT', obj: tOut, team: tOut.team, x: tOut.outX, y: tOut.outY, hp: tOut.hp, maxHp: tOut.maxHp };
         }
+        if (this.zombies) {
+            const z = this.zombies.find(z => z.x === x && z.y === y && z.team !== attackerTeam && z.hp > 0);
+            if (z) return { type: 'ZOMBIE', obj: z, team: z.team, x: z.x, y: z.y, hp: z.hp, maxHp: z.maxHp };
+        }
         return null;
     }
 
     damageDeployable(dep, dmg, attacker) {
         if (!dep || !dep.obj || dep.obj.hp <= 0) return;
         dep.obj.hp -= dmg;
+        const isZombie = (dep.type === 'ZOMBIE');
         const isSentry = (dep.type === 'SENTRY');
-        const label = isSentry ? 'Sentry 🤖' : 'Cổng Dịch Chuyển 🌀';
-        const ownerName = dep.obj.ownerName || 'Engie';
+        const label = isZombie ? 'Thây Ma 🧟' : (isSentry ? 'Sentry 🤖' : 'Cổng Dịch Chuyển 🌀');
+        const ownerName = dep.obj.ownerName || (isZombie ? 'Fake Savior' : 'Engie');
 
         this.createHitSparks(dep.x, dep.y, '#f59e0b');
         this.addFloatingText(`-${dmg} HP (${label})`, dep.x, dep.y, '#f87171');
@@ -6318,7 +6611,9 @@ class GameEngine {
                 'clash'
             );
 
-            if (isSentry) {
+            if (isZombie) {
+                this.zombies = this.zombies.filter(z => z.hp > 0);
+            } else if (isSentry) {
                 this.sentries = this.sentries.filter(s => s.hp > 0);
             } else {
                 this.teleporters = this.teleporters.filter(t => t.hp > 0);
@@ -6327,6 +6622,16 @@ class GameEngine {
     }
 
     damageDeployablesInArea(centerX, centerY, radius, dmg, attackerTeam, attacker) {
+        if (this.zombies) {
+            const zombiesToDamage = this.zombies.filter(z =>
+                z.hp > 0 &&
+                (!attackerTeam || z.team !== attackerTeam) &&
+                Math.abs(z.x - centerX) <= radius && Math.abs(z.y - centerY) <= radius
+            );
+            for (const z of zombiesToDamage) {
+                this.damageDeployable({ type: 'ZOMBIE', obj: z, team: z.team, x: z.x, y: z.y, hp: z.hp, maxHp: z.maxHp }, dmg, attacker);
+            }
+        }
         if (this.sentries) {
             const sentriesToDamage = this.sentries.filter(s =>
                 s.hp > 0 &&
@@ -6466,6 +6771,48 @@ class GameEngine {
                 }
             }
             await this.delay(100);
+        }
+    }
+
+    async resolveZombieAttacks(stepIndex) {
+        if (!this.zombies || this.zombies.length === 0) return;
+        const allLivingUnits = [...this.blueTeam, ...this.redTeam].filter(u => u.hp > 0);
+
+        for (const zombie of this.zombies) {
+            if (zombie.hp <= 0) continue;
+            // Mỗi thây ma chỉ có duy nhất 1 lệnh tấn công trong lượt:
+            if (zombie.attackedThisTurn) continue;
+
+            const opposingTeam = (zombie.team === 'BLUE') ? this.redTeam : this.blueTeam;
+            const livingOpponents = opposingTeam.filter(u => u.hp > 0);
+            if (livingOpponents.length === 0) continue;
+
+            // Quét phạm vi 3x3 quanh thây ma (bán kính Chebyshev <= 1)
+            const inRangeEnemies = livingOpponents.filter(e =>
+                Math.abs(e.x - zombie.x) <= 1 &&
+                Math.abs(e.y - zombie.y) <= 1
+            );
+
+            if (inRangeEnemies.length === 0) continue;
+
+            // "và chỉ ở duy nhất 1 kẻ địch ngẫu nhiên nếu có nhiều kẻ địch trong phạm vi"
+            const target = inRangeEnemies[Math.floor(Math.random() * inRangeEnemies.length)];
+
+            // Thực thi lệnh tấn công duy nhất
+            zombie.attackedThisTurn = true;
+
+            if (window.soundCtrl && (target.isPlayer || allLivingUnits.some(u => u.isPlayer))) window.soundCtrl.playZombieAttack();
+
+            const dmg = zombie.power || 35;
+            this.applyDamage(target, dmg);
+            this.createHitSparks(target.x, target.y, '#10b981');
+            this.addFloatingText(`🧟 CẮN -${dmg} HP!`, target.x, target.y, '#10b981');
+            this.addCombatLog(
+                this.lang === 'en'
+                    ? `Nhịp #${stepIndex + 1}: ${zombie.name} bit ${target.name} for ${dmg} DMG in 3x3 zone!`
+                    : `Nhịp #${stepIndex + 1}: ${zombie.name} tấn công cắn xé ${target.name} gây ${dmg} sát thương trong vùng 3x3!`,
+                'hit'
+            );
         }
     }
 
@@ -6835,6 +7182,45 @@ class GameEngine {
                 ctx.fillStyle = '#ffffff';
                 ctx.font = 'bold 9px sans-serif';
                 ctx.fillText(`${sentry.hp}/${sentry.maxHp}`, sx, sy - 34);
+
+                ctx.restore();
+            });
+        }
+
+        // 2e. Vẽ Thây Ma (Zombies)
+        if (this.zombies && this.zombies.length > 0) {
+            this.zombies.forEach(zombie => {
+                if (zombie.hp <= 0) return;
+                const zx = zombie.x * CELL_SIZE + CELL_SIZE / 2;
+                const zy = zombie.y * CELL_SIZE + CELL_SIZE / 2;
+
+                ctx.save();
+                ctx.fillStyle = zombie.team === 'BLUE' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(244, 63, 94, 0.2)';
+                ctx.strokeStyle = zombie.team === 'BLUE' ? '#38bdf8' : '#f43f5e';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(zx, zy, 20, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.font = '22px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🧟', zx, zy - 2);
+
+                const hpPct = Math.max(0, zombie.hp / zombie.maxHp);
+                const barW = 32;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                ctx.fillRect(zx - barW / 2, zy - 28, barW, 5);
+                ctx.fillStyle = hpPct > 0.5 ? '#10b981' : (hpPct > 0.25 ? '#f59e0b' : '#ef4444');
+                ctx.fillRect(zx - barW / 2, zy - 28, barW * hpPct, 5);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(zx - barW / 2, zy - 28, barW, 5);
+
+                ctx.fillStyle = '#a78bfa';
+                ctx.font = 'bold 9px sans-serif';
+                ctx.fillText(`${zombie.hp}/${zombie.maxHp}`, zx, zy - 34);
 
                 ctx.restore();
             });
@@ -7375,6 +7761,16 @@ class GameEngine {
             this.sentries.forEach(s => {
                 if (s.hp > 0) {
                     mCtx.fillRect(s.x * cellW - 1, s.y * cellH - 1, 3, 3);
+                }
+            });
+        }
+
+        // Vẽ Thây Ma trên minimap
+        if (this.zombies && this.zombies.length > 0) {
+            this.zombies.forEach(z => {
+                if (z.hp > 0) {
+                    mCtx.fillStyle = z.team === 'BLUE' ? '#38bdf8' : '#f43f5e';
+                    mCtx.fillRect(z.x * cellW - 1, z.y * cellH - 1, 3, 3);
                 }
             });
         }

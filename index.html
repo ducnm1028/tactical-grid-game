@@ -12,7 +12,7 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
     <title>Chrono Clash - WEGO Tactics 20x7</title>
-    <link rel="stylesheet" href="style.css?v=2.3.0">
+    <link rel="stylesheet" href="style.css?v=2.4.0">
 </head>
 <body>
     <!-- Mobile Rotate Screen Overlay (Hiển thị khi cầm dọc máy trên điện thoại) -->
@@ -39,8 +39,8 @@
             <button id="btnOpenCharSelect" class="btn-change-char" title="Mở màn hình chọn tướng">
                 👤 Đổi Tướng
             </button>
-            <button id="btnHeaderUpdate" class="btn-change-char btn-update-badge" title="Tải phiên bản mới nhất & Làm mới bộ nhớ đệm (v2.3.0)">
-                🔄 Bản mới v2.3
+            <button id="btnHeaderUpdate" class="btn-change-char btn-update-badge" title="Tải phiên bản mới nhất & Làm mới bộ nhớ đệm (v2.4.0)">
+                🔄 Bản mới v2.4
             </button>
             <button id="soundToggleBtn" class="key-badge" style="cursor:pointer;" title="Bật/Tắt âm thanh">
                 🔊 Âm thanh: BẬT
@@ -309,7 +309,7 @@
 
             <div class="menu-feature-pills">
                 <div class="pill">⚡ WEGO 4 Lệnh / Lượt</div>
-                <div class="pill">👥 8 Tướng Đặc Sắc</div>
+                <div class="pill">👥 9 Tướng Đặc Sắc</div>
                 <div class="pill">👟 Lập Lộ Trình Tự Do</div>
                 <div class="pill">🤖 Trí Tuệ Nhân Tạo CPU</div>
             </div>
@@ -403,11 +403,11 @@
                     </div>
                 </div>
 
-                <!-- Mục 4: Bộ 8 Nhân Vật -->
+                <!-- Mục 4: Bộ 9 Nhân Vật -->
                 <div class="guide-section-card">
                     <div class="section-card-title">
                         <span class="sec-icon">👥</span>
-                        <span>4. HỒ SƠ 8 CHIẾN BINH ĐẶC NHIỆM</span>
+                        <span>4. HỒ SƠ 9 CHIẾN BINH ĐẶC NHIỆM</span>
                     </div>
                     <div class="section-card-body">
                         <div class="char-guide-cards">
@@ -538,6 +538,22 @@
                                     <li><b>🌀 Phát Bắn Rối Loạn:</b> Cường hóa phát bắn tiếp theo +30% sát thương và mở rộng bán kính nổ thành 5x5 cực đại (Hồi: 3L).</li>
                                 </ul>
                             </div>
+
+                            <!-- Fake Savior -->
+                            <div class="cg-card">
+                                <div class="cg-header">
+                                    <span class="cg-avatar">🪬</span>
+                                    <div>
+                                        <h4 class="cg-name" style="color: #8b5cf6;">FAKE SAVIOR</h4>
+                                        <div class="cg-sub">Kẻ Cứu Rỗi Giả Tạo • 100 HP</div>
+                                    </div>
+                                </div>
+                                <ul class="cg-skills">
+                                    <li><b>🔫 Revolver:</b> Sát thương 25, tầm bắn 4 ô theo 8 hướng.</li>
+                                    <li><b>🔮 Telekinesis:</b> Khống chế kẻ địch gần nhất trong 5x5, hất văng 3 ô ngược hướng di chuyển. Nếu chạm kẻ địch khác thì đẩy tiếp 3 ô. Gây 20 DMG nếu 1 người, 30 DMG mỗi người nếu nhiều người (Hồi: 3L).</li>
+                                    <li><b>🧟 Necromancy:</b> Triệu hồi 2 thây ma CPU (40 HP) kề bên. Thây ma chỉ có duy nhất 1 lệnh tấn công gây 35 DMG ở vùng 3x3 vào 1 kẻ địch ngẫu nhiên (Hồi: 4L).</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -622,6 +638,7 @@
                             <button class="p-char-mini-btn" data-player="1" data-char="engie">🔧 Engie</button>
                             <button class="p-char-mini-btn" data-player="1" data-char="snipeman">🎯 Snipeman</button>
                             <button class="p-char-mini-btn" data-player="1" data-char="hat_boom_man">🎩 Hat Boom Man</button>
+                            <button class="p-char-mini-btn" data-player="1" data-char="fake_savior">🪬 Fake Savior</button>
                         </div>
                     </div>
                 </div>
@@ -650,6 +667,7 @@
                             <button class="p-char-mini-btn" data-player="2" data-char="engie">🔧 Engie</button>
                             <button class="p-char-mini-btn" data-player="2" data-char="snipeman">🎯 Snipeman</button>
                             <button class="p-char-mini-btn" data-player="2" data-char="hat_boom_man">🎩 Hat Boom Man</button>
+                            <button class="p-char-mini-btn" data-player="2" data-char="fake_savior">🪬 Fake Savior</button>
                         </div>
                     </div>
                 </div>
@@ -679,6 +697,7 @@
                 <button class="cpu-opt-btn" data-cpuchar="engie">🔧 Engie</button>
                 <button class="cpu-opt-btn" data-cpuchar="snipeman">🎯 Snipeman</button>
                 <button class="cpu-opt-btn" data-cpuchar="hat_boom_man">🎩 Hat Boom Man</button>
+                <button class="cpu-opt-btn" data-cpuchar="fake_savior">🪬 Fake Savior</button>
             </div>
         </div>
 
@@ -746,15 +765,15 @@
         </div>
     </div>
 
-    <script src="audio.js?v=2.3.0"></script>
-    <script src="i18n.js?v=2.3.0"></script>
-    <script src="characters.js?v=2.3.0"></script>
-    <script src="game.js?v=2.3.0"></script>
+    <script src="audio.js?v=2.4.0"></script>
+    <script src="i18n.js?v=2.4.0"></script>
+    <script src="characters.js?v=2.4.0"></script>
+    <script src="game.js?v=2.4.0"></script>
     <script>
         // Đăng ký Service Worker cho Android & iOS PWA Offline Play
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=2.3.0').then((reg) => {
+                navigator.serviceWorker.register('./sw.js?v=2.4.0').then((reg) => {
                     reg.update();
                     reg.addEventListener('updatefound', () => {
                         const newWorker = reg.installing;

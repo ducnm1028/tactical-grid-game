@@ -13,11 +13,12 @@ const testFiles = [
     'test_fireman.js',
     'test_engie.js',
     'test_snipeman.js',
-    'test_hat_boom_man.js'
+    'test_hat_boom_man.js',
+    'test_fake_savior.js'
 ];
 
 console.log('====================================================');
-console.log('🚀 CHRONO CLASH - CHẠY TẤT CẢ 10 TEST SUITES');
+console.log('🚀 CHRONO CLASH - CHẠY TẤT CẢ 11 TEST SUITES');
 console.log('====================================================\n');
 
 let totalPassed = 0;

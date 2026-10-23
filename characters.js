@@ -625,6 +625,83 @@ const CHARACTERS_DATABASE = [
                 color: '#a855f7'
             }
         ]
+    },
+    {
+        id: 'fake_savior',
+        name: 'Fake Savior (Kẻ Cứu Rỗi Giả Tạo)',
+        name_en: 'Fake Savior (False Prophet)',
+        title: 'Thao Túng Lực Tâm Linh & Chiêu Hồn Thây Ma',
+        title_en: 'Telekinetic Puppeteer & Undead Summoner',
+        description: 'Vũ khí Revolver: Sát thương 25, tầm bắn 4 ô. Chiêu 1: Telekinesis (Kiểm soát địch gần nhất trong 5x5, hất văng 3 ô ngược hướng di chuyển; đẩy tiếp kẻ địch khác trên đường văng; gây 20 DMG nếu 1 người, 30 DMG nếu nhiều người). Chiêu 2: Necromancy (Triệu hồi 2 thây ma CPU 40 HP, chỉ có duy nhất 1 lệnh tấn công 35 DMG ở vùng 3x3 vào 1 kẻ địch ngẫu nhiên).',
+        description_en: 'Revolver: 25 DMG, range 4. Skill 1: Telekinesis (Controls closest enemy in 5x5, knocks back 3 tiles opposite to their move direction; chains push to collateral enemies; deals 20 DMG to solo target or 30 DMG each to multiple targets). Skill 2: Necromancy (Summons 2 CPU zombies with 40 HP, each having only 1 attack command dealing 35 DMG in 3x3 to a single random enemy).',
+        avatar: '🪬',
+        themeColor: '#8b5cf6',
+        secondaryColor: '#a78bfa',
+        maxHp: 100,
+        moveBudget: 2,
+        isUnlocked: true,
+        skills: [
+            {
+                slot: 1,
+                id: 'SAVIOR_MOVE',
+                name: 'Lộ Trình',
+                name_en: 'Route',
+                icon: '👟',
+                hotkey: '1 / M',
+                type: 'PATH_MOVE',
+                maxSteps: 2,
+                power: 0,
+                desc: 'Di chuyển tự do tối đa 2 bước theo mọi hướng',
+                desc_en: 'Free movement up to 2 steps in all directions',
+                color: '#8b5cf6'
+            },
+            {
+                slot: 2,
+                id: 'SAVIOR_REVOLVER',
+                name: 'Revolver',
+                name_en: 'Revolver',
+                icon: '🔫',
+                hotkey: '2 / J',
+                type: 'REVOLVER',
+                range: 4,
+                power: 25,
+                desc: 'Bắn súng ổ xoay tầm xa 4 ô theo 8 hướng (25 Sát thương)',
+                desc_en: 'Fires heavy cylinder revolver up to 4 tiles in 8 directions (25 Damage)',
+                color: '#ec4899'
+            },
+            {
+                slot: 3,
+                id: 'SAVIOR_TELEKINESIS',
+                name: 'Telekinesis',
+                name_en: 'Telekinesis',
+                icon: '🔮',
+                hotkey: '3 / K',
+                type: 'TELEKINESIS',
+                range: 2,
+                power: 20,
+                comboPower: 30,
+                knockback: 3,
+                cooldown: 3,
+                desc: 'Khống chế kẻ địch gần nhất trong 5x5, hất văng 3 ô ngược hướng di chuyển. Nếu chạm kẻ địch khác thì đẩy tiếp 3 ô. Gây 20 DMG nếu 1 mục tiêu, 30 DMG mỗi người nếu nhiều mục tiêu (Hồi: 3L)',
+                desc_en: 'Controls closest enemy in 5x5, knocks back 3 tiles opposite to their movement. Chains 3-tile push to collateral enemies. Deals 20 DMG to solo target or 30 DMG each to multiple targets (CD: 3T)',
+                color: '#c084fc'
+            },
+            {
+                slot: 4,
+                id: 'SAVIOR_NECROMANCY',
+                name: 'Necromancy',
+                name_en: 'Necromancy',
+                icon: '🧟',
+                hotkey: '4 / L',
+                type: 'NECROMANCY',
+                cooldown: 4,
+                zombieHp: 40,
+                zombiePower: 35,
+                desc: 'Triệu hồi 2 thây ma CPU (40 HP) kề bên. Thây ma chỉ có duy nhất 1 lệnh tấn công gây 35 DMG ở phạm vi 3x3 vào 1 kẻ địch ngẫu nhiên (Hồi: 4L)',
+                desc_en: 'Summons 2 CPU zombies (40 HP) adjacent. Each zombie has only 1 attack command dealing 35 DMG in a 3x3 radius to a single random enemy (CD: 4T)',
+                color: '#10b981'
+            }
+        ]
     }
 ];
 

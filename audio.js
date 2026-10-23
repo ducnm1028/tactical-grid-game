@@ -833,6 +833,124 @@ class SoundController {
             osc.stop(now + 0.32);
         } catch (e) {}
     }
+
+    // --- Fake Savior SFX: Revolver, Telekinesis, Necromancy, Zombie Attack ---
+    playRevolver() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng búa đập kim loại và tiếng nổ đanh thép của súng Revolver
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(650, now);
+            osc.frequency.exponentialRampToValueAtTime(70, now + 0.18);
+            gain.gain.setValueAtTime(0.55, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.18);
+
+            // Tiếng rít đạn xé gió ngắn
+            const noise = this.ctx.createBufferSource();
+            const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.1, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < buffer.length; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+            noise.buffer = buffer;
+            const nGain = this.ctx.createGain();
+            nGain.gain.setValueAtTime(0.35, now);
+            nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+            noise.connect(nGain);
+            nGain.connect(this.ctx.destination);
+            noise.start(now);
+        } catch (e) {}
+    }
+
+    playTelekinesis() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng sóng tâm linh dị giới rền vang rồi hất văng bùng nổ
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(180, now);
+            osc.frequency.exponentialRampToValueAtTime(840, now + 0.15);
+            osc.frequency.exponentialRampToValueAtTime(120, now + 0.35);
+            gain.gain.setValueAtTime(0.45, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.35);
+
+            // Tiếng rung tần số cao ma mị
+            const buzz = this.ctx.createOscillator();
+            const bGain = this.ctx.createGain();
+            buzz.type = 'triangle';
+            buzz.frequency.setValueAtTime(432, now);
+            buzz.frequency.linearRampToValueAtTime(666, now + 0.2);
+            bGain.gain.setValueAtTime(0.25, now);
+            bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+            buzz.connect(bGain);
+            bGain.connect(this.ctx.destination);
+            buzz.start(now);
+            buzz.stop(now + 0.25);
+        } catch (e) {}
+    }
+
+    playNecromancy() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng chuông âm ti trầm tối kết hợp âm thanh triệu hồi linh hồn
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(110, now);
+            osc.frequency.linearRampToValueAtTime(220, now + 0.2);
+            osc.frequency.exponentialRampToValueAtTime(55, now + 0.5);
+            gain.gain.setValueAtTime(0.5, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.5);
+
+            // Tiếng thì thầm rùng rợn của cõi chết
+            const whisper = this.ctx.createOscillator();
+            const wGain = this.ctx.createGain();
+            whisper.type = 'sawtooth';
+            whisper.frequency.setValueAtTime(330, now + 0.1);
+            whisper.frequency.exponentialRampToValueAtTime(80, now + 0.45);
+            wGain.gain.setValueAtTime(0.2, now + 0.1);
+            wGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+            whisper.connect(wGain);
+            wGain.connect(this.ctx.destination);
+            whisper.start(now + 0.1);
+            whisper.stop(now + 0.45);
+        } catch (e) {}
+    }
+
+    playZombieAttack() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng gầm gừ cắn xé của thây ma
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(140, now);
+            osc.frequency.exponentialRampToValueAtTime(45, now + 0.2);
+            gain.gain.setValueAtTime(0.4, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.22);
+        } catch (e) {}
+    }
 }
 
 window.soundCtrl = new SoundController();
