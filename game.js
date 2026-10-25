@@ -725,7 +725,16 @@ class GameEngine {
             respawnTurns: 0,
             isOiled: false,
             burnTurns: 0,
-            burnDmg: 5
+            burnDmg: 5,
+            stats: {
+                kills: 0,
+                deaths: 0,
+                damageDealt: 0,
+                damageTaken: 0,
+                healing: 0,
+                hillPoints: 0,
+                score: 0
+            }
         };
         charObj.skills.forEach(s => {
             if (s.maxAmmo) unit.skillAmmo[s.id] = s.maxAmmo;
@@ -879,6 +888,11 @@ class GameEngine {
         const btnPlay = document.getElementById('btnMenuPlay');
         if (btnPlay) {
             btnPlay.addEventListener('click', () => this.showCharSelectScreen());
+        }
+
+        const btnMenuLb = document.getElementById('btnMenuLeaderboard');
+        if (btnMenuLb) {
+            btnMenuLb.addEventListener('click', () => this.openHallOfFame());
         }
 
         const btnGuide = document.getElementById('btnMenuGuide');
@@ -1080,6 +1094,12 @@ class GameEngine {
         const subElem = document.querySelector('.title-container .subtitle');
         if (subElem) subElem.innerText = t('headerSubtitle');
 
+        const btnHdrLb = document.getElementById('btnHeaderLeaderboard');
+        if (btnHdrLb) btnHdrLb.innerText = t('btnHeaderLeaderboard');
+
+        const btnHudLb = document.getElementById('btnHudLeaderboard');
+        if (btnHudLb) btnHudLb.innerText = t('btnHudLeaderboard');
+
         const btnLang = document.getElementById('btnHeaderLang');
         if (btnLang) btnLang.innerText = lang === 'vi' ? '🌐 English' : '🌐 Tiếng Việt';
 
@@ -1114,6 +1134,11 @@ class GameEngine {
         if (playMain) playMain.innerText = t('btnMenuPlay');
         const playSub = document.querySelector('#btnMenuPlay .btn-sub-text');
         if (playSub) playSub.innerText = t('btnMenuPlaySub');
+
+        const lbMenuMain = document.querySelector('#btnMenuLeaderboard .btn-main-text');
+        if (lbMenuMain) lbMenuMain.innerText = t('btnMenuLeaderboard');
+        const lbMenuSub = document.querySelector('#btnMenuLeaderboard .btn-sub-text');
+        if (lbMenuSub) lbMenuSub.innerText = t('btnMenuLeaderboardSub');
 
         const guideMain = document.querySelector('#btnMenuGuide .btn-main-text');
         if (guideMain) guideMain.innerText = t('btnMenuGuide');
@@ -1686,6 +1711,42 @@ class GameEngine {
     bindEvents() {
         window.addEventListener('keydown', (e) => this.handleKeyDown(e));
 
+        const btnHdrLb = document.getElementById('btnHeaderLeaderboard');
+        if (btnHdrLb) btnHdrLb.addEventListener('click', () => this.toggleInMatchLeaderboard());
+
+        const btnHudLb = document.getElementById('btnHudLeaderboard');
+        if (btnHudLb) btnHudLb.addEventListener('click', () => this.toggleInMatchLeaderboard());
+
+        const btnCloseLb = document.getElementById('btnCloseLeaderboard');
+        if (btnCloseLb) btnCloseLb.addEventListener('click', () => this.closeInMatchLeaderboard());
+
+        const btnResume = document.getElementById('btnResumeMatch');
+        if (btnResume) btnResume.addEventListener('click', () => this.closeInMatchLeaderboard());
+
+        const tabAll = document.getElementById('lbTabAll');
+        if (tabAll) tabAll.addEventListener('click', () => this.renderInMatchLeaderboard('all'));
+
+        const tabBlue = document.getElementById('lbTabBlue');
+        if (tabBlue) tabBlue.addEventListener('click', () => this.renderInMatchLeaderboard('BLUE'));
+
+        const tabRed = document.getElementById('lbTabRed');
+        if (tabRed) tabRed.addEventListener('click', () => this.renderInMatchLeaderboard('RED'));
+
+        const btnCloseHof = document.getElementById('btnCloseHof');
+        if (btnCloseHof) btnCloseHof.addEventListener('click', () => this.closeHallOfFame());
+
+        const btnCloseHofBtn = document.getElementById('btnCloseHofBtn');
+        if (btnCloseHofBtn) btnCloseHofBtn.addEventListener('click', () => this.closeHallOfFame());
+
+        const btnClearHof = document.getElementById('btnClearHofHistory');
+        if (btnClearHof) btnClearHof.addEventListener('click', () => this.clearHallOfFameHistory());
+
+        const btnPmHof = document.getElementById('btnPostMatchHof');
+        if (btnPmHof) btnPmHof.addEventListener('click', () => this.openHallOfFame());
+
+        const btnPmMenu = document.getElementById('btnPostMatchMenu');
+        if (btnPmMenu) btnPmMenu.addEventListener('click', () => this.showMainMenuScreen());
+
         document.getElementById('btnOpenCharSelect').addEventListener('click', () => {
             this.showCharSelectScreen();
         });
@@ -1982,6 +2043,25 @@ class GameEngine {
     }
 
     handleKeyDown(e) {
+        if (e.code === 'Tab') {
+            e.preventDefault();
+            this.toggleInMatchLeaderboard();
+            return;
+        }
+
+        if (e.code === 'Escape') {
+            if (this.isLeaderboardOpen) {
+                e.preventDefault();
+                this.closeInMatchLeaderboard();
+                return;
+            }
+            if (this.isHofOpen) {
+                e.preventDefault();
+                this.closeHallOfFame();
+                return;
+            }
+        }
+
         if (this.isHotseatModalOpen) {
             if (e.code === 'Space' || e.code === 'Enter') {
                 e.preventDefault();
@@ -2011,6 +2091,9 @@ class GameEngine {
             } else if (e.key === 'h' || e.key === 'H') {
                 e.preventDefault();
                 this.showHowToPlayScreen();
+            } else if (e.key === 'l' || e.key === 'L') {
+                e.preventDefault();
+                this.openHallOfFame();
             }
             return;
         }
@@ -4308,8 +4391,8 @@ class GameEngine {
                         this.createClashBurst(midX, midY);
                         this.addFloatingText(this.lang === 'en' ? 'HEAD-ON CLASH!' : 'ĐÂM NHAU!', midX, midY, '#fbbf24');
                         this.addCombatLog(`Nhịp #${stepIndex + 1}: ${uA.name} và ${uB.name} đâm trực diện! Dội lùi và mất 5 HP!`, 'clash');
-                        this.applyDamage(uA, 5);
-                        this.applyDamage(uB, 5);
+                        this.applyDamage(uA, 5, uB);
+                        this.applyDamage(uB, 5, uA);
                         pA.nx = uA.x; pA.ny = uA.y; pA.moving = false;
                         pB.nx = uB.x; pB.ny = uB.y; pB.moving = false;
                     }
@@ -4449,7 +4532,7 @@ class GameEngine {
                     const targetAct = target.queue ? target.queue[stepIndex] : null;
                     if (targetAct && targetAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
 
-                    this.applyDamage(target, dmg);
+                    this.applyDamage(target, dmg, actor);
                     this.createHitSparks(target.x, target.y, target.color);
                     this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
                     this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} ĐÁNH TRÚNG ${target.name}! (-${dmg} HP${buffTag})`, 'hit');
@@ -4521,9 +4604,9 @@ class GameEngine {
                         const targetAct = target.queue ? target.queue[stepIndex] : null;
                         if (targetAct && targetAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
 
-                        this.applyDamage(target, dmg);
+                        this.applyDamage(target, dmg, actor);
                         if (act.skillId === 'FIREMAN_GATTLING_FIRE') {
-                            this.applyBurn(target, act.burnTurns || 3, act.burnDmg || 5);
+                            this.applyBurn(target, act.burnTurns || 3, act.burnDmg || 5, actor);
                             this.createHitSparks(target.x, target.y, '#ea580c');
                             this.addFloatingText(`-${dmg} HP + 🔥 CHÁY!`, target.x, target.y, '#ea580c');
                             this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} BẮN TRÚNG ${target.name}! Gây ${dmg} sát thương và thiêu đốt (-5 HP/lượt trong 3 lượt)!`, 'hit');
@@ -4669,7 +4752,7 @@ class GameEngine {
                         const targetAct = target.queue ? target.queue[stepIndex] : null;
                         if (targetAct && targetAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
 
-                        this.applyDamage(target, dmg);
+                        this.applyDamage(target, dmg, actor);
                         this.createHitSparks(target.x, target.y, isDestructive ? '#ec4899' : '#818cf8');
                         this.addFloatingText(`-${dmg} HP!`, target.x, target.y, isDestructive ? '#ec4899' : '#f87171');
 
@@ -4817,7 +4900,7 @@ class GameEngine {
                     let dDmg = directDmg;
                     if (targetAct && targetAct.type === 'LEAP') dDmg = Math.round(dDmg * 0.75);
 
-                    this.applyDamage(directTarget, dDmg);
+                    this.applyDamage(directTarget, dDmg, actor);
                     this.createHitSparks(directTarget.x, directTarget.y, tracerColor);
                     this.addFloatingText(`-${dDmg} HP!`, directTarget.x, directTarget.y, '#f87171');
                     this.addCombatLog(`Nhịp #${stepIndex + 1}: 🎯 [Nòng Xe Tăng] ${actor.name} BẮN TRÚNG TRỰC DIỆN ${directTarget.name}! (-${dDmg} HP${chaosTag}, cự ly: ${hitDist} ô)!`, 'hit');
@@ -4846,7 +4929,7 @@ class GameEngine {
                     let splashDmg = 10;
                     if (uAct && uAct.type === 'LEAP') splashDmg = Math.round(splashDmg * 0.75);
 
-                    this.applyDamage(u, splashDmg);
+                    this.applyDamage(u, splashDmg, actor);
                     this.createHitSparks(u.x, u.y, u.color);
                     this.addFloatingText(`-${splashDmg} HP!`, u.x, u.y, '#f87171');
                     this.addCombatLog(`💥 Vụ nổ ${blastSizeStr} Nòng Xe Tăng gây -${splashDmg} HP nổ lan lên ${u.name}!`, 'hit');
@@ -4913,7 +4996,7 @@ class GameEngine {
                         if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
                         let dmg = act.power || 15;
                         if (hasBuffDmg) dmg = Math.round(dmg * dmgMult);
-                        this.applyDamage(target, dmg);
+                        this.applyDamage(target, dmg, actor);
                         this.createHitSparks(target.x, target.y, '#ef4444');
 
                         const pullX = Math.max(0, Math.min(GRID_COLS - 1, target.x - uD.dx));
@@ -5018,7 +5101,7 @@ class GameEngine {
                     let uDmg = (u === actor) ? (act.power || 30) : baseDmg;
                     if (uAct && uAct.type === 'LEAP') uDmg = Math.round(uDmg * 0.75);
 
-                    this.applyDamage(u, uDmg);
+                    this.applyDamage(u, uDmg, actor);
                     this.createHitSparks(u.x, u.y, u.color);
                     this.addFloatingText(`-${uDmg} HP!`, u.x, u.y, '#f87171');
                     this.addCombatLog(`💥 Vụ nổ ${act.name} trúng ${u.name}! (-${uDmg} HP)!`, 'hit');
@@ -5069,7 +5152,8 @@ class GameEngine {
                 aoeRadius: 1,
                 owner: actor.isPlayer ? 'PLAYER' : 'CPU',
                 ownerId: actor.id,
-                ownerName: actor.name
+                ownerName: actor.name,
+                ownerUnit: actor
             });
 
             this.addFloatingText('💣 LỰU ĐẠN (ĐẾM 2 LƯỢT)!', targetX, targetY, '#f59e0b');
@@ -5184,7 +5268,7 @@ class GameEngine {
                     let uDmg = (u === actor) ? (act.power || 15) : baseDmg;
                     if (uAct && uAct.type === 'LEAP') uDmg = Math.round(uDmg * 0.75);
 
-                    this.applyDamage(u, uDmg);
+                    this.applyDamage(u, uDmg, actor);
                     this.createHitSparks(u.x, u.y, '#ea580c');
                     this.addFloatingText(`-${uDmg} HP!`, u.x, u.y, '#ea580c');
                     this.addCombatLog(`💥 Vụ nổ Đại Bác Lửa trúng ${u.name}! (-${uDmg} HP)!`, 'hit');
@@ -5206,7 +5290,8 @@ class GameEngine {
                 y: targetY,
                 aoeRadius: 1,
                 turnsLeft: act.fireZoneDuration || 2,
-                creatorName: actor.name
+                creatorName: actor.name,
+                ownerUnit: actor
             });
 
             // Kẻ địch trong vùng kể từ thời điểm sau khi nổ tung sẽ bị hiệu ứng cháy
@@ -5258,7 +5343,7 @@ class GameEngine {
                         const targetAct = target.queue ? target.queue[stepIndex] : null;
                         if (targetAct && targetAct.type === 'LEAP') dmg = Math.round(dmg * 0.75);
 
-                        this.applyDamage(target, dmg);
+                        this.applyDamage(target, dmg, actor);
                         this.createHitSparks(target.x, target.y, '#06b6d4');
                         this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
                         this.addCombatLog(`Nhịp #${stepIndex + 1}: 🗡️ [Kiếm Gắn Tay] ${actor.name} CHÉM QUÉT 3x2 TRÚNG ${target.name}! (-${dmg} HP${buffTag})!`, 'hit');
@@ -5494,7 +5579,7 @@ class GameEngine {
                 this.createHitSparks(actor.x, actor.y, '#c084fc');
 
                 for (const target of affected) {
-                    this.applyDamage(target, finalDmg);
+                    this.applyDamage(target, finalDmg, actor);
                     this.createHitSparks(target.x, target.y, '#c084fc');
                     this.addFloatingText(`🔮 TELEKINESIS -${finalDmg} HP!`, target.x, target.y, '#c084fc');
                     this.addCombatLog(
@@ -5605,6 +5690,8 @@ class GameEngine {
             if (unit.buffs && unit.buffs.adrenaline && unit.buffs.adrenaline.turnsLeft > 0) {
                 const healAmount = Math.min(5, unit.maxHp - unit.hp);
                 unit.hp += healAmount;
+                if (!unit.stats) unit.stats = { kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0, healing: 0, hillPoints: 0, score: 0 };
+                unit.stats.healing += healAmount;
                 unit.buffs.adrenaline.turnsLeft--;
                 if (unit.isPlayer && this.playerBuffs) this.playerBuffs.adrenaline.turnsLeft = unit.buffs.adrenaline.turnsLeft;
 
@@ -5647,7 +5734,7 @@ class GameEngine {
             // 4. Sát thương Cháy (Burn DOT: -5 HP/lượt, không thể cộng dồn)
             if (unit.burnTurns > 0) {
                 const burnDmg = unit.burnDmg || 5;
-                this.applyDamage(unit, burnDmg);
+                this.applyDamage(unit, burnDmg, unit.burnSource || null);
                 unit.burnTurns--;
                 this.createHitSparks(unit.x, unit.y, '#ea580c');
                 this.addFloatingText(`-${burnDmg} HP (CHÁY 🔥)`, unit.x, unit.y, '#ea580c');
@@ -5717,7 +5804,7 @@ class GameEngine {
 
             for (const u of allUnits) {
                 if (u.hp > 0 && Math.abs(u.x - h.x) <= 1 && Math.abs(u.y - h.y) <= 1) {
-                    this.applyDamage(u, h.power);
+                    this.applyDamage(u, h.power, h.ownerUnit || null);
                     this.createHitSparks(u.x, u.y, u.color);
                     this.addFloatingText(`-${h.power} HP! (LỰU ĐẠN)`, u.x, u.y, '#f87171');
                     this.addCombatLog(`➔ ${u.name} dính trọn vụ nổ Lựu Đạn! Mất ${h.power} HP!`, 'hit');
@@ -5860,6 +5947,12 @@ class GameEngine {
             // Kể cả khi cứ điểm đang bị Tranh Chấp (Contested) hay đối thủ đang lấn chiếm kéo thanh
             if (this.hillOwner === 'BLUE') {
                 this.blueScore = Math.min(this.SCORE_LIMIT, this.blueScore + 1);
+                for (const u of (this.blueTeam || [])) {
+                    if (u.hp > 0 && Math.abs(u.x - this.HILL_CENTER_X) <= this.HILL_RADIUS && Math.abs(u.y - this.HILL_CENTER_Y) <= this.HILL_RADIUS) {
+                        if (!u.stats) u.stats = { kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0, healing: 0, hillPoints: 0, score: 0 };
+                        u.stats.hillPoints += 1;
+                    }
+                }
                 this.addFloatingText('+1 ĐIỂM!', 10, 3, '#38bdf8');
                 this.addCombatLog(
                     this.lang === 'en'
@@ -5869,6 +5962,12 @@ class GameEngine {
                 );
             } else if (this.hillOwner === 'RED') {
                 this.redScore = Math.min(this.SCORE_LIMIT, this.redScore + 1);
+                for (const u of (this.redTeam || [])) {
+                    if (u.hp > 0 && Math.abs(u.x - this.HILL_CENTER_X) <= this.HILL_RADIUS && Math.abs(u.y - this.HILL_CENTER_Y) <= this.HILL_RADIUS) {
+                        if (!u.stats) u.stats = { kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0, healing: 0, hillPoints: 0, score: 0 };
+                        u.stats.hillPoints += 1;
+                    }
+                }
                 this.addFloatingText('+1 ĐIỂM!', 10, 3, '#f43f5e');
                 this.addCombatLog(
                     this.lang === 'en'
@@ -6006,10 +6105,11 @@ class GameEngine {
         this.updateHUD();
     }
 
-    applyBurn(target, turns = 3, dmg = 5) {
+    applyBurn(target, turns = 3, dmg = 5, source = null) {
         if (!target || target.hp <= 0) return;
         target.burnTurns = Math.max(target.burnTurns || 0, turns);
         target.burnDmg = dmg; // không thể cộng dồn sát thương, duy trì 5 HP/lượt
+        if (source) target.burnSource = source;
     }
 
     checkFireZones(unit) {
@@ -6020,7 +6120,7 @@ class GameEngine {
                     if (unit.isOiled) {
                         unit.isOiled = false;
                     }
-                    this.applyBurn(unit, 3, 5);
+                    this.applyBurn(unit, 3, 5, zone.ownerUnit || null);
                     this.createHitSparks(unit.x, unit.y, '#ea580c');
                     this.addFloatingText('🔥 BỐC CHÁY!', unit.x, unit.y, '#ea580c');
                     this.addCombatLog(this.lang === 'en'
@@ -6032,27 +6132,50 @@ class GameEngine {
         }
     }
 
-    applyDamage(entity, amount) {
-        if (entity.isImmune) return;
+    applyDamage(entity, amount, source = null) {
+        if (!entity || entity.isImmune) return;
         const curAct = (entity.queue && this.currentStep >= 0) ? entity.queue[this.currentStep] : null;
         if (curAct && curAct.type === 'BOOM_LEAP') return;
 
         if (entity.isOiled && amount > 0) {
             entity.isOiled = false;
-            this.applyBurn(entity, 3, 5);
+            this.applyBurn(entity, 3, 5, source);
             this.createHitSparks(entity.x, entity.y, '#ea580c');
             this.addFloatingText(this.lang === 'en' ? '🔥 OIL IGNITED!' : '🔥 DẦU BỐC CHÁY!', entity.x, entity.y, '#ea580c');
             this.addCombatLog(this.lang === 'en'
                 ? `🔥 Oil on ${entity.name} ignited upon taking damage! Suffering Burn (-5 HP/turn for 3 turns)!`
                 : `🔥 Lớp dầu trên ${entity.name} bốc cháy khi nhận sát thương! Bị thiêu đốt (-5 HP/lượt trong 3 lượt)!`, 'hit');
         }
+
+        const prevHp = entity.hp;
+        const actualDmg = Math.min(prevHp, amount);
         entity.hp = Math.max(0, entity.hp - amount);
-        if (entity.hp === 0 && this.gameMode === 'KOTH' && !entity.isDead) {
-            entity.isDead = true;
-            entity.alive = false;
-            entity.respawnTurns = this.RESPAWN_TURNS;
-            this.addCombatLog(`💀 ${entity.name} ${this.lang === 'en' ? 'was eliminated! Respawning in 2 turns...' : 'đã hy sinh! Hồi sinh sau 2 lượt...'}`, 'clash');
-            this.addFloatingText('💀 K.O! (RESPAWN 2L)', entity.x, entity.y, '#f43f5e');
+
+        if (!entity.stats) {
+            entity.stats = { kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0, healing: 0, hillPoints: 0, score: 0 };
+        }
+        entity.stats.damageTaken = (entity.stats.damageTaken || 0) + actualDmg;
+
+        if (source && source !== entity) {
+            if (!source.stats) {
+                source.stats = { kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0, healing: 0, hillPoints: 0, score: 0 };
+            }
+            source.stats.damageDealt = (source.stats.damageDealt || 0) + actualDmg;
+        }
+
+        if (entity.hp === 0 && prevHp > 0) {
+            entity.stats.deaths = (entity.stats.deaths || 0) + 1;
+            if (source && source !== entity && source.stats) {
+                source.stats.kills = (source.stats.kills || 0) + 1;
+            }
+
+            if (this.gameMode === 'KOTH' && !entity.isDead) {
+                entity.isDead = true;
+                entity.alive = false;
+                entity.respawnTurns = this.RESPAWN_TURNS;
+                this.addCombatLog(`💀 ${entity.name} ${this.lang === 'en' ? 'was eliminated! Respawning in 2 turns...' : 'đã hy sinh! Hồi sinh sau 2 lượt...'}`, 'clash');
+                this.addFloatingText('💀 K.O! (RESPAWN 2L)', entity.x, entity.y, '#f43f5e');
+            }
         }
     }
 
@@ -6150,6 +6273,9 @@ class GameEngine {
                 }
             }
 
+            this.saveMatchRecord(kothWinner);
+            this.renderPostMatchLeaderboard(kothWinner);
+
             modal.style.display = 'flex';
             this.updateHUD();
             return;
@@ -6196,13 +6322,494 @@ class GameEngine {
             }
         }
 
+        this.saveMatchRecord(kothWinner);
+        this.renderPostMatchLeaderboard(kothWinner);
+
         modal.style.display = 'flex';
         this.updateHUD();
+    }
+
+    // --- LEADERBOARD & STATS TRACKING ENGINE ---
+
+    calculateUnitScore(unit) {
+        if (!unit || !unit.stats) return 0;
+        const s = unit.stats;
+        const killScore = (s.kills || 0) * 100;
+        const dmgScore = Math.round(s.damageDealt || 0);
+        const healScore = Math.round((s.healing || 0) * 0.8);
+        const hillScore = (s.hillPoints || 0) * 50;
+        const deathPenalty = (s.deaths || 0) * 20;
+        const aliveBonus = (unit.hp > 0) ? 50 : 0;
+        const total = Math.max(0, killScore + dmgScore + healScore + hillScore + aliveBonus - deathPenalty);
+        s.score = total;
+        return total;
+    }
+
+    getMatchLeaderboard() {
+        const allUnits = [...(this.blueTeam || []), ...(this.redTeam || [])];
+        const entries = allUnits.map(u => {
+            if (!u.stats) {
+                u.stats = { kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0, healing: 0, hillPoints: 0, score: 0 };
+            }
+            const score = this.calculateUnitScore(u);
+            return {
+                unit: u,
+                id: u.id,
+                name: u.name,
+                avatar: u.avatar || '🪖',
+                charId: u.charId,
+                team: u.team,
+                isPlayer: !!u.isPlayer,
+                playerIndex: u.playerIndex || (u.isPlayer ? 1 : null),
+                hp: Math.max(0, u.hp),
+                maxHp: u.maxHp || 100,
+                alive: u.hp > 0,
+                kills: u.stats.kills || 0,
+                deaths: u.stats.deaths || 0,
+                damageDealt: u.stats.damageDealt || 0,
+                damageTaken: u.stats.damageTaken || 0,
+                healing: u.stats.healing || 0,
+                hillPoints: u.stats.hillPoints || 0,
+                score
+            };
+        });
+
+        // Sắp xếp theo: Score DESC -> Kills DESC -> Damage DESC -> HP DESC
+        entries.sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            if (b.kills !== a.kills) return b.kills - a.kills;
+            if (b.damageDealt !== a.damageDealt) return b.damageDealt - a.damageDealt;
+            return b.hp - a.hp;
+        });
+
+        entries.forEach((e, idx) => {
+            e.rank = idx + 1;
+            e.isMvp = (idx === 0);
+        });
+
+        return entries;
+    }
+
+    getTeamStats() {
+        const blue = { score: 0, kills: 0, damageDealt: 0, aliveCount: 0, totalCount: (this.blueTeam || []).length };
+        const red = { score: 0, kills: 0, damageDealt: 0, aliveCount: 0, totalCount: (this.redTeam || []).length };
+
+        for (const u of (this.blueTeam || [])) {
+            const score = this.calculateUnitScore(u);
+            blue.score += score;
+            blue.kills += (u.stats && u.stats.kills) || 0;
+            blue.damageDealt += (u.stats && u.stats.damageDealt) || 0;
+            if (u.hp > 0) blue.aliveCount++;
+        }
+
+        for (const u of (this.redTeam || [])) {
+            const score = this.calculateUnitScore(u);
+            red.score += score;
+            red.kills += (u.stats && u.stats.kills) || 0;
+            red.damageDealt += (u.stats && u.stats.damageDealt) || 0;
+            if (u.hp > 0) red.aliveCount++;
+        }
+
+        return { blue, red };
+    }
+
+    openInMatchLeaderboard(filter = 'all') {
+        const modal = document.getElementById('inMatchLeaderboardModal');
+        if (!modal) return;
+        this.isLeaderboardOpen = true;
+        this.leaderboardFilter = filter;
+        modal.style.display = 'flex';
+        this.renderInMatchLeaderboard(filter);
+        if (window.soundCtrl && window.soundCtrl.playSelect) window.soundCtrl.playSelect();
+    }
+
+    closeInMatchLeaderboard() {
+        const modal = document.getElementById('inMatchLeaderboardModal');
+        if (!modal) return;
+        this.isLeaderboardOpen = false;
+        modal.style.display = 'none';
+        if (window.soundCtrl && window.soundCtrl.playUndo) window.soundCtrl.playUndo();
+    }
+
+    toggleInMatchLeaderboard() {
+        if (this.isLeaderboardOpen) {
+            this.closeInMatchLeaderboard();
+        } else {
+            if (this.phase === 'MAIN_MENU' || this.phase === 'LANG_SELECT') {
+                this.openHallOfFame();
+            } else {
+                this.openInMatchLeaderboard(this.leaderboardFilter || 'all');
+            }
+        }
+    }
+
+    renderInMatchLeaderboard(filter = null) {
+        if (filter) this.leaderboardFilter = filter;
+        const curFilter = this.leaderboardFilter || 'all';
+
+        const modal = document.getElementById('inMatchLeaderboardModal');
+        if (!modal) return;
+
+        // Cập nhật Subtitle thông tin trận
+        const infoEl = document.getElementById('lbMatchInfo');
+        if (infoEl) {
+            const modeName = this.gameMode === 'KOTH' ? `KOTH (${(this.blueTeam || []).length}v${(this.redTeam || []).length})` : `DUEL (1v1)`;
+            const blueScoreText = this.gameMode === 'KOTH' ? this.blueScore : (this.blueTeam || []).filter(u => u.hp > 0).length;
+            const redScoreText = this.gameMode === 'KOTH' ? this.redScore : (this.redTeam || []).filter(u => u.hp > 0).length;
+            infoEl.innerText = t('lbMatchInfo', {
+                mode: modeName,
+                turn: this.turn,
+                blue: blueScoreText,
+                red: redScoreText
+            });
+        }
+
+        // Cập nhật Team Summary Bar
+        const teamStats = this.getTeamStats();
+        const bScore = document.getElementById('lbBlueScore');
+        const bKills = document.getElementById('lbBlueKills');
+        const bDmg = document.getElementById('lbBlueDmg');
+        const bAlive = document.getElementById('lbBlueAlive');
+        if (bScore) bScore.innerText = teamStats.blue.score;
+        if (bKills) bKills.innerText = teamStats.blue.kills;
+        if (bDmg) bDmg.innerText = teamStats.blue.damageDealt;
+        if (bAlive) bAlive.innerText = `${teamStats.blue.aliveCount}/${teamStats.blue.totalCount}`;
+
+        const rScore = document.getElementById('lbRedScore');
+        const rKills = document.getElementById('lbRedKills');
+        const rDmg = document.getElementById('lbRedDmg');
+        const rAlive = document.getElementById('lbRedAlive');
+        if (rScore) rScore.innerText = teamStats.red.score;
+        if (rKills) rKills.innerText = teamStats.red.kills;
+        if (rDmg) rDmg.innerText = teamStats.red.damageDealt;
+        if (rAlive) rAlive.innerText = `${teamStats.red.aliveCount}/${teamStats.red.totalCount}`;
+
+        // Cập nhật Tabs
+        document.querySelectorAll('.lb-tab-btn').forEach(btn => {
+            const f = btn.getAttribute('data-filter');
+            btn.classList.toggle('active', f === curFilter);
+        });
+
+        // Ẩn/Hiện cột Hill nếu không phải KOTH
+        const hillHeader = document.getElementById('colHeaderHill');
+        if (hillHeader) {
+            hillHeader.style.display = (this.gameMode === 'KOTH') ? '' : 'none';
+        }
+
+        // Render Table Body
+        const tbody = document.getElementById('inMatchLbTbody');
+        if (!tbody) return;
+
+        let leaderboard = this.getMatchLeaderboard();
+        if (curFilter === 'BLUE') leaderboard = leaderboard.filter(e => e.team === 'BLUE');
+        else if (curFilter === 'RED') leaderboard = leaderboard.filter(e => e.team === 'RED');
+
+        tbody.innerHTML = leaderboard.map(e => {
+            const isMvp = e.isMvp;
+            const isPlayer = e.isPlayer;
+            const hpPct = Math.round((e.hp / e.maxHp) * 100);
+            const teamBadgeClass = e.team === 'BLUE' ? 'blue' : 'red';
+            const teamName = e.team === 'BLUE' ? (this.lang === 'en' ? 'Blue' : 'Xanh') : (this.lang === 'en' ? 'Red' : 'Đỏ');
+
+            let rankBadge = `${e.rank}`;
+            if (e.rank === 1) rankBadge = '🥇';
+            else if (e.rank === 2) rankBadge = '🥈';
+            else if (e.rank === 3) rankBadge = '🥉';
+
+            const playerTag = isPlayer ? `<span class="lb-badge-you">${e.playerIndex === 2 ? 'P2' : (this.isTwoPlayerMode ? 'P1' : (this.lang === 'en' ? 'YOU' : 'BẠN'))}</span>` : '';
+            const mvpTag = isMvp ? `<span class="lb-badge-mvp">MVP</span>` : '';
+
+            const hillCell = (this.gameMode === 'KOTH') 
+                ? `<td class="col-stat" style="color:#38bdf8; font-weight:700;">${e.hillPoints}</td>` 
+                : '';
+
+            return `
+                <tr class="lb-row-${teamBadgeClass} ${isMvp ? 'lb-row-mvp' : ''} ${isPlayer ? 'lb-row-player' : ''} ${!e.alive ? 'lb-row-dead' : ''}">
+                    <td class="col-rank">${rankBadge}</td>
+                    <td class="col-char">
+                        <div class="lb-avatar-tag">
+                            <span class="lb-char-avatar">${e.avatar}</span>
+                            <div class="lb-char-name-group">
+                                <span class="lb-char-name">${e.name} ${playerTag} ${mvpTag}</span>
+                                <span class="lb-char-subtag">${getCharTitle(getCharacterById(e.charId), this.lang)}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="col-team">
+                        <span class="mvp-team-badge ${teamBadgeClass}">${teamName}</span>
+                    </td>
+                    <td class="col-hp">
+                        <div style="font-size:0.75rem; font-weight:700; color:${e.alive ? '#f8fafc' : '#f43f5e'};">
+                            ${e.alive ? `${e.hp}/${e.maxHp}` : (this.lang === 'en' ? '💀 DOWN' : '💀 HẠ GỤC')}
+                        </div>
+                        <div class="lb-hp-mini-bar">
+                            <div class="lb-hp-mini-fill ${teamBadgeClass}" style="width: ${hpPct}%;"></div>
+                        </div>
+                    </td>
+                    <td class="col-stat" style="color:#4ade80; font-weight:700;">${e.kills}</td>
+                    <td class="col-stat" style="color:#f87171;">${e.deaths}</td>
+                    <td class="col-stat" style="color:#fbbf24; font-weight:700;">${e.damageDealt}</td>
+                    <td class="col-stat" style="color:#94a3b8;">${e.damageTaken}</td>
+                    <td class="col-stat" style="color:#34d399;">${e.healing}</td>
+                    ${hillCell}
+                    <td class="col-score">${e.score}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    renderPostMatchLeaderboard(kothWinner = null) {
+        const leaderboard = this.getMatchLeaderboard();
+        if (leaderboard.length === 0) return;
+
+        const mvp = leaderboard[0];
+
+        // 1. Cập nhật MVP Showcase Card
+        const mvpCard = document.getElementById('postMatchMvpCard');
+        if (mvpCard) {
+            const mvpTag = document.getElementById('mvpHeaderTag');
+            const mvpAvatar = document.getElementById('mvpAvatar');
+            const mvpName = document.getElementById('mvpName');
+            const mvpTeam = document.getElementById('mvpTeamBadge');
+            const mvpKills = document.getElementById('mvpKills');
+            const mvpDmg = document.getElementById('mvpDmg');
+            const mvpScore = document.getElementById('mvpScore');
+
+            if (mvpTag) {
+                mvpTag.innerText = (mvp.unit === this.player || mvp.unit === this.p1Unit) 
+                    ? t('lbPlayerMvpNotice') 
+                    : t('lbMvpTitle');
+            }
+            if (mvpAvatar) mvpAvatar.innerText = mvp.avatar;
+            if (mvpName) mvpName.innerText = mvp.name;
+            if (mvpTeam) {
+                mvpTeam.className = `mvp-team-badge ${mvp.team === 'BLUE' ? 'blue' : 'red'}`;
+                mvpTeam.innerText = mvp.team === 'BLUE' ? (this.lang === 'en' ? 'Blue Team' : 'Đội Xanh') : (this.lang === 'en' ? 'Red Team' : 'Đội Đỏ');
+            }
+            if (mvpKills) mvpKills.innerText = mvp.kills;
+            if (mvpDmg) mvpDmg.innerText = mvp.damageDealt;
+            if (mvpScore) mvpScore.innerText = mvp.score;
+        }
+
+        // 2. Cập nhật Bảng Chung Cuộc
+        const tbody = document.getElementById('postMatchLbTbody');
+        if (tbody) {
+            tbody.innerHTML = leaderboard.map(e => {
+                const isPlayer = e.isPlayer;
+                let rankBadge = `${e.rank}`;
+                if (e.rank === 1) rankBadge = '🥇';
+                else if (e.rank === 2) rankBadge = '🥈';
+                else if (e.rank === 3) rankBadge = '🥉';
+
+                const playerTag = isPlayer ? `<span class="lb-badge-you">${this.lang === 'en' ? 'YOU' : 'BẠN'}</span>` : '';
+                const teamName = e.team === 'BLUE' ? (this.lang === 'en' ? 'Blue' : 'Xanh') : (this.lang === 'en' ? 'Red' : 'Đỏ');
+
+                return `
+                    <tr class="lb-row-${e.team === 'BLUE' ? 'blue' : 'red'} ${e.isMvp ? 'lb-row-mvp' : ''} ${isPlayer ? 'lb-row-player' : ''}">
+                        <td class="col-rank">${rankBadge}</td>
+                        <td class="col-char">
+                            <span style="font-size:1.1rem; margin-right:6px;">${e.avatar}</span>
+                            <b>${e.name}</b> ${playerTag}
+                        </td>
+                        <td class="col-team">
+                            <span class="mvp-team-badge ${e.team === 'BLUE' ? 'blue' : 'red'}">${teamName}</span>
+                        </td>
+                        <td class="col-stat" style="color:#4ade80; font-weight:700;">${e.kills}</td>
+                        <td class="col-stat" style="color:#f87171;">${e.deaths}</td>
+                        <td class="col-stat" style="color:#fbbf24; font-weight:700;">${e.damageDealt}</td>
+                        <td class="col-score">${e.score}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+
+    saveMatchRecord(kothWinner = null) {
+        if (typeof localStorage === 'undefined') return null;
+        try {
+            const leaderboard = this.getMatchLeaderboard();
+            const mvp = leaderboard.length > 0 ? leaderboard[0] : null;
+            const playerUnit = this.player || this.p1Unit;
+            const pStats = playerUnit && playerUnit.stats ? playerUnit.stats : { kills: 0, deaths: 0, damageDealt: 0, score: 0 };
+            
+            let outcome = 'DRAW';
+            if (this.gameMode === 'KOTH') {
+                const blueAlive = (this.blueTeam || []).filter(u => u.hp > 0).length;
+                const redAlive = (this.redTeam || []).filter(u => u.hp > 0).length;
+                const isBlueWinner = kothWinner === 'BLUE_KOTH' || (kothWinner === null && (this.blueScore > this.redScore || (redAlive === 0 && blueAlive > 0)));
+                const isRedWinner = kothWinner === 'RED_KOTH' || (kothWinner === null && (this.redScore > this.blueScore || (blueAlive === 0 && redAlive > 0)));
+                if (playerUnit) {
+                    if (playerUnit.team === 'BLUE') outcome = isBlueWinner ? 'VICTORY' : (isRedWinner ? 'DEFEAT' : 'DRAW');
+                    else outcome = isRedWinner ? 'VICTORY' : (isBlueWinner ? 'DEFEAT' : 'DRAW');
+                }
+            } else {
+                const blueAlive = (this.blueTeam || []).filter(u => u.hp > 0).length;
+                const redAlive = (this.redTeam || []).filter(u => u.hp > 0).length;
+                if (blueAlive === 0 && redAlive === 0) {
+                    outcome = 'DRAW';
+                } else if (playerUnit) {
+                    if (playerUnit.team === 'BLUE') outcome = (redAlive === 0) ? 'VICTORY' : 'DEFEAT';
+                    else outcome = (blueAlive === 0) ? 'VICTORY' : 'DEFEAT';
+                }
+            }
+
+            const record = {
+                id: 'm_' + Date.now(),
+                date: new Date().toISOString(),
+                dateFormatted: new Date().toLocaleDateString(this.lang === 'en' ? 'en-US' : 'vi-VN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                gameMode: this.gameMode,
+                teamSize: `${(this.blueTeam || []).length}v${(this.redTeam || []).length}`,
+                turns: this.turn,
+                outcome,
+                playerChar: playerUnit ? playerUnit.charId : 'trooper',
+                playerCharName: playerUnit ? getCharName(playerUnit.character, this.lang) : 'Operator',
+                playerAvatar: playerUnit ? playerUnit.avatar : '🪖',
+                kills: pStats.kills || 0,
+                deaths: pStats.deaths || 0,
+                damageDealt: pStats.damageDealt || 0,
+                score: pStats.score || 0,
+                mvpName: mvp ? mvp.name : '',
+                mvpAvatar: mvp ? mvp.avatar : '👑',
+                mvpScore: mvp ? mvp.score : 0,
+                isPlayerMvp: mvp && mvp.unit === playerUnit
+            };
+
+            const raw = localStorage.getItem('crazy_warfare_match_history');
+            let history = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(history)) history = [];
+            history.unshift(record);
+            if (history.length > 30) history = history.slice(0, 30);
+            localStorage.setItem('crazy_warfare_match_history', JSON.stringify(history));
+            return record;
+        } catch (e) {
+            console.warn('Failed to save match record:', e);
+            return null;
+        }
+    }
+
+    getMatchHistory() {
+        if (typeof localStorage === 'undefined') return [];
+        try {
+            const raw = localStorage.getItem('crazy_warfare_match_history');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    getHallOfFameStats() {
+        const history = this.getMatchHistory();
+        let totalMatches = history.length;
+        let wins = 0;
+        let highestScore = 0;
+        let mostKills = 0;
+        let mostDamage = 0;
+
+        for (const m of history) {
+            if (m.outcome === 'VICTORY') wins++;
+            if (m.score > highestScore) highestScore = m.score;
+            if (m.kills > mostKills) mostKills = m.kills;
+            if (m.damageDealt > mostDamage) mostDamage = m.damageDealt;
+        }
+
+        const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+        return {
+            totalMatches,
+            wins,
+            winRate,
+            highestScore,
+            mostKills,
+            mostDamage,
+            history
+        };
+    }
+
+    openHallOfFame() {
+        const modal = document.getElementById('hallOfFameModal');
+        if (!modal) return;
+        this.isHofOpen = true;
+        modal.style.display = 'flex';
+        this.renderHallOfFame();
+        if (window.soundCtrl && window.soundCtrl.playSelect) window.soundCtrl.playSelect();
+    }
+
+    closeHallOfFame() {
+        const modal = document.getElementById('hallOfFameModal');
+        if (!modal) return;
+        this.isHofOpen = false;
+        modal.style.display = 'none';
+        if (window.soundCtrl && window.soundCtrl.playUndo) window.soundCtrl.playUndo();
+    }
+
+    clearHallOfFameHistory() {
+        if (typeof localStorage !== 'undefined') {
+            try {
+                localStorage.removeItem('crazy_warfare_match_history');
+            } catch (e) {}
+        }
+        this.renderHallOfFame();
+        this.addCombatLog(t('hofClearedMsg'), 'system');
+        if (window.soundCtrl && window.soundCtrl.playSelect) window.soundCtrl.playSelect();
+    }
+
+    renderHallOfFame() {
+        const modal = document.getElementById('hallOfFameModal');
+        if (!modal) return;
+
+        const stats = this.getHallOfFameStats();
+
+        const hsEl = document.getElementById('hofHighScoreVal');
+        const mkEl = document.getElementById('hofMaxKillsVal');
+        const mdEl = document.getElementById('hofMaxDmgVal');
+        const wrEl = document.getElementById('hofWinRateVal');
+        const wrLbl = document.getElementById('hofWinRateLabel');
+
+        if (hsEl) hsEl.innerText = stats.highestScore;
+        if (mkEl) mkEl.innerText = stats.mostKills;
+        if (mdEl) mdEl.innerText = stats.mostDamage;
+        if (wrEl) wrEl.innerText = `${stats.winRate}%`;
+        if (wrLbl) wrLbl.innerText = `${t('hofWinRate')} (${stats.wins}/${stats.totalMatches} ${t('hofMatches')})`;
+
+        const tbody = document.getElementById('hofTbody');
+        if (!tbody) return;
+
+        if (stats.history.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:32px; color:#64748b;">${t('hofNoHistory')}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = stats.history.map(m => {
+            let resBadge = `<span class="tag-outcome win">${t('hofVictory')}</span>`;
+            if (m.outcome === 'DEFEAT') resBadge = `<span class="tag-outcome loss">${t('hofDefeat')}</span>`;
+            else if (m.outcome === 'DRAW') resBadge = `<span class="tag-outcome draw">${t('hofDraw')}</span>`;
+
+            return `
+                <tr>
+                    <td style="color:#94a3b8; font-size:0.75rem;">${m.dateFormatted || ''}</td>
+                    <td style="font-weight:700;">${m.gameMode} (${m.teamSize})</td>
+                    <td>
+                        <span style="font-size:1.1rem; margin-right:4px;">${m.playerAvatar || '🪖'}</span>
+                        <b>${m.playerCharName || m.playerChar}</b>
+                    </td>
+                    <td>${resBadge}</td>
+                    <td style="font-weight:700; color:#4ade80;">${m.kills} / ${m.deaths}</td>
+                    <td style="font-weight:700; color:#fbbf24;">${m.damageDealt}</td>
+                    <td style="font-weight:900; color:#fbbf24;">${m.score}</td>
+                    <td>
+                        <span style="font-size:1rem; margin-right:4px;">${m.mvpAvatar || '👑'}</span>
+                        <span style="font-size:0.78rem;">${m.mvpName || '-'}</span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 
     restartGame() {
         const modal = document.getElementById('gameModal');
         if (modal) modal.style.display = 'none';
+        const inMatchLb = document.getElementById('inMatchLeaderboardModal');
+        if (inMatchLb) inMatchLb.style.display = 'none';
+        this.isLeaderboardOpen = false;
         this.turn = 1;
         this.phase = 'PLANNING';
         this.currentStep = -1;
@@ -6759,7 +7366,7 @@ class GameEngine {
             } else {
                 if (window.soundCtrl && (target.isPlayer || allLivingUnits.some(u => u.isPlayer))) window.soundCtrl.playHit();
                 const dmg = sentry.power || 10;
-                this.applyDamage(target, dmg);
+                this.applyDamage(target, dmg, sentry.owner || null);
                 this.createHitSparks(target.x, target.y, target.color);
                 this.addFloatingText(`-${dmg} HP (SENTRY 🤖)`, target.x, target.y, '#ea580c');
                 this.addCombatLog(`Nhịp #${stepIndex + 1}: 🤖 Sentry của ${sentry.ownerName} tự động nã đạn vào ${target.name}! (-${dmg} HP)!`, 'hit');
@@ -6804,7 +7411,7 @@ class GameEngine {
             if (window.soundCtrl && (target.isPlayer || allLivingUnits.some(u => u.isPlayer))) window.soundCtrl.playZombieAttack();
 
             const dmg = zombie.power || 35;
-            this.applyDamage(target, dmg);
+            this.applyDamage(target, dmg, zombie.owner || null);
             this.createHitSparks(target.x, target.y, '#10b981');
             this.addFloatingText(`🧟 CẮN -${dmg} HP!`, target.x, target.y, '#10b981');
             this.addCombatLog(

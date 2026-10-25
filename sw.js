@@ -1,6 +1,6 @@
 // Crazy Warfare - PWA Service Worker for Offline Play on Android & iOS
-// Updated to v2.4.0: Network-First strategy with new operative Fake Savior (Revolver, Telekinesis, Necromancy)
-const CACHE_NAME = 'crazy-warfare-v2.5.0';
+// Updated to v2.6.0: Leaderboard, Match Statistics, Live Scoreboard & Hall of Fame
+const CACHE_NAME = 'crazy-warfare-v2.6.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
