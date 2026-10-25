@@ -1,6 +1,6 @@
 {
-  "appId": "com.chronoclash.tactics",
-  "appName": "Chrono Clash",
+  "appId": "com.crazywarfare.tactics",
+  "appName": "Crazy Warfare",
   "webDir": ".",
   "bundledWebRuntime": false,
   "server": {

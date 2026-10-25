@@ -1,5 +1,5 @@
 /**
- * CHRONO CLASH: CHARACTER & SKILL DATABASE
+ * CRAZY WARFARE: CHARACTER & SKILL DATABASE
  * Modular character definitions with Bilingual (VI / EN) Support.
  */
 

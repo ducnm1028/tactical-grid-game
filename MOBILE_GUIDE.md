@@ -1,5 +1,5 @@
 # HƯỚNG DẪN CÀI ĐẶT & BUILD PHIÊN BẢN ANDROID & IOS
-## Chrono Clash: WEGO 20x7 Tactical Grid Game
+## Crazy Warfare: WEGO 20x7 Tactical Grid Game
 
 Dự án đã được tích hợp đầy đủ công nghệ **PWA (Progressive Web App)** và **Capacitor Mobile SDK** để chạy hoàn hảo trên cả **Android** và **iOS**.
 
@@ -12,7 +12,7 @@ Dự án đã được tích hợp đầy đủ công nghệ **PWA (Progressive 
 1. Mở trang web game bằng trình duyệt **Safari**.
 2. Nhấn vào biểu tượng **Chia sẻ (Share)** ở thanh công cụ dưới đáy màn hình (hình ô vuông có mũi tên chỉ lên).
 3. Cuộn xuống và chọn **"Thêm vào MH chính" (Add to Home Screen)**.
-4. Đặt tên app (mặc định: `Chrono Clash`) và nhấn **Thêm (Add)**.
+4. Đặt tên app (mặc định: `Crazy Warfare`) và nhấn **Thêm (Add)**.
 5. Biểu tượng game sẽ xuất hiện trên màn hình chính như một app Native:
    * Chạy toàn màn hình (Standalone, không còn thanh địa chỉ Safari).
    * Tương thích tai thỏ / Dynamic Island (Safe-area cover).

@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Chrono Clash">
+    <meta name="apple-mobile-web-app-title" content="Crazy Warfare">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#030712">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
-    <title>Chrono Clash - WEGO Tactics 20x7</title>
-    <link rel="stylesheet" href="style.css?v=2.4.0">
+    <title>Crazy Warfare - WEGO Tactics 20x7</title>
+    <link rel="stylesheet" href="style.css?v=2.5.0">
 </head>
 <body>
     <!-- Mobile Rotate Screen Overlay (Hiển thị khi cầm dọc máy trên điện thoại) -->
@@ -23,7 +23,7 @@
     </div>
     <header>
         <div class="title-container">
-            <h1>Chrono Clash: WEGO 20x7</h1>
+            <h1>Crazy Warfare: WEGO 20x7</h1>
             <div class="subtitle">Game Chiến thuật Bàn cờ Lượt đồng thời • Nhập 4 hành động</div>
         </div>
         <div class="header-controls" style="display: flex; gap: 8px;">
@@ -39,8 +39,8 @@
             <button id="btnOpenCharSelect" class="btn-change-char" title="Mở màn hình chọn tướng">
                 👤 Đổi Tướng
             </button>
-            <button id="btnHeaderUpdate" class="btn-change-char btn-update-badge" title="Tải phiên bản mới nhất & Làm mới bộ nhớ đệm (v2.4.0)">
-                🔄 Bản mới v2.4
+            <button id="btnHeaderUpdate" class="btn-change-char btn-update-badge" title="Tải phiên bản mới nhất & Làm mới bộ nhớ đệm (v2.5.0)">
+                🔄 Bản mới v2.5
             </button>
             <button id="soundToggleBtn" class="key-badge" style="cursor:pointer;" title="Bật/Tắt âm thanh">
                 🔊 Âm thanh: BẬT
@@ -244,7 +244,7 @@
         <div class="lang-backdrop-glow"></div>
         <div class="lang-modal-box">
             <div class="lang-badge">LANGUAGE SELECTION • CHỌN NGÔN NGỮ</div>
-            <h1 class="lang-title">CHRONO CLASH</h1>
+            <h1 class="lang-title">CRAZY WARFARE</h1>
             <div class="lang-tagline">WEGO TACTICS 20x7</div>
             <p class="lang-subtitle">Chọn ngôn ngữ của bạn để bắt đầu • Choose your language to begin</p>
 
@@ -280,7 +280,7 @@
         <div class="menu-backdrop-glow"></div>
         <div class="menu-content-box">
             <div class="menu-badge">TACTICAL WEGO PROTOCOL • 20x7</div>
-            <h1 class="menu-title">CHRONO CLASH</h1>
+            <h1 class="menu-title">CRAZY WARFARE</h1>
             <div class="menu-tagline">CHIẾN THUẬT LƯỢT ĐỒNG THỜI • BÀN CỜ 20x7</div>
             <p class="menu-description">
                 Lập kế hoạch bí mật 4 hành động, dự đoán hướng đi của đối thủ và giải phóng các chiêu thức đặc sắc trên đấu trường lưới.
@@ -325,7 +325,7 @@
         <div class="guide-modal-container">
             <div class="guide-header">
                 <div class="guide-header-text">
-                    <h2>📖 CẨM NANG CHIẾN THUẬT CHRONO CLASH</h2>
+                    <h2>📖 CẨM NANG CHIẾN THUẬT CRAZY WARFARE</h2>
                     <p>Nắm vững cơ chế WEGO, điều khiển lộ trình và làm chủ 4 chiến binh đặc nhiệm</p>
                 </div>
                 <button id="btnCloseGuideX" class="guide-close-btn" title="Đóng hướng dẫn">✕</button>
@@ -339,7 +339,7 @@
                         <span>1. CƠ CHẾ LƯỢT ĐỒNG THỜI (WEGO SYSTEM)</span>
                     </div>
                     <div class="section-card-body">
-                        <p>Khác với cờ theo lượt truyền thống, ở <b>Chrono Clash</b> cả 2 bên cùng lúc hành động theo cơ chế thời gian thực đồng thời:</p>
+                        <p>Khác với cờ theo lượt truyền thống, ở <b>Crazy Warfare</b> cả 2 bên cùng lúc hành động theo cơ chế thời gian thực đồng thời:</p>
                         <div class="guide-steps-grid">
                             <div class="g-step-box">
                                 <span class="g-step-badge">Pha 1</span>
@@ -765,15 +765,15 @@
         </div>
     </div>
 
-    <script src="audio.js?v=2.4.0"></script>
-    <script src="i18n.js?v=2.4.0"></script>
-    <script src="characters.js?v=2.4.0"></script>
-    <script src="game.js?v=2.4.0"></script>
+    <script src="audio.js?v=2.5.0"></script>
+    <script src="i18n.js?v=2.5.0"></script>
+    <script src="characters.js?v=2.5.0"></script>
+    <script src="game.js?v=2.5.0"></script>
     <script>
         // Đăng ký Service Worker cho Android & iOS PWA Offline Play
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=2.4.0').then((reg) => {
+                navigator.serviceWorker.register('./sw.js?v=2.5.0').then((reg) => {
                     reg.update();
                     reg.addEventListener('updatefound', () => {
                         const newWorker = reg.installing;

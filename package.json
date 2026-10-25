@@ -1,7 +1,7 @@
 {
-  "name": "chrono-clash",
+  "name": "crazy-warfare",
   "version": "1.0.0",
-  "description": "Chrono Clash: WEGO 20x7 Tactical Grid Game for Web, Android & iOS",
+  "description": "Crazy Warfare: WEGO 20x7 Tactical Grid Game for Web, Android & iOS",
   "main": "game.js",
   "scripts": {
     "test": "node run_all_tests.js",

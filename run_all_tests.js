@@ -1,5 +1,5 @@
 /**
- * Master Test Runner: Runs all 7 test suites for Chrono Clash
+ * Master Test Runner: Runs all 11 test suites for Crazy Warfare
  */
 const { execSync } = require('child_process');
 
@@ -18,7 +18,7 @@ const testFiles = [
 ];
 
 console.log('====================================================');
-console.log('🚀 CHRONO CLASH - CHẠY TẤT CẢ 11 TEST SUITES');
+console.log('🚀 CRAZY WARFARE - CHẠY TẤT CẢ 11 TEST SUITES');
 console.log('====================================================\n');
 
 let totalPassed = 0;

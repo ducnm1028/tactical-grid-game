@@ -1,6 +1,6 @@
-// Chrono Clash - PWA Service Worker for Offline Play on Android & iOS
+// Crazy Warfare - PWA Service Worker for Offline Play on Android & iOS
 // Updated to v2.4.0: Network-First strategy with new operative Fake Savior (Revolver, Telekinesis, Necromancy)
-const CACHE_NAME = 'chrono-clash-v2.4.0';
+const CACHE_NAME = 'crazy-warfare-v2.5.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
