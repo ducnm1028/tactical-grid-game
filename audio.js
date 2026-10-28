@@ -951,6 +951,84 @@ class SoundController {
             osc.stop(now + 0.22);
         } catch (e) {}
     }
+
+    playMachinePistol() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Loạt đạn tiểu liên cực nhanh 3 viên tạch-tạch-tạch
+            for (let i = 0; i < 3; i++) {
+                const burstTime = now + i * 0.055;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(520, burstTime);
+                osc.frequency.exponentialRampToValueAtTime(140, burstTime + 0.045);
+                gain.gain.setValueAtTime(0.3, burstTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, burstTime + 0.045);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(burstTime);
+                osc.stop(burstTime + 0.045);
+            }
+        } catch (e) {}
+    }
+
+    playHealStation() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Chuỗi âm bổng cộng hưởng hồi máu êm dịu, ấm áp (E4 - G#4 - B4 - E5)
+            const freqs = [329.63, 415.30, 493.88, 659.25];
+            freqs.forEach((freq, idx) => {
+                const noteTime = now + idx * 0.07;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, noteTime);
+                osc.frequency.exponentialRampToValueAtTime(freq * 1.05, noteTime + 0.25);
+                gain.gain.setValueAtTime(0.25, noteTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.25);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(noteTime);
+                osc.stop(noteTime + 0.25);
+            });
+        } catch (e) {}
+    }
+
+    playInvulnerabilityShield() {
+        this.init();
+        try {
+            const now = this.ctx.currentTime;
+            // Tiếng kích hoạt màn chắn năng lượng bất hoại rực rỡ
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+            osc.frequency.exponentialRampToValueAtTime(440, now + 0.4);
+            gain.gain.setValueAtTime(0.4, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.4);
+
+            // Shimmer huyền ảo
+            const shimmer = this.ctx.createOscillator();
+            const sGain = this.ctx.createGain();
+            shimmer.type = 'sine';
+            shimmer.frequency.setValueAtTime(1320, now + 0.05);
+            shimmer.frequency.linearRampToValueAtTime(1760, now + 0.35);
+            sGain.gain.setValueAtTime(0.2, now + 0.05);
+            sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            shimmer.connect(sGain);
+            sGain.connect(this.ctx.destination);
+            shimmer.start(now + 0.05);
+            shimmer.stop(now + 0.35);
+        } catch (e) {}
+    }
 }
 
 window.soundCtrl = new SoundController();

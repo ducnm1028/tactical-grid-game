@@ -715,7 +715,8 @@ class GameEngine {
                 cigarette: { turnsLeft: 0, dmgBonusPercent: 30, moveBonus: 1 },
                 destructiveShot: false,
                 thermalVision: { active: false, rangeBonus: 0 },
-                chaosShot: false
+                chaosShot: false,
+                invulnerability: { active: false, primedForNextTurn: false, turnsLeft: 0, sourceName: '' }
             },
             isScoped: false,
             isImmune: false,
@@ -3121,6 +3122,8 @@ class GameEngine {
                 action = this.generateCpuActionHatBoomMan(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit);
             } else if (charId === 'fake_savior') {
                 action = this.generateCpuActionFakeSavior(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit);
+            } else if (charId === 'medic') {
+                action = this.generateCpuActionMedic(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit);
             } else {
                 action = this.generateCpuActionTrooper(i, simX, simY, dx, dy, dist, targetInvisible, simCooldowns, simSkillAmmo, simBuffs);
             }
@@ -3914,6 +3917,78 @@ class GameEngine {
         };
     }
 
+    generateCpuActionMedic(stepIdx, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit) {
+        const targetDir = this.getDirectionTowards(dx, dy);
+        const myTeam = unit ? (unit.team === 'BLUE' ? this.blueTeam : this.redTeam) : [];
+        const livingAllies = myTeam.filter(u => u.hp > 0);
+
+        // 1. Hộ Thuẫn Bất Tử: Dùng nếu có đồng đội (hoặc Medic) thấp máu (<= 75 HP) hoặc chưa hồi chiêu
+        if (!simCooldowns['MEDIC_INVULNERABILITY_SHIELD']) {
+            const injuredAlly = livingAllies.find(u => u.hp <= 75 && Math.hypot(u.x - simX, u.y - simY) <= 8);
+            if (injuredAlly || (unit && unit.hp <= 75) || Math.random() < 0.25) {
+                simCooldowns['MEDIC_INVULNERABILITY_SHIELD'] = 4;
+                const targetAlly = injuredAlly || unit;
+                const shieldDir = targetAlly ? this.getDirectionTowards(targetAlly.x - simX, targetAlly.y - simY) : targetDir;
+                return {
+                    type: 'INVULNERABILITY_SHIELD',
+                    skillId: 'MEDIC_INVULNERABILITY_SHIELD',
+                    name: 'Hộ Thuẫn Bất Tử',
+                    icon: '🛡️',
+                    dir: shieldDir,
+                    dirSymbol: DIRECTIONS[shieldDir].symbol,
+                    range: 8,
+                    cooldown: 4,
+                    targetUnit: targetAlly
+                };
+            }
+        }
+
+        // 2. Trạm Hồi Máu (HEAL_STATION): Không cooldown. Dùng nếu bản thân hoặc đồng đội trong 5x5 mất máu
+        const woundedNearby = livingAllies.some(u => u.hp < u.maxHp && Math.abs(u.x - simX) <= 2 && Math.abs(u.y - simY) <= 2);
+        if (woundedNearby || (unit && unit.hp <= 85)) {
+            return {
+                type: 'HEAL_STATION',
+                skillId: 'MEDIC_HEAL_STATION',
+                name: 'Trạm Hồi Máu',
+                icon: '🏥',
+                dir: targetDir,
+                dirSymbol: DIRECTIONS[targetDir].symbol,
+                range: 2,
+                power: 10,
+                cooldown: 0
+            };
+        }
+
+        // 3. Machine Pistol: Bắn tiểu liên tầm 5 theo 8 hướng (12.5 DMG)
+        const alignedDir = this.getAlignedRangedDirection(simX, simY, simX + dx, simY + dy, 5);
+        if (alignedDir && (!playerInvisible || dist <= 3)) {
+            return {
+                type: 'MACHINE_PISTOL',
+                skillId: 'MEDIC_MACHINE_PISTOL',
+                name: 'Machine Pistol',
+                icon: '🔫',
+                dir: alignedDir,
+                dirSymbol: DIRECTIONS[alignedDir].symbol,
+                range: 5,
+                power: 12.5
+            };
+        }
+
+        // 4. Di chuyển bằng Lộ Trình (PATH_MOVE 2 bước) tiếp cận hoặc hỗ trợ
+        const moveBudget = (unit && unit.moveBudget) || 2;
+        const path = this.findBestPathTowards(simX, simY, simX + dx, simY + dy, moveBudget);
+        return {
+            type: 'PATH_MOVE',
+            skillId: 'MEDIC_MOVE',
+            name: "Lộ Trình (" + path.length + "b)",
+            icon: '👟',
+            path: path,
+            steps: path.length,
+            dir: path.length > 0 ? path[path.length - 1].dir : targetDir,
+            dirSymbol: DIRECTIONS[path.length > 0 ? path[path.length - 1].dir : targetDir].symbol
+        };
+    }
+
     generateCpuActionHatBoomMan(stepIdx, simX, simY, dx, dy, dist, playerInvisible, simCooldowns, simSkillAmmo, simBuffs, queue, unit) {
         let isScoped = (unit && unit.isScoped) || false;
         if (queue) {
@@ -4556,7 +4631,7 @@ class GameEngine {
                 }
             }
         }
-        else if (act.type === 'RANGED_LINE' || act.type === 'RANGED_VARIABLE' || act.type === 'REVOLVER') {
+        else if (act.type === 'RANGED_LINE' || act.type === 'RANGED_VARIABLE' || act.type === 'REVOLVER' || act.type === 'MACHINE_PISTOL') {
             const uD = DIRECTIONS[act.dir];
             let thermalBonus = 0;
             if (actor.buffs && actor.buffs.thermalVision && actor.buffs.thermalVision.active) {
@@ -4566,6 +4641,8 @@ class GameEngine {
             const maxRange = (act.range || 5) + thermalBonus;
             if (act.type === 'REVOLVER' || act.skillId === 'SAVIOR_REVOLVER') {
                 if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playRevolver();
+            } else if (act.type === 'MACHINE_PISTOL' || act.skillId === 'MEDIC_MACHINE_PISTOL') {
+                if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playMachinePistol();
             } else if (act.skillId === 'ENGIE_NAILGUN') {
                 if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playNailgun();
             } else if (act.skillId === 'RAZOR_PULSE_RIFLE') {
@@ -4640,6 +4717,7 @@ class GameEngine {
 
             let tracerColor = '#34d399';
             if (act.type === 'REVOLVER' || act.skillId === 'SAVIOR_REVOLVER') tracerColor = '#c084fc';
+            else if (act.type === 'MACHINE_PISTOL' || act.skillId === 'MEDIC_MACHINE_PISTOL') tracerColor = '#10b981';
             else if (act.skillId === 'ENGIE_NAILGUN') tracerColor = '#fbbf24';
             else if (act.skillId === 'FIREMAN_GATTLING_FIRE') tracerColor = '#ea580c';
             else if (act.skillId === 'SMOKE_RIFLE') tracerColor = '#fb923c';
@@ -5661,6 +5739,97 @@ class GameEngine {
             if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 4;
             if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 4;
         }
+        else if (act.type === 'HEAL_STATION') {
+            const allies = (actor.team === 'BLUE' ? this.blueTeam : this.redTeam).filter(u => u.hp > 0);
+            const healRange = act.range !== undefined ? act.range : 2; // Chebyshev distance <= 2 is 5x5 zone
+            let totalHealed = 0;
+            let healedUnits = 0;
+
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) {
+                window.soundCtrl.playHealStation();
+            }
+
+            for (const ally of allies) {
+                // Check 5x5 area around Medic
+                if (Math.abs(ally.x - actor.x) <= healRange && Math.abs(ally.y - actor.y) <= healRange) {
+                    const healPower = act.power || 10;
+                    const prevHp = ally.hp;
+                    ally.hp = Math.min(ally.maxHp, ally.hp + healPower);
+                    const actualHeal = ally.hp - prevHp;
+                    totalHealed += actualHeal;
+                    healedUnits++;
+
+                    this.createBuffSparks(ally.x, ally.y, '#10b981');
+                    this.addFloatingText(`+${healPower} HP!`, ally.x, ally.y, '#10b981');
+                }
+            }
+
+            if (!actor.stats) {
+                actor.stats = { kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0, healing: 0, hillPoints: 0, score: 0 };
+            }
+            actor.stats.healing = (actor.stats.healing || 0) + totalHealed;
+
+            this.addCombatLog(
+                this.lang === 'en'
+                    ? `Beat #${stepIndex + 1}: ${actor.name} deployed [Healing Station] (5x5 zone)! Restored HP to ${healedUnits} teammate(s) (Total +${totalHealed} HP)!`
+                    : `Nhịp #${stepIndex + 1}: ${actor.name} triển khai [Trạm Hồi Máu] (khu vực 5x5)! Hồi 10 máu cho ${healedUnits} đồng đội (Tổng hồi +${totalHealed} HP)!`,
+                'buff'
+            );
+        }
+        else if (act.type === 'INVULNERABILITY_SHIELD') {
+            const allies = (actor.team === 'BLUE' ? this.blueTeam : this.redTeam).filter(u => u.hp > 0);
+            let targetAlly = act.targetUnit || (act.targetId ? allLivingUnits.find(u => u.id === act.targetId) : null);
+
+            // 1. Kiểm tra theo hướng act.dir
+            if (!targetAlly && act.dir && DIRECTIONS[act.dir]) {
+                const uD = DIRECTIONS[act.dir];
+                for (let r = 1; r <= (act.range || 8); r++) {
+                    const tx = actor.x + uD.dx * r;
+                    const ty = actor.y + uD.dy * r;
+                    const match = allies.find(u => u.x === tx && u.y === ty);
+                    if (match) {
+                        targetAlly = match;
+                        break;
+                    }
+                }
+            }
+
+            // 2. Nếu không tìm thấy theo hướng, ưu tiên đồng đội thấp máu nhất trong tầm (hoặc chính Medic)
+            if (!targetAlly) {
+                const candidateAllies = allies.filter(u => Math.hypot(u.x - actor.x, u.y - actor.y) <= (act.range || 8));
+                if (candidateAllies.length > 0) {
+                    candidateAllies.sort((a, b) => a.hp - b.hp);
+                    targetAlly = candidateAllies[0];
+                } else {
+                    targetAlly = actor;
+                }
+            }
+
+            if (!targetAlly.buffs) targetAlly.buffs = {};
+            targetAlly.buffs.invulnerability = {
+                active: false,
+                primedForNextTurn: true,
+                turnsLeft: 1,
+                sourceName: actor.name
+            };
+
+            if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) {
+                window.soundCtrl.playInvulnerabilityShield();
+            }
+
+            this.createBuffSparks(targetAlly.x, targetAlly.y, '#38bdf8');
+            this.addFloatingText(this.lang === 'en' ? '🛡️ PRIMED SHIELD!' : '🛡️ NIỆM HỘ THUẪN!', targetAlly.x, targetAlly.y, '#38bdf8');
+            this.addCombatLog(
+                this.lang === 'en'
+                    ? `Beat #${stepIndex + 1}: ${actor.name} targeted ${targetAlly.name} with [Invulnerability Shield]! Immune to all damage next turn!`
+                    : `Nhịp #${stepIndex + 1}: ${actor.name} niệm [Hộ Thuẫn Bất Tử] lên ${targetAlly.name}! Kháng mọi sát thương trong lượt tiếp theo!`,
+                'buff'
+            );
+
+            actor.cooldowns[act.skillId || 'MEDIC_INVULNERABILITY_SHIELD'] = act.cooldown || 4;
+            if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId || 'MEDIC_INVULNERABILITY_SHIELD'] = act.cooldown || 4;
+            if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId || 'MEDIC_INVULNERABILITY_SHIELD'] = act.cooldown || 4;
+        }
     }
 
     finishTurn() {
@@ -5728,6 +5897,41 @@ class GameEngine {
                 if (unit.buffs.cigarette.turnsLeft === 0) {
                     unit.cooldowns['SMOKE_CIGARETTE'] = 3;
                     this.addCombatLog(`⏳ Khói [Thuốc Lá] của ${unit.name} đã tàn, bắt đầu hồi chiêu 3 lượt!`, 'system');
+                }
+            }
+
+            // 5. Cập nhật Hộ Thuẫn Bất Tử (Medic)
+            if (unit.buffs && unit.buffs.invulnerability) {
+                const inv = unit.buffs.invulnerability;
+                if (inv.active) {
+                    inv.turnsLeft--;
+                    if (inv.turnsLeft <= 0) {
+                        inv.active = false;
+                        this.addCombatLog(
+                            this.lang === 'en'
+                                ? `✨ [Invulnerability Shield] on ${unit.name} has expired!`
+                                : `✨ [Hộ Thuẫn Bất Tử] trên ${unit.name} đã kết thúc hiệu lực!`,
+                            'system'
+                        );
+                    }
+                } else if (inv.primedForNextTurn) {
+                    inv.primedForNextTurn = false;
+                    inv.active = true;
+                    inv.turnsLeft = 1;
+                    if (window.soundCtrl) window.soundCtrl.playInvulnerabilityShield();
+                    this.createBuffSparks(unit.x, unit.y, '#38bdf8');
+                    this.addFloatingText(
+                        this.lang === 'en' ? '🛡️ INVULNERABLE (1 TURN)!' : '🛡️ BẤT TỬ (1 LƯỢT)!',
+                        unit.x,
+                        unit.y,
+                        '#38bdf8'
+                    );
+                    this.addCombatLog(
+                        this.lang === 'en'
+                            ? `🛡️ ${unit.name} is now protected by [Invulnerability Shield]! Immune to all damage this turn!`
+                            : `🛡️ ${unit.name} bắt đầu kích hoạt [Hộ Thuẫn Bất Tử]! Kháng toàn bộ sát thương trong lượt này!`,
+                        'shield'
+                    );
                 }
             }
 
@@ -6136,6 +6340,15 @@ class GameEngine {
         if (!entity || entity.isImmune) return;
         const curAct = (entity.queue && this.currentStep >= 0) ? entity.queue[this.currentStep] : null;
         if (curAct && curAct.type === 'BOOM_LEAP') return;
+
+        if (entity.buffs && entity.buffs.invulnerability && entity.buffs.invulnerability.active) {
+            this.createHitSparks(entity.x, entity.y, '#38bdf8');
+            this.addFloatingText(this.lang === 'en' ? '🛡️ DAMAGE IMMUNE!' : '🛡️ KHÁNG SÁT THƯƠNG!', entity.x, entity.y, '#38bdf8');
+            this.addCombatLog(this.lang === 'en'
+                ? `🛡️ ${entity.name}'s [Invulnerability Shield] completely absorbed ${amount} incoming damage!`
+                : `🛡️ [Hộ Thuẫn Bất Tử] của ${entity.name} đã triệt tiêu hoàn toàn ${amount} sát thương!`, 'shield');
+            return;
+        }
 
         if (entity.isOiled && amount > 0) {
             entity.isOiled = false;
@@ -8211,6 +8424,30 @@ class GameEngine {
             ctx.stroke();
             ctx.restore();
             tag = `${tag} [🌀]`;
+        }
+
+        // Hiệu ứng Hộ Thuẫn Bất Tử (Medic: Kháng mọi sát thương)
+        if (fighter.buffs && fighter.buffs.invulnerability && fighter.buffs.invulnerability.active) {
+            ctx.save();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.shadowColor = '#38bdf8';
+            ctx.shadowBlur = 10;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, 26, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            tag = `${tag} [🛡️BẤT TỬ]`;
+        } else if (fighter.buffs && fighter.buffs.invulnerability && fighter.buffs.invulnerability.primedForNextTurn) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 25, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            tag = `${tag} [⏳HỘ THUẪN]`;
         }
 
         // Hiệu ứng Miễn Nhiễm Sát Thương (Hat Boom Man Bật Nhảy)

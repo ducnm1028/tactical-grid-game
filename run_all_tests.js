@@ -1,5 +1,5 @@
 /**
- * Master Test Runner: Runs all 12 test suites for Crazy Warfare
+ * Master Test Runner: Runs all 13 test suites for Crazy Warfare
  */
 const { execSync } = require('child_process');
 
@@ -15,11 +15,12 @@ const testFiles = [
     'test_snipeman.js',
     'test_hat_boom_man.js',
     'test_fake_savior.js',
+    'test_medic.js',
     'test_leaderboard.js'
 ];
 
 console.log('====================================================');
-console.log('🚀 CRAZY WARFARE - CHẠY TẤT CẢ 12 TEST SUITES');
+console.log('🚀 CRAZY WARFARE - CHẠY TẤT CẢ 13 TEST SUITES');
 console.log('====================================================\n');
 
 let totalPassed = 0;

@@ -702,6 +702,80 @@ const CHARACTERS_DATABASE = [
                 color: '#10b981'
             }
         ]
+    },
+    {
+        id: 'medic',
+        name: 'Medic (Bác Sĩ Quân Y)',
+        name_en: 'Medic (Combat Physician)',
+        title: 'Cứu Thương Trận Địa & Hộ Thuẫn Bất Tử',
+        title_en: 'Field Resuscitation & Invulnerability Ward',
+        description: 'Vũ khí Machine Pistol: Sát thương 12.5, Phạm vi: 5 ô theo 8 hướng. Chiêu 1: Trạm Hồi Máu (Mọi đồng đội trong phạm vi 5x5 hồi 10 máu, không cooldown). Chiêu 2: Hộ Thuẫn Bất Tử (Lựa chọn một đồng đội hoặc bản thân, đồng đội đó sẽ kháng mọi sát thương trong lượt tiếp theo; vẫn nhận hiệu ứng xấu như choáng hay hất tung; Cooldown: 4 lượt).',
+        description_en: 'Machine Pistol: 12.5 DMG, range 5 tiles in 8 directions. Skill 1: Healing Station (All allies within 5x5 radius recover 10 HP, 0 cooldown). Skill 2: Invulnerability Shield (Grants complete immunity to all damage during the next turn to an ally or self; target can still receive status debuffs like stun or knockback; CD: 4 turns).',
+        avatar: '🩺',
+        themeColor: '#10b981',
+        secondaryColor: '#34d399',
+        maxHp: 100,
+        moveBudget: 2,
+        isUnlocked: true,
+        skills: [
+            {
+                slot: 1,
+                id: 'MEDIC_MOVE',
+                name: 'Lộ Trình',
+                name_en: 'Route',
+                icon: '👟',
+                hotkey: '1 / M',
+                type: 'PATH_MOVE',
+                maxSteps: 2,
+                power: 0,
+                desc: 'Di chuyển tự do tối đa 2 bước theo mọi hướng',
+                desc_en: 'Free movement up to 2 steps in all directions',
+                color: '#10b981'
+            },
+            {
+                slot: 2,
+                id: 'MEDIC_MACHINE_PISTOL',
+                name: 'Machine Pistol',
+                name_en: 'Machine Pistol',
+                icon: '🔫',
+                hotkey: '2 / J',
+                type: 'MACHINE_PISTOL',
+                range: 5,
+                power: 12.5,
+                desc: 'Bắn súng tiểu liên tốc độ cao tầm xa 5 ô theo 8 hướng (12.5 Sát thương)',
+                desc_en: 'Fires high-rate machine pistol burst up to 5 tiles in 8 directions (12.5 Damage)',
+                color: '#34d399'
+            },
+            {
+                slot: 3,
+                id: 'MEDIC_HEAL_STATION',
+                name: 'Trạm Hồi Máu',
+                name_en: 'Healing Station',
+                icon: '🏥',
+                hotkey: '3 / K',
+                type: 'HEAL_STATION',
+                range: 2,
+                power: 10,
+                cooldown: 0,
+                desc: 'Triển khai trạm y tế 5x5 quanh Medic, hồi 10 HP cho mọi đồng đội trong phạm vi (Không hồi chiêu)',
+                desc_en: 'Deploys 5x5 field around Medic, healing 10 HP to all allies in range (0 Cooldown)',
+                color: '#10b981'
+            },
+            {
+                slot: 4,
+                id: 'MEDIC_INVULNERABILITY_SHIELD',
+                name: 'Hộ Thuẫn Bất Tử',
+                name_en: 'Invulnerability Shield',
+                icon: '🛡️',
+                hotkey: '4 / L',
+                type: 'INVULNERABILITY_SHIELD',
+                range: 8,
+                cooldown: 4,
+                desc: 'Lựa chọn một đồng đội hoặc bản thân, kháng mọi sát thương trong lượt tiếp theo (vẫn nhận hiệu ứng xấu như choáng hay hất tung) (Hồi: 4L)',
+                desc_en: 'Targets an ally or self, making them immune to all damage during the next turn (still vulnerable to debuffs like knockback/stun) (CD: 4T)',
+                color: '#06b6d4'
+            }
+        ]
     }
 ];
 
