@@ -554,7 +554,7 @@ class GameEngine {
                     </div>
                 `;
             }
-            blueList.innerHTML = blueHtml || `<span style="color:#64748b; font-size:0.75rem;">(Trống)</span>`;
+            blueList.innerHTML = blueHtml || `<span style="color:#64748b; font-size:0.75rem;">(${this.lang === 'en' ? 'Empty' : 'Trống'})</span>`;
 
             // Roster Đội Đỏ (2P Mode)
             let redHtml = '';
@@ -587,7 +587,7 @@ class GameEngine {
                     </div>
                 `;
             }
-            redList.innerHTML = redHtml || `<span style="color:#64748b; font-size:0.75rem;">(Trống)</span>`;
+            redList.innerHTML = redHtml || `<span style="color:#64748b; font-size:0.75rem;">(${this.lang === 'en' ? 'Empty' : 'Trống'})</span>`;
             return;
         }
 
@@ -2005,6 +2005,7 @@ class GameEngine {
             skillId: char.skills[0].id,
             type: 'PATH_MOVE',
             name: `Lộ Trình (${this.activePath.length}b)`,
+            name_en: `Route (${this.activePath.length} steps)`,
             icon: '👟',
             path: [...this.activePath],
             dir: this.activePath[this.activePath.length - 1].dir,
@@ -2303,8 +2304,8 @@ class GameEngine {
             const currentAmmo = uSkillAmmo[skill.id] !== undefined ? uSkillAmmo[skill.id] : skill.maxAmmo;
             const queuedCount = currentQueue.filter(act => act.skillId === skill.id).length;
             if (queuedCount >= currentAmmo) {
-                const emptyWord = skill.type === 'RECT_SLASH' ? 'HẾT LƯỢT DÙNG!' : 'HẾT ĐẠN!';
-                const unitWord = skill.type === 'RECT_SLASH' ? 'lượt sử dụng' : 'viên đạn';
+                const emptyWord = skill.type === 'RECT_SLASH' ? (this.lang === 'en' ? 'OUT OF USES!' : 'HẾT LƯỢT DÙNG!') : (this.lang === 'en' ? 'OUT OF AMMO!' : 'HẾT ĐẠN!');
+                const unitWord = skill.type === 'RECT_SLASH' ? (this.lang === 'en' ? 'use(s)' : 'lượt sử dụng') : (this.lang === 'en' ? 'round(s)' : 'viên đạn');
                 this.addFloatingText(emptyWord, ux, uy, '#f87171');
                 this.addCombatLog(this.lang === 'en' ? `[${getSkillName(skill, 'en')}] only has ${currentAmmo} ${skill.type === 'RECT_SLASH' ? 'use(s)' : 'round(s)'} left!` : `[${skill.name}] chỉ còn ${currentAmmo} ${unitWord}!`, 'hit');
                 if (window.soundCtrl) window.soundCtrl.playUndo();
@@ -2540,7 +2541,7 @@ class GameEngine {
         const playerPrefix = this.isTwoPlayerMode ? `[P${this.activePlanningPlayer}] ` : '';
         this.addCombatLog(
             this.lang === 'en'
-                ? `${playerPrefix}Queued [${action.name}] facing [${dirLabel} ${action.dirSymbol}]!`
+                ? `${playerPrefix}Queued [${this.getActionName(action)}] facing [${dirLabel} ${action.dirSymbol}]!`
                 : `${playerPrefix}Đã nạp [${action.name}] hướng [${dirLabel} ${action.dirSymbol}] vào hàng đợi!`,
             'system'
         );
@@ -2665,7 +2666,7 @@ class GameEngine {
                                 cSlot.innerHTML = `
                                     <span class="slot-step-num">#${i + 1}</span>
                                     <span class="slot-icon">${act.icon}</span>
-                                    <span class="slot-name">${act.name}</span>
+                                    <span class="slot-name">${this.getActionName(act)}</span>
                                     <span class="slot-dir" style="letter-spacing: 2px;">${act.dirSymbol || ''}</span>
                                 `;
                             } else {
@@ -2982,14 +2983,71 @@ class GameEngine {
         if (!act) return '';
         if (this.lang === 'en') {
             if (act.name_en) return act.name_en;
+
+            // Tra cứu động qua cơ sở dữ liệu nhân vật & kỹ năng
+            if (act.skillId && typeof CHARACTERS_DATABASE !== 'undefined') {
+                for (const char of CHARACTERS_DATABASE) {
+                    const sk = char.skills.find(s => s.id === act.skillId);
+                    if (sk && sk.name_en) return sk.name_en;
+                }
+            }
+
+            const actionNameMap = {
+                'Lộ Trình': 'Route',
+                'Bắn Bừa Bãi': 'Wild Spray',
+                'Bắn Bừa Tên Lửa': 'Wild Rocket',
+                'Bắn Bừa Bom Pháo': 'Wild Bomb Shot',
+                'Bắn Bừa Đại Bác Lửa': 'Wild Fire Cannon',
+                'Ném Bừa Thùng Dầu': 'Wild Oil Barrel',
+                'Bắn Bừa Gattling Fire': 'Wild Gatling Fire',
+                'Khiên': 'Shield',
+                'Tên Lửa': 'Rocket',
+                'Lựu Đạn': 'Frag Grenade',
+                'Móc Kéo': 'Grappling Hook',
+                'Adrenaline': 'Adrenaline Stim',
+                'Ống Tiêm Adrenaline': 'Adrenaline Stim',
+                'Silence Pistol': 'Silence Pistol',
+                'Thuốc Lá': 'Cigarette',
+                'Súng Bắn Bom': 'Bomb Launcher',
+                'Combat Rifle': 'Combat Rifle',
+                'Kiếm Gắn Tay': 'Arm Blade',
+                'Nhảy Đột Kích': 'Assault Leap',
+                'Pulse Rifle': 'Pulse Rifle',
+                'Thùng Dầu': 'Oil Barrel',
+                'Đại Bác Lửa': 'Fire Cannon',
+                'Gattling Fire': 'Gattling Fire',
+                'Xây Sentry': 'Deploy Sentry',
+                'Cổng Dịch Chuyển': 'Teleporter',
+                'Súng Thanh Sắt': 'Iron Rod Gun',
+                'Tầm Nhìn Dò Nhiệt': 'Thermal Vision',
+                'Phát Bắn Hủy Diệt': 'Destructive Shot',
+                'Bắn Súng Tỉa': 'Sniper Shot',
+                'Ngắm Bắn': 'Scope In',
+                'Necromancy': 'Necromancy',
+                'Telekinesis': 'Telekinesis',
+                'Revolver': 'Revolver',
+                'Hộ Thuẫn Bất Tử': 'Invulnerability Shield',
+                'Trạm Hồi Máu': 'Healing Station',
+                'Machine Pistol': 'Machine Pistol',
+                'Cú Bật Nhảy': 'Invulnerable Leap',
+                'Phát Bắn Rối Loạn': 'Chaos Shot',
+                'Bắn Nòng Xe Tăng': 'Tank Cannon Shot',
+                'Ngắm Nòng Pháo': 'Scope In'
+            };
+            if (act.name && actionNameMap[act.name]) return actionNameMap[act.name];
+
+            if (typeof act.name === 'string' && act.name.startsWith('Lộ Trình')) {
+                return act.name.replace('Lộ Trình', 'Route').replace('b)', ' steps)').replace('b', ' steps');
+            }
+
             const skillMap = {
                 'TROOPER_MOVE': 'Route',
                 'TROOPER_RIFLE': 'Assault Rifle',
                 'TROOPER_ROCKET': 'Rocket Launcher',
                 'TROOPER_GRENADE': 'Frag Grenade',
                 'HOOKMAN_MOVE': 'Patrol Route',
-                'HOOKMAN_PISTOL': 'Silenced Pistol',
-                'HOOKMAN_ADRENALINE': 'Adrenaline Shot',
+                'HOOKMAN_PISTOL': 'Silence Pistol',
+                'HOOKMAN_ADRENALINE': 'Adrenaline Stim',
                 'HOOKMAN_HOOK': 'Grappling Hook',
                 'SMOKE_MOVE': 'Route',
                 'SMOKE_RIFLE': 'Combat Rifle',
@@ -2997,17 +3055,19 @@ class GameEngine {
                 'SMOKE_CIGARETTE': 'Light Cigarette',
                 'RAZOR_MOVE': 'Route',
                 'RAZOR_PULSE_RIFLE': 'Pulse Rifle',
-                'RAZOR_LEAP': 'Ambush Leap',
-                'RAZOR_BLADE': 'Wrist Blades',
+                'RAZOR_LEAP': 'Assault Leap',
+                'RAZOR_BLADE': 'Arm Blade',
                 'FIREMAN_MOVE': 'Route',
                 'FIREMAN_GATTLING_FIRE': 'Gatling Inferno',
-                'FIREMAN_OIL_BOMB': 'Oil Flask Bomb',
+                'FIREMAN_OIL_BARREL': 'Oil Barrel',
+                'FIREMAN_OIL_BOMB': 'Oil Barrel',
                 'FIREMAN_FIRE_CANNON': 'Fire Cannon',
                 'ENGIE_MOVE': 'Route',
                 'ENGIE_NAILGUN': 'Iron Rod Gun',
                 'ENGIE_SENTRY': 'Deploy Sentry',
                 'ENGIE_TELEPORTER': 'Teleporter',
                 'SNIPER_MOVE': 'Route',
+                'SNIPER_RIFLE': 'Sniper Rifle',
                 'SNIPER_SCOPE': 'Scope In',
                 'SNIPER_SHOT': 'Sniper Shot',
                 'SNIPER_DESTRUCTIVE': 'Destructive Shot',
@@ -3015,7 +3075,8 @@ class GameEngine {
                 'BOOM_MOVE': 'Route',
                 'BOOM_SCOPE': 'Scope In',
                 'BOOM_SHOT': 'Tank Cannon Shot',
-                'BOOM_LEAP': 'Rocket Leap',
+                'TANK_CANNON': 'Tank Cannon Shot',
+                'BOOM_LEAP': 'Invulnerable Leap',
                 'BOOM_CHAOS_SHOT': 'Chaos Shot',
                 'SAVIOR_MOVE': 'Route',
                 'SAVIOR_REVOLVER': 'Revolver',
@@ -3028,14 +3089,15 @@ class GameEngine {
             };
             if (act.skillId && skillMap[act.skillId]) return skillMap[act.skillId];
             if (act.type === 'PATH_MOVE') return 'Route';
-            if (act.type === 'LEAP') return 'Ambush Leap';
-            if (act.type === 'BOOM_LEAP') return 'Rocket Leap';
+            if (act.type === 'SHIELD') return 'Shield';
+            if (act.type === 'LEAP') return 'Assault Leap';
+            if (act.type === 'BOOM_LEAP') return 'Invulnerable Leap';
             if (act.type === 'ATTACK') return 'Melee Attack';
-            if (act.type === 'RECT_SLASH') return 'Wrist Blades';
+            if (act.type === 'RECT_SLASH') return 'Arm Blade';
             if (act.type === 'GRENADE') return 'Frag Grenade';
             if (act.type === 'ROCKET') return 'Rocket Launcher';
             if (act.type === 'BOMB_LAUNCHER') return 'Smoke Bomb Launcher';
-            if (act.type === 'OIL_BOMB') return 'Oil Flask Bomb';
+            if (act.type === 'OIL_BARREL' || act.type === 'OIL_BOMB') return 'Oil Barrel';
             if (act.type === 'FIRE_CANNON') return 'Fire Cannon';
             if (act.type === 'DEPLOY_SENTRY') return 'Deploy Sentry';
             if (act.type === 'DEPLOY_TELEPORTER') return 'Teleporter';
@@ -3044,10 +3106,17 @@ class GameEngine {
             if (act.type === 'HEAL_STATION') return 'Healing Station';
             if (act.type === 'INVULNERABILITY_SHIELD') return 'Invulnerability Shield';
             if (act.type === 'SNIPER_SHOT') return 'Sniper Shot';
+            if (act.type === 'SNIPER_SCOPE') return 'Scope In';
             if (act.type === 'TANK_SHOT') return 'Tank Cannon Shot';
+            if (act.type === 'TANK_SCOPE') return 'Scope In';
             if (act.type === 'HOOK_PULL') return 'Grappling Hook';
             if (act.type === 'REVOLVER') return 'Revolver';
             if (act.type === 'MACHINE_PISTOL') return 'Machine Pistol';
+            if (act.type === 'BUFF_HEAL') return 'Adrenaline Stim';
+            if (act.type === 'BUFF_SMOKE') return 'Cigarette';
+            if (act.type === 'BUFF_DESTRUCTIVE') return 'Destructive Shot';
+            if (act.type === 'BUFF_THERMAL') return 'Thermal Vision';
+            if (act.type === 'BUFF_CHAOS_SHOT') return 'Chaos Shot';
         }
         return act.name || '';
     }
@@ -3134,6 +3203,7 @@ class GameEngine {
         return {
             type: 'PATH_MOVE',
             name: `Lộ Trình (${path.length}b)`,
+            name_en: `Route (${path.length} steps)`,
             icon: '👟',
             path: path,
             dir: dir,
@@ -3141,6 +3211,11 @@ class GameEngine {
             power: 0,
             range: 1
         };
+    }
+
+    findBestPathTowards(fromX, fromY, toX, toY, maxSteps = 2) {
+        const move = this.createCpuPathMove(fromX, fromY, toX, toY, maxSteps);
+        return move.path || [];
     }
 
     generateCpuQueue() {
@@ -4021,6 +4096,7 @@ class GameEngine {
             type: 'PATH_MOVE',
             skillId: 'SAVIOR_MOVE',
             name: `Lộ Trình (${path.length}b)`,
+            name_en: `Route (${path.length} steps)`,
             icon: '👟',
             path: path,
             steps: path.length,
@@ -4093,6 +4169,7 @@ class GameEngine {
             type: 'PATH_MOVE',
             skillId: 'MEDIC_MOVE',
             name: "Lộ Trình (" + path.length + "b)",
+            name_en: "Route (" + path.length + " steps)",
             icon: '👟',
             path: path,
             steps: path.length,
