@@ -1,13 +1,13 @@
 /**
- * CRAZY WARFARE: INTERNATIONALIZATION (i18n) ENGINE
+ * BREAKERS COMBINE!: INTERNATIONALIZATION (i18n) ENGINE
  * Supports Tiếng Việt (vi) and English (en)
  */
 
 const I18N_DICTIONARY = {
     vi: {
         // App Title & Header
-        appTitle: "Crazy Warfare - WEGO Tactics 20x7",
-        headerTitle: "Crazy Warfare: WEGO 20x7",
+        appTitle: "Breakers Combine! - WEGO Tactics 20x7",
+        headerTitle: "Breakers Combine!: WEGO 20x7",
         headerSubtitle: "Game Chiến thuật Bàn cờ Lượt đồng thời • Nhập 4 hành động",
         btnHeaderMenu: "🏠 Menu Chính",
         btnHeaderGuide: "📖 Hướng Dẫn",
@@ -18,7 +18,7 @@ const I18N_DICTIONARY = {
 
         // Language Select Screen
         langBadge: "CHỌN NGÔN NGỮ • LANGUAGE SELECTION",
-        langTitle: "CRAZY WARFARE",
+        langTitle: "BREAKERS COMBINE!",
         langSubtitle: "Chọn ngôn ngữ của bạn để bắt đầu • Choose your language to begin",
         langCardViTitle: "TIẾNG VIỆT",
         langCardViSub: "Giao diện, cẩm nang & chiến thuật Tiếng Việt",
@@ -28,7 +28,7 @@ const I18N_DICTIONARY = {
 
         // Main Menu Screen
         menuBadge: "TACTICAL WEGO PROTOCOL • 20x7",
-        menuTitle: "CRAZY WARFARE",
+        menuTitle: "BREAKERS COMBINE!",
         menuTagline: "CHIẾN THUẬT LƯỢT ĐỒNG THỜI • BÀN CỜ 20x7",
         menuDescription: "Lập kế hoạch bí mật 4 hành động, dự đoán hướng đi của đối thủ và giải phóng các chiêu thức đặc sắc trên đấu trường lưới.",
         btnMenuPlay: "CHƠI",
@@ -187,14 +187,14 @@ const I18N_DICTIONARY = {
         restartBtnText: "Chơi Lại Ván Mới (Enter)",
 
         // How To Play Modal
-        guideMainTitle: "📖 CẨM NANG CHIẾN THUẬT CRAZY WARFARE",
+        guideMainTitle: "📖 CẨM NANG CHIẾN THUẬT BREAKERS COMBINE!",
         guideMainSub: "Nắm vững cơ chế WEGO, điều khiển lộ trình và làm chủ 4 chiến binh đặc nhiệm",
         btnGuideBack: "⬅ QUAY LẠI MENU CHÍNH",
         btnGuidePlay: "VÀO CHỌN TƯỚNG & CHIẾN 🚀",
 
         // How To Play Sections
         guideSec1Title: "1. CƠ CHẾ LƯỢT ĐỒNG THỜI (WEGO SYSTEM)",
-        guideSec1Desc: "Khác với cờ theo lượt truyền thống, ở <b>Crazy Warfare</b> cả 2 bên cùng lúc hành động theo cơ chế thời gian thực đồng thời:",
+        guideSec1Desc: "Khác với cờ theo lượt truyền thống, ở <b>Breakers Combine!</b> cả 2 bên cùng lúc hành động theo cơ chế thời gian thực đồng thời:",
         guideSec1Phase1Title: "Lập Kế Hoạch Bí Mật",
         guideSec1Phase1Desc: "Bạn và CPU cùng nạp đúng <b>4 hành động</b> vào hàng đợi của mình mà đối phương không nhìn thấy.",
         guideSec1Phase2Title: "Khóa Lệnh & Thực Thi",
@@ -285,8 +285,8 @@ const I18N_DICTIONARY = {
 
     en: {
         // App Title & Header
-        appTitle: "Crazy Warfare - WEGO Tactics 20x7",
-        headerTitle: "Crazy Warfare: WEGO 20x7",
+        appTitle: "Breakers Combine! - WEGO Tactics 20x7",
+        headerTitle: "Breakers Combine!: WEGO 20x7",
         headerSubtitle: "Simultaneous Turn-Based Grid Tactics • Queue 4 Actions",
         btnHeaderMenu: "🏠 Main Menu",
         btnHeaderGuide: "📖 Guide",
@@ -297,7 +297,7 @@ const I18N_DICTIONARY = {
 
         // Language Select Screen
         langBadge: "LANGUAGE SELECTION • CHỌN NGÔN NGỮ",
-        langTitle: "CRAZY WARFARE",
+        langTitle: "BREAKERS COMBINE!",
         langSubtitle: "Choose your language to begin • Chọn ngôn ngữ của bạn để bắt đầu",
         langCardViTitle: "TIẾNG VIỆT",
         langCardViSub: "Giao diện, cẩm nang & chiến thuật Tiếng Việt",
@@ -307,7 +307,7 @@ const I18N_DICTIONARY = {
 
         // Main Menu Screen
         menuBadge: "TACTICAL WEGO PROTOCOL • 20x7",
-        menuTitle: "CRAZY WARFARE",
+        menuTitle: "BREAKERS COMBINE!",
         menuTagline: "SIMULTANEOUS TURN-BASED GRID TACTICS • 20x7",
         menuDescription: "Secretly plan 4 actions, anticipate your enemy's moves, and unleash lethal operative abilities on the cybernetic grid.",
         btnMenuPlay: "PLAY",
@@ -466,14 +466,14 @@ const I18N_DICTIONARY = {
         restartBtnText: "Rematch (Enter)",
 
         // How To Play Modal
-        guideMainTitle: "📖 CRAZY WARFARE TACTICAL FIELD MANUAL",
+        guideMainTitle: "📖 BREAKERS COMBINE! TACTICAL FIELD MANUAL",
         guideMainSub: "Master WEGO resolution, freeform movement routing, and 4 specialized operatives",
         btnGuideBack: "⬅ BACK TO MAIN MENU",
         btnGuidePlay: "CHOOSE HERO & DEPLOY 🚀",
 
         // How To Play Sections
         guideSec1Title: "1. SIMULTANEOUS RESOLUTION (WEGO SYSTEM)",
-        guideSec1Desc: "Unlike standard turn-based games, <b>Crazy Warfare</b> executes moves in simultaneous real-time phases:",
+        guideSec1Desc: "Unlike standard turn-based games, <b>Breakers Combine!</b> executes moves in simultaneous real-time phases:",
         guideSec1Phase1Title: "Secret Planning",
         guideSec1Phase1Desc: "Both you and the CPU secretly queue exactly <b>4 actions</b> without seeing the opponent's choices.",
         guideSec1Phase2Title: "Commit & Lock",

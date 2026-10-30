@@ -1,5 +1,5 @@
 /**
- * CRAZY WARFARE: CHARACTER & SKILL DATABASE
+ * BREAKERS COMBINE!: CHARACTER & SKILL DATABASE
  * Modular character definitions with Bilingual (VI / EN) Support.
  */
 

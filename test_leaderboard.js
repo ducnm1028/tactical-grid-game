@@ -1,5 +1,5 @@
 /**
- * Test Suite: Leaderboard & Match Statistics for Crazy Warfare
+ * Test Suite: Leaderboard & Match Statistics for Breakers Combine!
  */
 const fs = require('fs');
 const vm = require('vm');

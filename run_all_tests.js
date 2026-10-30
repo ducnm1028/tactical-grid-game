@@ -1,5 +1,5 @@
 /**
- * Master Test Runner: Runs all 13 test suites for Crazy Warfare
+ * Master Test Runner: Runs all 13 test suites for Breakers Combine!
  */
 const { execSync } = require('child_process');
 
@@ -20,7 +20,7 @@ const testFiles = [
 ];
 
 console.log('====================================================');
-console.log('🚀 CRAZY WARFARE - CHẠY TẤT CẢ 13 TEST SUITES');
+console.log('🚀 BREAKERS COMBINE! - CHẠY TẤT CẢ 13 TEST SUITES');
 console.log('====================================================\n');
 
 let totalPassed = 0;

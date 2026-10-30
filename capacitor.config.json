@@ -1,6 +1,6 @@
 {
-  "appId": "com.crazywarfare.tactics",
-  "appName": "Crazy Warfare",
+  "appId": "com.breakerscombine.tactics",
+  "appName": "Breakers Combine!",
   "webDir": ".",
   "bundledWebRuntime": false,
   "server": {

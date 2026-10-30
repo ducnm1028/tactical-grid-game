@@ -1,5 +1,5 @@
 /**
- * CRAZY WARFARE: WEGO TACTICS 20x7
+ * BREAKERS COMBINE!: WEGO TACTICS 20x7
  * Simultaneous Turn-Based Action Queue Engine
  * Features: Modular Characters, Path-based Movement, Ranged Weapons, Cooldowns & 3x3 AoE Explosions
  */
