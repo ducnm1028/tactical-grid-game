@@ -1161,6 +1161,15 @@ class GameEngine {
                 : `Nhấn <kbd class="kbd-hint">SPACE</kbd> hoặc <kbd class="kbd-hint">ENTER</kbd> để vào Chơi • Nhấn <kbd class="kbd-hint">H</kbd> để xem Hướng dẫn`;
         }
 
+        // Đồng bộ hóa tên các đấu thủ theo ngôn ngữ hiện tại
+        if (this.blueTeam && this.redTeam) {
+            [...this.blueTeam, ...this.redTeam].forEach(u => {
+                if (u.character) {
+                    u.name = u.isPlayer ? getCharName(u.character, lang) : `${u.team === 'BLUE' ? (lang === 'en' ? 'Ally' : 'Đồng minh') : (lang === 'en' ? 'Enemy' : 'Kẻ địch')} ${getCharName(u.character, lang)}`;
+                }
+            });
+        }
+
         // Character Select Screen
         const csTitle = document.getElementById('charSelectHeaderMainTitle') || document.querySelector('.char-select-header h2');
         if (csTitle) csTitle.innerText = t('charSelectHeaderTitle');
@@ -1570,7 +1579,7 @@ class GameEngine {
         this.updateSkillButtons();
         this.updateQueueDisplay();
         this.updateHUD();
-        this.addCombatLog(`🎮 [P2] ${this.p2Unit.name} bắt đầu lên 4 lệnh!`, 'system');
+        this.addCombatLog(this.lang === 'en' ? `🎮 [P2] ${this.p2Unit.name} begins planning 4 actions!` : `🎮 [P2] ${this.p2Unit.name} bắt đầu lên 4 lệnh!`, 'system');
     }
 
     isUnitScoped(unit, queue = null) {
@@ -1881,7 +1890,7 @@ class GameEngine {
         if (this.gameMode === 'KOTH' && unit && unit.hp <= 0) return;
         const currentQueue = this.getActivePlanningQueue();
         if (currentQueue.length >= 4) {
-            this.addCombatLog('Hàng đợi đã đầy 4 lệnh! Nhấn [SPACE] để thực thi.', 'system');
+            this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Hàng đợi đã đầy 4 lệnh! Nhấn [SPACE] để thực thi.', 'system');
             return;
         }
 
@@ -1899,7 +1908,7 @@ class GameEngine {
         this.updatePathNoticeUI();
         if (window.soundCtrl) window.soundCtrl.playSelect();
         const scopedNote = isScoped ? (this.lang === 'en' ? ' (Scoped: -1 step)' : ' (Đang ngắm: -1 bước)') : '';
-        this.addCombatLog(`Vẽ lộ trình (tối đa ${this.activePathMaxSteps} bước${scopedNote}): Nhấn phím hướng để nối bước!`, 'system');
+        this.addCombatLog(this.lang === 'en' ? `Route planning (max ${this.activePathMaxSteps} steps${scopedNote}): Press direction keys or click arrows to add steps!` : `Vẽ lộ trình (tối đa ${this.activePathMaxSteps} bước${scopedNote}): Nhấn phím hướng để nối bước!`, 'system');
     }
 
     updatePathNoticeUI() {
@@ -1927,7 +1936,7 @@ class GameEngine {
         const nextY = tipY + d.dy;
 
         if (nextX < 0 || nextX >= GRID_COLS || nextY < 0 || nextY >= GRID_ROWS) {
-            this.addFloatingText('CHẠM BIÊN!', tipX, tipY, '#cbd5e1');
+            this.addFloatingText(this.lang === 'en' ? 'BORDER HIT!' : 'CHẠM BIÊN!', tipX, tipY, '#cbd5e1');
             if (window.soundCtrl) window.soundCtrl.playUndo();
             return;
         }
@@ -1982,7 +1991,7 @@ class GameEngine {
 
         if (window.soundCtrl) window.soundCtrl.playCommit();
         this.updateQueueDisplay();
-        this.addCombatLog(`Đã nạp [${action.name}: ${action.dirSymbol}] vào hàng đợi!`, 'system');
+        this.addCombatLog(this.lang === 'en' ? `Queued [${this.getActionName(action)}: ${action.dirSymbol}]!` : `Đã nạp [${action.name}: ${action.dirSymbol}] vào hàng đợi!`, 'system');
 
         if (currentQueue.length === 4) {
             if (this.isTwoPlayerMode && this.activePlanningPlayer === 1) {
@@ -2233,8 +2242,8 @@ class GameEngine {
 
         // Kỹ năng chưa hoàn thiện (CUSTOM / Chưa thiết kế)
         if (skill.type === 'CUSTOM') {
-            this.addFloatingText('CHƯA THIẾT KẾ!', ux, uy, '#f59e0b');
-            this.addCombatLog(`Chiêu [${skill.name}] hiện đang chờ ý tưởng thiết kế từ bạn!`, 'system');
+            this.addFloatingText(this.lang === 'en' ? 'NOT DESIGNED!' : 'CHƯA THIẾT KẾ!', ux, uy, '#f59e0b');
+            this.addCombatLog(this.lang === 'en' ? `Skill [${getSkillName(skill, 'en')}] is currently awaiting your design ideas!` : `Chiêu [${skill.name}] hiện đang chờ ý tưởng thiết kế từ bạn!`, 'system');
             if (window.soundCtrl) window.soundCtrl.playUndo();
             return;
         }
@@ -2247,16 +2256,16 @@ class GameEngine {
 
         // Kiểm tra Dây Móc đang găm (Active Tether)
         if (this.activeHookTethers && this.activeHookTethers.some(t => t.skillId === skill.id && (t.sourceUnit === unit || (unit && unit.isPlayer && t.source === 'PLAYER')))) {
-            this.addFloatingText('ĐANG TRÓI DÂY!', ux, uy, '#ef4444');
-            this.addCombatLog(`[${skill.name}] đang duy trì dây móc găm vào mục tiêu, cuối lượt sau sẽ giật kéo tiếp!`, 'hit');
+            this.addFloatingText(this.lang === 'en' ? 'TETHERED!' : 'ĐANG TRÓI DÂY!', ux, uy, '#ef4444');
+            this.addCombatLog(this.lang === 'en' ? `[${getSkillName(skill, 'en')}] is maintaining tether on target, will pull again next turn end!` : `[${skill.name}] đang duy trì dây móc găm vào mục tiêu, cuối lượt sau sẽ giật kéo tiếp!`, 'hit');
             if (window.soundCtrl) window.soundCtrl.playUndo();
             return;
         }
 
         // Kiểm tra Hồi chiêu (Cooldown)
         if (uCooldowns[skill.id] && uCooldowns[skill.id] > 0) {
-            this.addFloatingText(`HỒI CHIÊU (${uCooldowns[skill.id]}L)!`, ux, uy, '#f87171');
-            this.addCombatLog(`[${skill.name}] đang hồi chiêu! Còn ${uCooldowns[skill.id]} lượt nữa.`, 'hit');
+            this.addFloatingText(this.lang === 'en' ? `COOLDOWN (${uCooldowns[skill.id]}T)!` : `HỒI CHIÊU (${uCooldowns[skill.id]}L)!`, ux, uy, '#f87171');
+            this.addCombatLog(this.lang === 'en' ? `[${getSkillName(skill, 'en')}] is on cooldown! ${uCooldowns[skill.id]} turn(s) remaining.` : `[${skill.name}] đang hồi chiêu! Còn ${uCooldowns[skill.id]} lượt nữa.`, 'hit');
             if (window.soundCtrl) window.soundCtrl.playUndo();
             return;
         }
@@ -2269,7 +2278,7 @@ class GameEngine {
                 const emptyWord = skill.type === 'RECT_SLASH' ? 'HẾT LƯỢT DÙNG!' : 'HẾT ĐẠN!';
                 const unitWord = skill.type === 'RECT_SLASH' ? 'lượt sử dụng' : 'viên đạn';
                 this.addFloatingText(emptyWord, ux, uy, '#f87171');
-                this.addCombatLog(`[${skill.name}] chỉ còn ${currentAmmo} ${unitWord}!`, 'hit');
+                this.addCombatLog(this.lang === 'en' ? `[${getSkillName(skill, 'en')}] only has ${currentAmmo} ${skill.type === 'RECT_SLASH' ? 'use(s)' : 'round(s)'} left!` : `[${skill.name}] chỉ còn ${currentAmmo} ${unitWord}!`, 'hit');
                 if (window.soundCtrl) window.soundCtrl.playUndo();
                 return;
             }
@@ -2289,15 +2298,15 @@ class GameEngine {
                 this.currentSelectedDir = snapped;
                 if (unit) unit.dir = snapped;
                 this.highlightSelectedDirButton();
-                this.addFloatingText(`HƯỚNG: ${DIRECTIONS[snapped].label}`, ux, uy, '#06b6d4');
-                this.addCombatLog(`⚠️ [${skill.name}] chỉ có thể vung theo 4 hướng chính! Tự động chuyển sang hướng [${DIRECTIONS[snapped].label}]!`, 'system');
+                this.addFloatingText(this.lang === 'en' ? `FACING: ${DIRECTIONS[snapped].label_en || DIRECTIONS[snapped].label}` : `HƯỚNG: ${DIRECTIONS[snapped].label}`, ux, uy, '#06b6d4');
+                this.addCombatLog(this.lang === 'en' ? `⚠️ [${getSkillName(skill, 'en')}] can only strike in 4 cardinal directions! Auto-snapped to [${DIRECTIONS[snapped].label_en || DIRECTIONS[snapped].label}]!` : `⚠️ [${skill.name}] chỉ có thể vung theo 4 hướng chính! Tự động chuyển sang hướng [${DIRECTIONS[snapped].label}]!`, 'system');
             }
         }
 
         // Kiểm tra Thuốc Lá đang hút
         if (skill.id === 'SMOKE_CIGARETTE' && uBuffs && uBuffs.cigarette && uBuffs.cigarette.turnsLeft > 0) {
-            this.addFloatingText('ĐANG HÚT THUỐC!', ux, uy, '#eab308');
-            this.addCombatLog(`[${skill.name}] đang duy trì hiệu lực (+30% DMG & +1 Tốc độ), không thể dùng đè!`, 'hit');
+            this.addFloatingText(this.lang === 'en' ? 'SMOKING!' : 'ĐANG HÚT THUỐC!', ux, uy, '#eab308');
+            this.addCombatLog(this.lang === 'en' ? `[${getSkillName(skill, 'en')}] is currently active (+30% DMG & +1 Speed), cannot overlap!` : `[${skill.name}] đang duy trì hiệu lực (+30% DMG & +1 Tốc độ), không thể dùng đè!`, 'hit');
             if (window.soundCtrl) window.soundCtrl.playUndo();
             return;
         }
@@ -2306,15 +2315,15 @@ class GameEngine {
         if (!skill.maxAmmo && skill.cooldown && skill.cooldown > 0) {
             const alreadyQueued = currentQueue.some(act => act.skillId === skill.id);
             if (alreadyQueued) {
-                this.addFloatingText(`ĐÃ CHỌN TRONG LƯỢT!`, ux, uy, '#f87171');
-                this.addCombatLog(`[${skill.name}] có hồi chiêu, chỉ được dùng tối đa 1 lần mỗi lượt!`, 'hit');
+                this.addFloatingText(this.lang === 'en' ? 'QUEUED THIS TURN!' : 'ĐÃ CHỌN TRONG LƯỢT!', ux, uy, '#f87171');
+                this.addCombatLog(this.lang === 'en' ? `[${getSkillName(skill, 'en')}] has a cooldown, can only be used once per turn!` : `[${skill.name}] có hồi chiêu, chỉ được dùng tối đa 1 lần mỗi lượt!`, 'hit');
                 if (window.soundCtrl) window.soundCtrl.playUndo();
                 return;
             }
         }
 
         if (currentQueue.length >= 4) {
-            this.addCombatLog('Hàng đợi đã đầy (4/4)! Nhấn [SPACE] để thực thi.', 'system');
+            this.addCombatLog(this.lang === 'en' ? 'Queue full (4/4)! Press [SPACE] to EXECUTE!' : 'Hàng đợi đã đầy (4/4)! Nhấn [SPACE] để thực thi.', 'system');
             return;
         }
 
@@ -2938,6 +2947,80 @@ class GameEngine {
         const d = DIRECTIONS[this.currentSelectedDir];
         const dLabel = this.lang === 'en' ? (d.label_en || d.label) : d.label;
         document.getElementById('currentDirText').innerText = `${dLabel} (${d.symbol})`;
+    }
+
+    getActionName(act) {
+        if (!act) return '';
+        if (this.lang === 'en') {
+            if (act.name_en) return act.name_en;
+            const skillMap = {
+                'TROOPER_MOVE': 'Route',
+                'TROOPER_RIFLE': 'Assault Rifle',
+                'TROOPER_ROCKET': 'Rocket Launcher',
+                'TROOPER_GRENADE': 'Frag Grenade',
+                'HOOKMAN_MOVE': 'Patrol Route',
+                'HOOKMAN_PISTOL': 'Silenced Pistol',
+                'HOOKMAN_ADRENALINE': 'Adrenaline Shot',
+                'HOOKMAN_HOOK': 'Grappling Hook',
+                'SMOKE_MOVE': 'Route',
+                'SMOKE_RIFLE': 'Combat Rifle',
+                'SMOKE_BOMB_LAUNCHER': 'Smoke Bomb Launcher',
+                'SMOKE_CIGARETTE': 'Light Cigarette',
+                'RAZOR_MOVE': 'Route',
+                'RAZOR_PULSE_RIFLE': 'Pulse Rifle',
+                'RAZOR_LEAP': 'Ambush Leap',
+                'RAZOR_BLADE': 'Wrist Blades',
+                'FIREMAN_MOVE': 'Route',
+                'FIREMAN_GATTLING_FIRE': 'Gatling Inferno',
+                'FIREMAN_OIL_BOMB': 'Oil Flask Bomb',
+                'FIREMAN_FIRE_CANNON': 'Fire Cannon',
+                'ENGIE_MOVE': 'Route',
+                'ENGIE_NAILGUN': 'Iron Rod Gun',
+                'ENGIE_SENTRY': 'Deploy Sentry',
+                'ENGIE_TELEPORTER': 'Teleporter',
+                'SNIPER_MOVE': 'Route',
+                'SNIPER_SCOPE': 'Scope In',
+                'SNIPER_SHOT': 'Sniper Shot',
+                'SNIPER_DESTRUCTIVE': 'Destructive Shot',
+                'SNIPER_THERMAL': 'Thermal Vision',
+                'BOOM_MOVE': 'Route',
+                'BOOM_SCOPE': 'Scope In',
+                'BOOM_SHOT': 'Tank Cannon Shot',
+                'BOOM_LEAP': 'Rocket Leap',
+                'BOOM_CHAOS_SHOT': 'Chaos Shot',
+                'SAVIOR_MOVE': 'Route',
+                'SAVIOR_REVOLVER': 'Revolver',
+                'SAVIOR_TELEKINESIS': 'Telekinesis',
+                'SAVIOR_NECROMANCY': 'Necromancy',
+                'MEDIC_MOVE': 'Route',
+                'MEDIC_MACHINE_PISTOL': 'Machine Pistol',
+                'MEDIC_HEAL_STATION': 'Healing Station',
+                'MEDIC_INVULNERABILITY_SHIELD': 'Invulnerability Shield'
+            };
+            if (act.skillId && skillMap[act.skillId]) return skillMap[act.skillId];
+            if (act.type === 'PATH_MOVE') return 'Route';
+            if (act.type === 'LEAP') return 'Ambush Leap';
+            if (act.type === 'BOOM_LEAP') return 'Rocket Leap';
+            if (act.type === 'ATTACK') return 'Melee Attack';
+            if (act.type === 'RECT_SLASH') return 'Wrist Blades';
+            if (act.type === 'GRENADE') return 'Frag Grenade';
+            if (act.type === 'ROCKET') return 'Rocket Launcher';
+            if (act.type === 'BOMB_LAUNCHER') return 'Smoke Bomb Launcher';
+            if (act.type === 'OIL_BOMB') return 'Oil Flask Bomb';
+            if (act.type === 'FIRE_CANNON') return 'Fire Cannon';
+            if (act.type === 'DEPLOY_SENTRY') return 'Deploy Sentry';
+            if (act.type === 'DEPLOY_TELEPORTER') return 'Teleporter';
+            if (act.type === 'TELEKINESIS') return 'Telekinesis';
+            if (act.type === 'NECROMANCY') return 'Necromancy';
+            if (act.type === 'HEAL_STATION') return 'Healing Station';
+            if (act.type === 'INVULNERABILITY_SHIELD') return 'Invulnerability Shield';
+            if (act.type === 'SNIPER_SHOT') return 'Sniper Shot';
+            if (act.type === 'TANK_SHOT') return 'Tank Cannon Shot';
+            if (act.type === 'HOOK_PULL') return 'Grappling Hook';
+            if (act.type === 'REVOLVER') return 'Revolver';
+            if (act.type === 'MACHINE_PISTOL') return 'Machine Pistol';
+        }
+        return act.name || '';
     }
 
     addCombatLog(msg, type = 'normal') {
@@ -4381,7 +4464,7 @@ class GameEngine {
                 this.checkFireZones(unit);
                 this.checkTeleporters(unit);
                 this.addFloatingText(this.lang === 'en' ? '🛡️ LEAP (IMMUNE)!' : '🛡️ BẬT NHẢY (MIỄN NHIỄM)!', destX, destY, '#eab308');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: ${unit.name} [${act.name}] bật nhảy 2 ô tới (${destX}, ${destY}) và miễn nhiễm mọi sát thương!`, 'buff');
+                this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${unit.name} [${this.getActionName(act)}] leaped 2 tiles to (${destX}, ${destY}) with complete damage immunity!` : `Nhịp #${stepIndex + 1}: ${unit.name} [${act.name}] bật nhảy 2 ô tới (${destX}, ${destY}) và miễn nhiễm mọi sát thương!`, 'buff');
             } else if (act && act.type === 'LEAP') {
                 const uD = DIRECTIONS[act.dir];
                 const startX = unit.x;
@@ -4407,10 +4490,10 @@ class GameEngine {
 
                 if (extraJump) {
                     this.addFloatingText(this.lang === 'en' ? '🦘 OBSTACLE! EXTRA 2 STEPS!' : '🦘 ĐÍCH CÓ VẬT THỂ/ĐỊCH! NHẢY THÊM 2 BƯỚC!', destX, destY, '#06b6d4');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${unit.name} [${act.name}] phát hiện vật thể/địch, nhảy tiếp 2 bước tới (${destX}, ${destY})!`, 'buff');
+                    this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${unit.name} [${this.getActionName(act)}] detected obstacle/enemy, leaped 2 extra steps to (${destX}, ${destY})!` : `Nhịp #${stepIndex + 1}: ${unit.name} [${act.name}] phát hiện vật thể/địch, nhảy tiếp 2 bước tới (${destX}, ${destY})!`, 'buff');
                 } else {
                     this.addFloatingText(this.lang === 'en' ? '🦘 LEAP 3 TILES!' : '🦘 NHẢY 3 Ô!', destX, destY, '#06b6d4');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${unit.name} [${act.name}] vượt địa hình tới (${destX}, ${destY})!`, 'system');
+                    this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${unit.name} [${this.getActionName(act)}] traversed terrain to (${destX}, ${destY})!` : `Nhịp #${stepIndex + 1}: ${unit.name} [${act.name}] vượt địa hình tới (${destX}, ${destY})!`, 'system');
                 }
             }
         }
@@ -4465,7 +4548,7 @@ class GameEngine {
                         const midY = (uA.y + uB.y) / 2;
                         this.createClashBurst(midX, midY);
                         this.addFloatingText(this.lang === 'en' ? 'HEAD-ON CLASH!' : 'ĐÂM NHAU!', midX, midY, '#fbbf24');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${uA.name} và ${uB.name} đâm trực diện! Dội lùi và mất 5 HP!`, 'clash');
+                        this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${uA.name} and ${uB.name} collided head-on! Bounced back and lost 5 HP!` : `Nhịp #${stepIndex + 1}: ${uA.name} và ${uB.name} đâm trực diện! Dội lùi và mất 5 HP!`, 'clash');
                         this.applyDamage(uA, 5, uB);
                         this.applyDamage(uB, 5, uA);
                         pA.nx = uA.x; pA.ny = uA.y; pA.moving = false;
@@ -4489,7 +4572,7 @@ class GameEngine {
                     if (window.soundCtrl) window.soundCtrl.playClash();
                     this.createClashBurst(cx, cy);
                     this.addFloatingText(this.lang === 'en' ? 'CLASH!' : 'VA CHẠM!', cx, cy, '#fbbf24');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: Nhiều đơn vị cùng lao vào ô (${cx}, ${cy}) -> DỘI LÙI!`, 'clash');
+                    this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: Multiple units rushed into tile (${cx}, ${cy}) -> BOUNCED BACK!` : `Nhịp #${stepIndex + 1}: Nhiều đơn vị cùng lao vào ô (${cx}, ${cy}) -> DỘI LÙI!`, 'clash');
                     for (const u of claimants) {
                         this.applyDamage(u, 5);
                         const pos = nextPositions.get(u);
@@ -4583,7 +4666,7 @@ class GameEngine {
         }
         if (hasCigarette) {
             dmgMult *= 1.3;
-            buffTag += ' (+30% Thuốc Lá)';
+            buffTag += (this.lang === 'en' ? ' (+30% Cigarette)' : ' (+30% Thuốc Lá)');
         }
         const hasBuffDmg = hasAdrenaline || hasCigarette;
 
@@ -4599,7 +4682,7 @@ class GameEngine {
                 if (target.shieldDir) {
                     if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
                     this.addFloatingText(this.lang === 'en' ? 'BLOCKED!' : 'CHẶN ĐƯỢC!', target.x, target.y, '#60a5fa');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} chém ${target.name} bị Khiên chặn đứng! (0 DMG)`, 'block');
+                    this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name}'s slash against ${target.name} was BLOCKED by Shield! (0 DMG)` : `Nhịp #${stepIndex + 1}: ${actor.name} chém ${target.name} bị Khiên chặn đứng! (0 DMG)`, 'block');
                 } else {
                     if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
                     let dmg = act.power || 25;
@@ -4610,7 +4693,7 @@ class GameEngine {
                     this.applyDamage(target, dmg, actor);
                     this.createHitSparks(target.x, target.y, target.color);
                     this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} ĐÁNH TRÚNG ${target.name}! (-${dmg} HP${buffTag})`, 'hit');
+                    this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: [${this.getActionName(act)}] ${actor.name} HIT ${target.name}! (-${dmg} HP${buffTag})` : `Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} ĐÁNH TRÚNG ${target.name}! (-${dmg} HP${buffTag})`, 'hit');
 
                     if (target.charId === 'hookman') {
                         target.revealedTurns = 2;
@@ -4671,7 +4754,7 @@ class GameEngine {
                     if (target.shieldDir) {
                         if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
                         this.addFloatingText(this.lang === 'en' ? 'BLOCKED BULLET!' : 'CHẶN ĐƯỢC ĐẠN!', target.x, target.y, '#60a5fa');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn loạt đạn ${act.name} từ ${actor.name}!`, 'block');
+                        this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${target.name} raised Shield, blocking ${this.getActionName(act)} burst from ${actor.name}!` : `Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn loạt đạn ${act.name} từ ${actor.name}!`, 'block');
                     } else {
                         if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
                         let dmg = (act.type === 'RANGED_VARIABLE') 
@@ -4685,12 +4768,12 @@ class GameEngine {
                         if (act.skillId === 'FIREMAN_GATTLING_FIRE') {
                             this.applyBurn(target, act.burnTurns || 3, act.burnDmg || 5, actor);
                             this.createHitSparks(target.x, target.y, '#ea580c');
-                            this.addFloatingText(`-${dmg} HP + 🔥 CHÁY!`, target.x, target.y, '#ea580c');
-                            this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} BẮN TRÚNG ${target.name}! Gây ${dmg} sát thương và thiêu đốt (-5 HP/lượt trong 3 lượt)!`, 'hit');
+                            this.addFloatingText(this.lang === 'en' ? `-${dmg} HP + 🔥 BURN!` : `-${dmg} HP + 🔥 CHÁY!`, target.x, target.y, '#ea580c');
+                            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: [${this.getActionName(act)}] ${actor.name} HIT ${target.name}! Dealt ${dmg} DMG and ignited Burn (-5 HP/turn for 3 turns)!` : `Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} BẮN TRÚNG ${target.name}! Gây ${dmg} sát thương và thiêu đốt (-5 HP/lượt trong 3 lượt)!`, 'hit');
                         } else {
                             this.createHitSparks(target.x, target.y, target.color);
                             this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
-                            this.addCombatLog(`Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} BẮN TRÚNG ${target.name}! Gây ${dmg} sát thương${buffTag}!`, 'hit');
+                            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: [${this.getActionName(act)}] ${actor.name} HIT ${target.name}! Dealt ${dmg} damage${buffTag}!` : `Nhịp #${stepIndex + 1}: [${act.name}] ${actor.name} BẮN TRÚNG ${target.name}! Gây ${dmg} sát thương${buffTag}!`, 'hit');
                         }
 
                         if (target.charId === 'hookman') {
@@ -4738,7 +4821,7 @@ class GameEngine {
 
             this.createBuffSparks(actor.x, actor.y, '#10b981');
             this.addFloatingText(this.lang === 'en' ? '💉 ADRENALINE! (+20% DMG)' : '💉 TIÊM ADRENALINE! (+20% DMG)', actor.x, actor.y, '#10b981');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} tiêm [Adrenaline]! Tăng +20% Sát thương và hồi 5 HP/lượt!`, 'hit');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} injected [Adrenaline]! +20% DMG and regenerates 5 HP/turn!` : `Nhịp #${stepIndex + 1}: ${actor.name} tiêm [Adrenaline]! Tăng +20% Sát thương và hồi 5 HP/lượt!`, 'hit');
             actor.cooldowns[act.skillId] = act.cooldown || 3;
         }
         else if (act.type === 'BUFF_SMOKE') {
@@ -4750,7 +4833,7 @@ class GameEngine {
 
             this.createBuffSparks(actor.x, actor.y, '#f97316');
             this.addFloatingText(this.lang === 'en' ? '🚬 SMOKING! (+30% DMG & +1 SPEED)' : '🚬 HÚT THUỐC! (+30% DMG & +1 BƯỚC)', actor.x, actor.y, '#f97316');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} châm [Thuốc Lá]! Tăng +30% Sát thương và +1 Tốc độ di chuyển!`, 'hit');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} lit a [Cigarette]! +30% DMG and +1 Movement Speed!` : `Nhịp #${stepIndex + 1}: ${actor.name} châm [Thuốc Lá]! Tăng +30% Sát thương và +1 Tốc độ di chuyển!`, 'hit');
         }
         else if (act.type === 'BUFF_DESTRUCTIVE') {
             if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playDestructiveShot();
@@ -4758,7 +4841,7 @@ class GameEngine {
             actor.buffs.destructiveShot = true;
             this.createBuffSparks(actor.x, actor.y, '#ec4899');
             this.addFloatingText(this.lang === 'en' ? '⚡ DESTRUCTIVE (+30% & PIERCE)!' : '⚡ PHÁT BẮN HỦY DIỆT (+30% & XUYÊN)!', actor.x, actor.y, '#ec4899');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} kích hoạt [Phát Bắn Hủy Diệt]! Phát súng tỉa tiếp theo +30% sát thương và xuyên thấu mọi kẻ địch!`, 'buff');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} activated [Destructive Shot]! Next sniper shot gets +30% DMG and pierces all enemies!` : `Nhịp #${stepIndex + 1}: ${actor.name} kích hoạt [Phát Bắn Hủy Diệt]! Phát súng tỉa tiếp theo +30% sát thương và xuyên thấu mọi kẻ địch!`, 'buff');
             actor.cooldowns[act.skillId] = act.cooldown || 3;
             if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 3;
             if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 3;
@@ -4772,7 +4855,7 @@ class GameEngine {
                 this.createBuffSparks(ally.x, ally.y, '#06b6d4');
                 this.addFloatingText(this.lang === 'en' ? '🔭 THERMAL (+1 RANGE)!' : '🔭 TẦM NHIỆT (+1 TẦM)!', ally.x, ally.y, '#06b6d4');
             }
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} kích hoạt [Tầm Nhìn Dò Nhiệt]! Toàn bộ đồng đội nhận +1 phạm vi cho lần dùng kế tiếp!`, 'buff');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} activated [Thermal Vision]! All teammates gain +1 range on their next ability!` : `Nhịp #${stepIndex + 1}: ${actor.name} kích hoạt [Tầm Nhìn Dò Nhiệt]! Toàn bộ đồng đội nhận +1 phạm vi cho lần dùng kế tiếp!`, 'buff');
             actor.cooldowns[act.skillId] = act.cooldown || 4;
             if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 4;
             if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 4;
@@ -4782,7 +4865,7 @@ class GameEngine {
             actor.isScoped = true;
             this.createBuffSparks(actor.x, actor.y, '#818cf8');
             this.addFloatingText(this.lang === 'en' ? '🎯 SCOPE ON!' : '🎯 CHẾ ĐỘ NGẮM BẮN!', actor.x, actor.y, '#818cf8');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} vào [Chế độ Ngắm Bắn]! Sẵn sàng tung đòn bắn tỉa tầm xa.`, 'system');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} entered [Scope In Mode]! Ready for long-range precision shot.` : `Nhịp #${stepIndex + 1}: ${actor.name} vào [Chế độ Ngắm Bắn]! Sẵn sàng tung đòn bắn tỉa tầm xa.`, 'system');
         }
         else if (act.type === 'SNIPER_SHOT') {
             const isDestructive = Boolean(actor.buffs && actor.buffs.destructiveShot);
@@ -4820,7 +4903,7 @@ class GameEngine {
                     if (target.shieldDir) {
                         if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
                         this.addFloatingText(this.lang === 'en' ? 'BLOCKED SNIPER!' : 'CHẶN ĐƯỢC BẮN TỈA!', target.x, target.y, '#60a5fa');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn phát súng tỉa từ ${actor.name}!`, 'block');
+                        this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${target.name} raised Shield, blocking sniper shot from ${actor.name}!` : `Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn phát súng tỉa từ ${actor.name}!`, 'block');
                     } else {
                         if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
                         // Công thức sát thương theo cự ly: 20 + 5 * d (25, 30, 35, 40, 45, 50, 55)
@@ -4834,10 +4917,12 @@ class GameEngine {
                         this.createHitSparks(target.x, target.y, isDestructive ? '#ec4899' : '#818cf8');
                         this.addFloatingText(`-${dmg} HP!`, target.x, target.y, isDestructive ? '#ec4899' : '#f87171');
 
-                        const destructiveTag = isDestructive ? ' [⚡HỦY DIỆT +30%]' : '';
-                        const distTag = ` (Cự ly: ${r} ô)`;
+                        const destructiveTag = isDestructive ? (this.lang === 'en' ? ' [⚡DESTRUCTIVE +30%]' : ' [⚡HỦY DIỆT +30%]') : '';
+                        const distTag = this.lang === 'en' ? ` (Dist: ${r} tiles)` : ` (Cự ly: ${r} ô)`;
                         this.addCombatLog(
-                            `Nhịp #${stepIndex + 1}: 🎯 [Súng Tỉa] ${actor.name} BẮN TRÚNG ${target.name}! (-${dmg} HP${destructiveTag}${distTag}${buffTag})!`,
+                            this.lang === 'en'
+                                ? `Beat #${stepIndex + 1}: 🎯 [Sniper Shot] ${actor.name} HIT ${target.name}! (-${dmg} HP${destructiveTag}${distTag}${buffTag})!`
+                                : `Nhịp #${stepIndex + 1}: 🎯 [Súng Tỉa] ${actor.name} BẮN TRÚNG ${target.name}! (-${dmg} HP${destructiveTag}${distTag}${buffTag})!`,
                             'hit'
                         );
 
@@ -4880,7 +4965,7 @@ class GameEngine {
             actor.buffs.chaosShot = true;
             this.createBuffSparks(actor.x, actor.y, '#a855f7');
             this.addFloatingText(this.lang === 'en' ? '🌀 CHAOS SHOT (+30% & 5x5)!' : '🌀 PHÁT BẮN RỐI LOẠN (+30% & 5x5)!', actor.x, actor.y, '#a855f7');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} kích hoạt [Phát Bắn Rối Loạn]! Phát bắn Nòng Xe Tăng tiếp theo tăng +30% sát thương trực diện và nổ 5x5!`, 'buff');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} activated [Chaos Shot]! Next tank cannon shot gains +30% direct DMG and 5x5 explosion!` : `Nhịp #${stepIndex + 1}: ${actor.name} kích hoạt [Phát Bắn Rối Loạn]! Phát bắn Nòng Xe Tăng tiếp theo tăng +30% sát thương trực diện và nổ 5x5!`, 'buff');
             actor.cooldowns[act.skillId] = act.cooldown || 3;
             if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 3;
             if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 3;
@@ -4890,7 +4975,7 @@ class GameEngine {
             actor.isScoped = true;
             this.createBuffSparks(actor.x, actor.y, '#e11d48');
             this.addFloatingText(this.lang === 'en' ? '🎯 TANK SCOPE ON!' : '🎯 NGẮM NÒNG PHÁO!', actor.x, actor.y, '#e11d48');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} vào [Chế độ Ngắm Nòng Pháo]! Chuẩn bị khai hỏa đại bác tầm xa.`, 'system');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} entered [Tank Cannon Scope In Mode]! Preparing long-range artillery shot.` : `Nhịp #${stepIndex + 1}: ${actor.name} vào [Chế độ Ngắm Nòng Pháo]! Chuẩn bị khai hỏa đại bác tầm xa.`, 'system');
         }
         else if (act.type === 'TANK_SHOT') {
             const hasChaos = Boolean(actor.buffs && actor.buffs.chaosShot);
@@ -4960,20 +5045,20 @@ class GameEngine {
             if (hasChaos) directDmg = Math.round(directDmg * 1.3);
             if (hasBuffDmg) directDmg = Math.round(directDmg * dmgMult);
 
-            const chaosTag = hasChaos ? ' [🌀RỐI LOẠN +30% & 5x5]' : '';
-            this.addFloatingText(`💥 NỔ ${blastSizeStr}!`, detX, detY, tracerColor);
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} bắn [Nòng Xe Tăng] nổ ${blastSizeStr} tại (${detX}, ${detY})!${chaosTag}`, 'clash');
+            const chaosTag = hasChaos ? (this.lang === 'en' ? ' [🌀CHAOS +30% & 5x5]' : ' [🌀RỐI LOẠN +30% & 5x5]') : '';
+            this.addFloatingText(this.lang === 'en' ? `💥 BLAST ${blastSizeStr}!` : `💥 NỔ ${blastSizeStr}!`, detX, detY, tracerColor);
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} fired [Tank Cannon] exploding ${blastSizeStr} at (${detX}, ${detY})!${chaosTag}` : `Nhịp #${stepIndex + 1}: ${actor.name} bắn [Nòng Xe Tăng] nổ ${blastSizeStr} tại (${detX}, ${detY})!${chaosTag}`, 'clash');
 
             // 1. Sát thương chính tại tâm
             if (directTarget) {
                 const targetAct = directTarget.queue ? directTarget.queue[stepIndex] : null;
                 if (directTarget.isImmune || (targetAct && targetAct.type === 'BOOM_LEAP')) {
                     this.addFloatingText(this.lang === 'en' ? 'IMMUNE!' : 'MIỄN NHIỄM!', directTarget.x, directTarget.y, '#eab308');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${directTarget.name} bật nhảy miễn nhiễm hoàn toàn phát bắn Nòng Xe Tăng!`, 'block');
+                    this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${directTarget.name} leaped with full immunity against Tank Cannon!` : `Nhịp #${stepIndex + 1}: ${directTarget.name} bật nhảy miễn nhiễm hoàn toàn phát bắn Nòng Xe Tăng!`, 'block');
                 } else if (directTarget.shieldDir) {
                     if (window.soundCtrl && (actor.isPlayer || directTarget.isPlayer)) window.soundCtrl.playShield();
                     this.addFloatingText(this.lang === 'en' ? 'BLOCKED SHELL!' : 'CHẶN ĐƯỢC ĐẠN PHÁO!', directTarget.x, directTarget.y, '#60a5fa');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: ${directTarget.name} giương Khiên chặn trực tiếp đạn pháo từ ${actor.name}!`, 'block');
+                    this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${directTarget.name} raised Shield, blocking cannon shell from ${actor.name}!` : `Nhịp #${stepIndex + 1}: ${directTarget.name} giương Khiên chặn trực tiếp đạn pháo từ ${actor.name}!`, 'block');
                 } else {
                     let dDmg = directDmg;
                     if (targetAct && targetAct.type === 'LEAP') dDmg = Math.round(dDmg * 0.75);
@@ -4981,7 +5066,7 @@ class GameEngine {
                     this.applyDamage(directTarget, dDmg, actor);
                     this.createHitSparks(directTarget.x, directTarget.y, tracerColor);
                     this.addFloatingText(`-${dDmg} HP!`, directTarget.x, directTarget.y, '#f87171');
-                    this.addCombatLog(`Nhịp #${stepIndex + 1}: 🎯 [Nòng Xe Tăng] ${actor.name} BẮN TRÚNG TRỰC DIỆN ${directTarget.name}! (-${dDmg} HP${chaosTag}, cự ly: ${hitDist} ô)!`, 'hit');
+                    this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: 🎯 [Tank Cannon] ${actor.name} DIRECT HIT ${directTarget.name}! (-${dDmg} HP${chaosTag}, distance: ${hitDist} tiles)!` : `Nhịp #${stepIndex + 1}: 🎯 [Nòng Xe Tăng] ${actor.name} BẮN TRÚNG TRỰC DIỆN ${directTarget.name}! (-${dDmg} HP${chaosTag}, cự ly: ${hitDist} ô)!`, 'hit');
 
                     if (directTarget.charId === 'hookman') {
                         directTarget.revealedTurns = 2;
@@ -5010,7 +5095,7 @@ class GameEngine {
                     this.applyDamage(u, splashDmg, actor);
                     this.createHitSparks(u.x, u.y, u.color);
                     this.addFloatingText(`-${splashDmg} HP!`, u.x, u.y, '#f87171');
-                    this.addCombatLog(`💥 Vụ nổ ${blastSizeStr} Nòng Xe Tăng gây -${splashDmg} HP nổ lan lên ${u.name}!`, 'hit');
+                    this.addCombatLog(this.lang === 'en' ? `💥 Tank Cannon ${blastSizeStr} blast dealt -${splashDmg} HP splash damage to ${u.name}!` : `💥 Vụ nổ ${blastSizeStr} Nòng Xe Tăng gây -${splashDmg} HP nổ lan lên ${u.name}!`, 'hit');
 
                     if (u.charId === 'hookman') {
                         u.revealedTurns = 2;
@@ -5069,7 +5154,7 @@ class GameEngine {
                     if (target.shieldDir) {
                         if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
                         this.addFloatingText(this.lang === 'en' ? 'BLOCKED HOOK!' : 'KHIÊN CHẶN MÓC!', target.x, target.y, '#60a5fa');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn đứng Móc Kéo từ ${actor.name}!`, 'block');
+                        this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${target.name} raised Shield, blocking Grappling Hook from ${actor.name}!` : `Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn đứng Móc Kéo từ ${actor.name}!`, 'block');
                     } else {
                         if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
                         let dmg = act.power || 15;
@@ -5087,8 +5172,8 @@ class GameEngine {
                             if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHookPull();
                         }
 
-                        this.addFloatingText(`-${dmg} HP & KÉO 1 Ô!`, target.x, target.y, '#ef4444');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: [Móc Kéo] ${actor.name} GĂM TRÚNG ${target.name}! (-${dmg} HP${buffTag}) và kéo lại gần 1 ô!`, 'hit');
+                        this.addFloatingText(this.lang === 'en' ? `-${dmg} HP & PULL 1!` : `-${dmg} HP & KÉO 1 Ô!`, target.x, target.y, '#ef4444');
+                        this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: [Grappling Hook] ${actor.name} HOOKED ${target.name}! (-${dmg} HP${buffTag}) and pulled 1 tile closer!` : `Nhịp #${stepIndex + 1}: [Móc Kéo] ${actor.name} GĂM TRÚNG ${target.name}! (-${dmg} HP${buffTag}) và kéo lại gần 1 ô!`, 'hit');
 
                         this.activeHookTethers = this.activeHookTethers.filter(t => t.sourceId !== actor.id);
                         this.activeHookTethers.push({
@@ -5103,7 +5188,7 @@ class GameEngine {
                             skillId: act.skillId,
                             cdAfterPull: act.cooldown || 4
                         });
-                        this.addCombatLog(`🪝 Dây móc đã găm chặt vào ${target.name}! Hết lượt sau sẽ bị giật kéo thêm 2 ô!`, 'clash');
+                        this.addCombatLog(this.lang === 'en' ? `🪝 Hook chain is tethered to ${target.name}! Will be jerked 2 tiles closer at the end of next turn!` : `🪝 Dây móc đã găm chặt vào ${target.name}! Hết lượt sau sẽ bị giật kéo thêm 2 ô!`, 'clash');
                     }
                     break;
                 }
@@ -5136,7 +5221,7 @@ class GameEngine {
                     actor.cooldowns[act.skillId] = act.cooldown || 4;
                     if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 4;
                     if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 4;
-                    this.addCombatLog(`⚠️ ${actor.name} [Súng Bắn Bom] hết đạn! Hồi chiêu 4 lượt để nạp đạn!`, 'system');
+                    this.addCombatLog(this.lang === 'en' ? `⚠️ ${actor.name} [Smoke Bomb Launcher] out of ammo! 4-turn cooldown to reload!` : `⚠️ ${actor.name} [Súng Bắn Bom] hết đạn! Hồi chiêu 4 lượt để nạp đạn!`, 'system');
                 }
             } else {
                 if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playRocketLaunch();
@@ -5167,8 +5252,8 @@ class GameEngine {
             if (window.soundCtrl) window.soundCtrl.playExplosion();
             this.createExplosionBurst(targetX, targetY, 40);
 
-            this.addFloatingText('💥 NỔ 3x3!', targetX, targetY, isBombLauncher ? '#f97316' : '#ef4444');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} bắn [${act.name}] phát nổ 3x3 tại (${targetX}, ${targetY})!`, 'clash');
+            this.addFloatingText(this.lang === 'en' ? '💥 3x3 BLAST!' : '💥 NỔ 3x3!', targetX, targetY, isBombLauncher ? '#f97316' : '#ef4444');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} fired [${this.getActionName(act)}] exploding 3x3 at (${targetX}, ${targetY})!` : `Nhịp #${stepIndex + 1}: ${actor.name} bắn [${act.name}] phát nổ 3x3 tại (${targetX}, ${targetY})!`, 'clash');
 
             let baseDmg = act.power || 30;
             if (hasBuffDmg) baseDmg = Math.round(baseDmg * dmgMult);
@@ -5182,7 +5267,7 @@ class GameEngine {
                     this.applyDamage(u, uDmg, actor);
                     this.createHitSparks(u.x, u.y, u.color);
                     this.addFloatingText(`-${uDmg} HP!`, u.x, u.y, '#f87171');
-                    this.addCombatLog(`💥 Vụ nổ ${act.name} trúng ${u.name}! (-${uDmg} HP)!`, 'hit');
+                    this.addCombatLog(this.lang === 'en' ? `💥 [${this.getActionName(act)}] blast hit ${u.name}! (-${uDmg} HP)!` : `💥 Vụ nổ ${act.name} trúng ${u.name}! (-${uDmg} HP)!`, 'hit');
 
                     if (u.charId === 'hookman') {
                         u.revealedTurns = 2;
@@ -5234,8 +5319,8 @@ class GameEngine {
                 ownerUnit: actor
             });
 
-            this.addFloatingText('💣 LỰU ĐẠN (ĐẾM 2 LƯỢT)!', targetX, targetY, '#f59e0b');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} ném lựu đạn tới (${targetX}, ${targetY})! Sẽ nổ 3x3 sau 2 lượt!`, 'clash');
+            this.addFloatingText(this.lang === 'en' ? '💣 GRENADE (2 TURNS)!' : '💣 LỰU ĐẠN (ĐẾM 2 LƯỢT)!', targetX, targetY, '#f59e0b');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} threw a grenade to (${targetX}, ${targetY})! Will detonate 3x3 in 2 turns!` : `Nhịp #${stepIndex + 1}: ${actor.name} ném lựu đạn tới (${targetX}, ${targetY})! Sẽ nổ 3x3 sau 2 lượt!`, 'clash');
         }
         else if (act.type === 'OIL_BARREL') {
             const uD = DIRECTIONS[act.dir];
@@ -5274,16 +5359,16 @@ class GameEngine {
             if (window.soundCtrl) window.soundCtrl.playExplosion();
             this.createExplosionBurst(targetX, targetY, 35);
 
-            this.addFloatingText('🛢️ DẦU LOANG 3x3!', targetX, targetY, '#d97706');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} ném [${act.name}] phát nổ dầu loang 3x3 tại (${targetX}, ${targetY})!`, 'clash');
+            this.addFloatingText(this.lang === 'en' ? '🛢️ 3x3 OIL SLICK!' : '🛢️ DẦU LOANG 3x3!', targetX, targetY, '#d97706');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} threw [${this.getActionName(act)}] splashing oil 3x3 at (${targetX}, ${targetY})!` : `Nhịp #${stepIndex + 1}: ${actor.name} ném [${act.name}] phát nổ dầu loang 3x3 tại (${targetX}, ${targetY})!`, 'clash');
 
             // Kẻ thù trúng dầu sẽ dính debuff isOiled, bốc cháy khi nhận sát thương từ mọi nguồn
             for (const u of livingOpponents) {
                 if (Math.abs(u.x - targetX) <= 1 && Math.abs(u.y - targetY) <= 1) {
                     u.isOiled = true;
                     this.createBuffSparks(u.x, u.y, '#d97706');
-                    this.addFloatingText('🛢️ DÍNH DẦU!', u.x, u.y, '#d97706');
-                    this.addCombatLog(`🛢️ ${u.name} dính Dầu Trơn! Bị bắt lửa cháy (-5 HP/lượt trong 3 lượt) khi nhận sát thương từ bất kỳ nguồn nào!`, 'hit');
+                    this.addFloatingText(this.lang === 'en' ? '🛢️ OILED!' : '🛢️ DÍNH DẦU!', u.x, u.y, '#d97706');
+                    this.addCombatLog(this.lang === 'en' ? `🛢️ ${u.name} is coated in Slick Oil! Will ignite (-5 HP/turn for 3 turns) upon taking damage from any source!` : `🛢️ ${u.name} dính Dầu Trơn! Bị bắt lửa cháy (-5 HP/lượt trong 3 lượt) khi nhận sát thương từ bất kỳ nguồn nào!`, 'hit');
 
                     if (u.charId === 'hookman') {
                         u.revealedTurns = 2;
@@ -5334,8 +5419,8 @@ class GameEngine {
             if (window.soundCtrl) window.soundCtrl.playExplosion();
             this.createExplosionBurst(targetX, targetY, 45);
 
-            this.addFloatingText('💥 ĐẠI BÁC LỬA 3x3!', targetX, targetY, '#dc2626');
-            this.addCombatLog(`Nhịp #${stepIndex + 1}: ${actor.name} bắn [${act.name}] nổ 3x3 tại (${targetX}, ${targetY}) (15 DMG) và tạo VÙNG CHÁY 2 lượt!`, 'clash');
+            this.addFloatingText(this.lang === 'en' ? '💥 3x3 FIRE CANNON!' : '💥 ĐẠI BÁC LỬA 3x3!', targetX, targetY, '#dc2626');
+            this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${actor.name} fired [${this.getActionName(act)}] exploding 3x3 at (${targetX}, ${targetY}) (15 DMG) and created FIRE ZONE for 2 turns!` : `Nhịp #${stepIndex + 1}: ${actor.name} bắn [${act.name}] nổ 3x3 tại (${targetX}, ${targetY}) (15 DMG) và tạo VÙNG CHÁY 2 lượt!`, 'clash');
 
             let baseDmg = act.power || 15;
             if (hasBuffDmg) baseDmg = Math.round(baseDmg * dmgMult);
@@ -5349,7 +5434,7 @@ class GameEngine {
                     this.applyDamage(u, uDmg, actor);
                     this.createHitSparks(u.x, u.y, '#ea580c');
                     this.addFloatingText(`-${uDmg} HP!`, u.x, u.y, '#ea580c');
-                    this.addCombatLog(`💥 Vụ nổ Đại Bác Lửa trúng ${u.name}! (-${uDmg} HP)!`, 'hit');
+                    this.addCombatLog(this.lang === 'en' ? `💥 Fire Cannon blast hit ${u.name}! (-${uDmg} HP)!` : `💥 Vụ nổ Đại Bác Lửa trúng ${u.name}! (-${uDmg} HP)!`, 'hit');
 
                     if (u.charId === 'hookman') {
                         u.revealedTurns = 2;
@@ -5377,7 +5462,7 @@ class GameEngine {
                 if (Math.abs(enemy.x - targetX) <= 1 && Math.abs(enemy.y - targetY) <= 1) {
                     if (enemy.hp > 0) {
                         this.applyBurn(enemy, 3, 5);
-                        this.addFloatingText('🔥 BỐC CHÁY!', enemy.x, enemy.y, '#ea580c');
+                        this.addFloatingText(this.lang === 'en' ? '🔥 BURNING!' : '🔥 BỐC CHÁY!', enemy.x, enemy.y, '#ea580c');
                     }
                 }
             }
@@ -5399,7 +5484,7 @@ class GameEngine {
                 actor.cooldowns[act.skillId] = act.cooldown || 4;
                 if (actor.isPlayer && this.cooldowns) this.cooldowns[act.skillId] = act.cooldown || 4;
                 if (actor === this.cpu && this.cpuCooldowns) this.cpuCooldowns[act.skillId] = act.cooldown || 4;
-                this.addCombatLog(`⚠️ ${actor.name} [Kiếm Gắn Tay] dùng hết 2 lượt! Bắt đầu hồi chiêu 4 lượt!`, 'system');
+                this.addCombatLog(this.lang === 'en' ? `⚠️ ${actor.name} [Wrist Blades] expended 2 uses! Starting 4-turn cooldown!` : `⚠️ ${actor.name} [Kiếm Gắn Tay] dùng hết 2 lượt! Bắt đầu hồi chiêu 4 lượt!`, 'system');
             }
 
             const slashTiles = this.getRectSlashTiles(actor.x, actor.y, act.dir);
@@ -5413,7 +5498,7 @@ class GameEngine {
                     if (target.shieldDir) {
                         if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playShield();
                         this.addFloatingText(this.lang === 'en' ? 'BLOCKED BLADE!' : 'CHẶN ĐỨNG KIẾM!', target.x, target.y, '#60a5fa');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn đứng Kiếm Gắn Tay từ ${actor.name}! (0 DMG)`, 'block');
+                        this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${target.name} raised Shield, blocking Wrist Blades from ${actor.name}! (0 DMG)` : `Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn đứng Kiếm Gắn Tay từ ${actor.name}! (0 DMG)`, 'block');
                     } else {
                         if (window.soundCtrl && (actor.isPlayer || target.isPlayer)) window.soundCtrl.playHit();
                         let dmg = act.power || 60;
@@ -5424,7 +5509,7 @@ class GameEngine {
                         this.applyDamage(target, dmg, actor);
                         this.createHitSparks(target.x, target.y, '#06b6d4');
                         this.addFloatingText(`-${dmg} HP!`, target.x, target.y, '#f87171');
-                        this.addCombatLog(`Nhịp #${stepIndex + 1}: 🗡️ [Kiếm Gắn Tay] ${actor.name} CHÉM QUÉT 3x2 TRÚNG ${target.name}! (-${dmg} HP${buffTag})!`, 'hit');
+                        this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: 🗡️ [Wrist Blades] ${actor.name} SWEEP-SLASHED 3x2 HIT ${target.name}! (-${dmg} HP${buffTag})!` : `Nhịp #${stepIndex + 1}: 🗡️ [Kiếm Gắn Tay] ${actor.name} CHÉM QUÉT 3x2 TRÚNG ${target.name}! (-${dmg} HP${buffTag})!`, 'hit');
 
                         if (target.charId === 'hookman') {
                             target.revealedTurns = 2;
@@ -5480,7 +5565,7 @@ class GameEngine {
             this.addFloatingText(this.lang === 'en' ? '🤖 SENTRY (50 HP)!' : '🤖 XÂY SENTRY (50 HP)!', sx, sy, '#f59e0b');
             this.addCombatLog(
                 this.lang === 'en'
-                    ? `Nhịp #${stepIndex + 1}: ${actor.name} deployed [Auto-Sentry] at (${sx}, ${sy}) (50 HP, 11x11 Zone, 10 DMG)!`
+                    ? `Beat #${stepIndex + 1}: ${actor.name} deployed [Auto-Sentry] at (${sx}, ${sy}) (50 HP, 11x11 Zone, 10 DMG)!`
                     : `Nhịp #${stepIndex + 1}: ${actor.name} triển khai [Auto-Sentry] tại (${sx}, ${sy}) (50 HP, Quét 11x11, 10 DMG)!`,
                 'buff'
             );
@@ -5534,7 +5619,7 @@ class GameEngine {
             this.addFloatingText(this.lang === 'en' ? '🌀 TELEPORTER (60 HP)!' : '🌀 CỔNG DỊCH CHUYỂN (60 HP)!', inX, inY, '#06b6d4');
             this.addCombatLog(
                 this.lang === 'en'
-                    ? `Nhịp #${stepIndex + 1}: ${actor.name} opened Teleporter Entrance at (${inX}, ${inY}) and Exit at (${outX}, ${outY}) (60 HP)!`
+                    ? `Beat #${stepIndex + 1}: ${actor.name} opened Teleporter Entrance at (${inX}, ${inY}) and Exit at (${outX}, ${outY}) (60 HP)!`
                     : `Nhịp #${stepIndex + 1}: ${actor.name} mở Cổng Vào tại (${inX}, ${inY}) và Cổng Ra tại (${outX}, ${outY}) (60 HP)!`,
                 'buff'
             );
@@ -5556,7 +5641,7 @@ class GameEngine {
                 this.addFloatingText(this.lang === 'en' ? 'NO TARGET (5x5)!' : 'HỤT (KHÔNG CÓ ĐỊCH 5x5)!', actor.x, actor.y, '#94a3b8');
                 this.addCombatLog(
                     this.lang === 'en'
-                        ? `Nhịp #${stepIndex + 1}: ${actor.name} used Telekinesis, but no enemies within 5x5 range!`
+                        ? `Beat #${stepIndex + 1}: ${actor.name} used Telekinesis, but no enemies within 5x5 range!`
                         : `Nhịp #${stepIndex + 1}: ${actor.name} thi triển Telekinesis, nhưng không có kẻ địch trong phạm vi 5x5!`,
                     'system'
                 );
@@ -5662,7 +5747,7 @@ class GameEngine {
                     this.addFloatingText(`🔮 TELEKINESIS -${finalDmg} HP!`, target.x, target.y, '#c084fc');
                     this.addCombatLog(
                         this.lang === 'en'
-                            ? `Nhịp #${stepIndex + 1}: ${actor.name} Telekinesis knocked back ${target.name} for ${finalDmg} DMG${affected.length > 1 ? ' (Chain hit 30 DMG/each!)' : ''}!`
+                            ? `Beat #${stepIndex + 1}: ${actor.name} Telekinesis knocked back ${target.name} for ${finalDmg} DMG${affected.length > 1 ? ' (Chain hit 30 DMG/each!)' : ''}!`
                             : `Nhịp #${stepIndex + 1}: ${actor.name} [Telekinesis] hất văng ${target.name} và gây ${finalDmg} sát thương${affected.length > 1 ? ' (Trúng nhiều mục tiêu: 30 DMG/người!)' : ''}!`,
                         'hit'
                     );
@@ -5725,12 +5810,12 @@ class GameEngine {
             if (window.soundCtrl && (actor.isPlayer || livingOpponents.some(o => o.isPlayer))) window.soundCtrl.playNecromancy();
             for (const z of createdZombies) {
                 this.createBuffSparks(z.x, z.y, '#10b981');
-                this.addFloatingText('🧟 THÂY MA (40 HP)!', z.x, z.y, '#10b981');
+                this.addFloatingText(this.lang === 'en' ? '🧟 ZOMBIE (40 HP)!' : '🧟 THÂY MA (40 HP)!', z.x, z.y, '#10b981');
             }
 
             this.addCombatLog(
                 this.lang === 'en'
-                    ? `Nhịp #${stepIndex + 1}: ${actor.name} cast Necromancy, summoning 2 CPU Zombies (40 HP, 3x3 35 DMG)!`
+                    ? `Beat #${stepIndex + 1}: ${actor.name} cast Necromancy, summoning 2 CPU Zombies (40 HP, 3x3 35 DMG)!`
                     : `Nhịp #${stepIndex + 1}: ${actor.name} thi triển [Necromancy], triệu hồi 2 thây ma CPU (40 HP, Quét 3x3 gây 35 DMG)!`,
                 'buff'
             );
@@ -5851,7 +5936,7 @@ class GameEngine {
                 unit.revealedTurns--;
                 if (unit.isPlayer) this.playerRevealedTurns = unit.revealedTurns;
                 if (unit.revealedTurns === 0) {
-                    this.addCombatLog(`👁️ ${unit.name} đã xóa sạch dấu vết, có thể tàng hình trở lại nếu ngoài 7x7!`, 'system');
+                    this.addCombatLog(this.lang === 'en' ? `👁️ ${unit.name} wiped all traces and can enter stealth again outside 7x7!` : `👁️ ${unit.name} đã xóa sạch dấu vết, có thể tàng hình trở lại nếu ngoài 7x7!`, 'system');
                 }
             }
 
@@ -5867,7 +5952,7 @@ class GameEngine {
                 if (unit.isPlayer && window.soundCtrl) window.soundCtrl.playSelect();
                 this.createBuffSparks(unit.x, unit.y, '#10b981');
                 this.addFloatingText(`+${healAmount} HP (ADRENALINE)`, unit.x, unit.y, '#10b981');
-                this.addCombatLog(`💉 Cuối lượt: ${unit.name} Adrenaline hồi phục +${healAmount} HP! (Còn ${unit.buffs.adrenaline.turnsLeft}L)`, 'hit');
+                this.addCombatLog(this.lang === 'en' ? `💉 Turn end: ${unit.name} Adrenaline restored +${healAmount} HP! (${unit.buffs.adrenaline.turnsLeft} turns left)` : `💉 Cuối lượt: ${unit.name} Adrenaline hồi phục +${healAmount} HP! (Còn ${unit.buffs.adrenaline.turnsLeft}L)`, 'hit');
             }
 
             // 2. Giảm thời gian hồi chiêu
@@ -5878,13 +5963,13 @@ class GameEngine {
                         if (skillId === 'SMOKE_BOMB_LAUNCHER') {
                             unit.skillAmmo['SMOKE_BOMB_LAUNCHER'] = 2;
                             if (unit.isPlayer && this.skillAmmo) this.skillAmmo['SMOKE_BOMB_LAUNCHER'] = 2;
-                            this.addCombatLog(`🔄 ${unit.name} [Súng Bắn Bom] nạp lại đầy đủ 2/2 viên đạn!`, 'system');
+                            this.addCombatLog(this.lang === 'en' ? `🔄 ${unit.name} [Smoke Bomb Launcher] reloaded full 2/2 rounds!` : `🔄 ${unit.name} [Súng Bắn Bom] nạp lại đầy đủ 2/2 viên đạn!`, 'system');
                         } else if (skillId === 'RAZOR_BLADE') {
                             unit.skillAmmo['RAZOR_BLADE'] = 2;
                             if (unit.isPlayer && this.skillAmmo) this.skillAmmo['RAZOR_BLADE'] = 2;
-                            this.addCombatLog(`🔄 ${unit.name} [Kiếm Gắn Tay] nạp lại đầy đủ 2/2 lượt chém!`, 'system');
+                            this.addCombatLog(this.lang === 'en' ? `🔄 ${unit.name} [Wrist Blades] recharged full 2/2 uses!` : `🔄 ${unit.name} [Kiếm Gắn Tay] nạp lại đầy đủ 2/2 lượt chém!`, 'system');
                         } else {
-                            this.addCombatLog(`✨ ${unit.name} Kỹ năng [${skillId}] đã hồi chiêu xong!`, 'system');
+                            this.addCombatLog(this.lang === 'en' ? `✨ ${unit.name}'s [${skillId}] is off cooldown!` : `✨ ${unit.name} Kỹ năng [${skillId}] đã hồi chiêu xong!`, 'system');
                         }
                     }
                 }
@@ -5896,7 +5981,7 @@ class GameEngine {
                 if (unit.isPlayer && this.playerBuffs) this.playerBuffs.cigarette.turnsLeft = unit.buffs.cigarette.turnsLeft;
                 if (unit.buffs.cigarette.turnsLeft === 0) {
                     unit.cooldowns['SMOKE_CIGARETTE'] = 3;
-                    this.addCombatLog(`⏳ Khói [Thuốc Lá] của ${unit.name} đã tàn, bắt đầu hồi chiêu 3 lượt!`, 'system');
+                    this.addCombatLog(this.lang === 'en' ? `⏳ ${unit.name}'s [Cigarette] smoke has dissipated, 3-turn cooldown begins!` : `⏳ Khói [Thuốc Lá] của ${unit.name} đã tàn, bắt đầu hồi chiêu 3 lượt!`, 'system');
                 }
             }
 
@@ -5941,7 +6026,7 @@ class GameEngine {
                 this.applyDamage(unit, burnDmg, unit.burnSource || null);
                 unit.burnTurns--;
                 this.createHitSparks(unit.x, unit.y, '#ea580c');
-                this.addFloatingText(`-${burnDmg} HP (CHÁY 🔥)`, unit.x, unit.y, '#ea580c');
+                this.addFloatingText(this.lang === 'en' ? `-${burnDmg} HP (BURN 🔥)` : `-${burnDmg} HP (CHÁY 🔥)`, unit.x, unit.y, '#ea580c');
                 this.addCombatLog(this.lang === 'en'
                     ? `🔥 Turn end: ${unit.name} suffers -${burnDmg} Burn damage! (${unit.burnTurns} turns left)`
                     : `🔥 Cuối lượt: ${unit.name} bị thiêu đốt mất -${burnDmg} HP! (Còn ${unit.burnTurns}L cháy)`, 'hit');
@@ -5977,15 +6062,15 @@ class GameEngine {
 
                     if (window.soundCtrl) window.soundCtrl.playHookPull();
                     this.createHitSparks(victim.x, victim.y, '#ef4444');
-                    this.addFloatingText(`🪝 GIẬT MÓC ${pulledSteps} Ô!`, victim.x, victim.y, '#ef4444');
-                    this.addCombatLog(`💥 HẾT LƯỢT SAU: Dây xích siết mạnh, giật ${victim.name} lại gần ${pulledSteps} ô!`, 'clash');
+                    this.addFloatingText(this.lang === 'en' ? `🪝 HOOK PULL ${pulledSteps} TILES!` : `🪝 GIẬT MÓC ${pulledSteps} Ô!`, victim.x, victim.y, '#ef4444');
+                    this.addCombatLog(this.lang === 'en' ? `💥 TURN END: Chain tightened hard, pulling ${victim.name} ${pulledSteps} tiles closer!` : `💥 HẾT LƯỢT SAU: Dây xích siết mạnh, giật ${victim.name} lại gần ${pulledSteps} ô!`, 'clash');
 
                     hooker.cooldowns[tether.skillId] = tether.cdAfterPull || 4;
-                    this.addCombatLog(`⏳ [Móc Kéo] của ${hooker.name} đã hoàn tất chuỗi kéo, hồi chiêu 4 lượt!`, 'system');
+                    this.addCombatLog(this.lang === 'en' ? `⏳ ${hooker.name}'s [Grappling Hook] finished pull sequence, 4-turn cooldown!` : `⏳ [Móc Kéo] của ${hooker.name} đã hoàn tất chuỗi kéo, hồi chiêu 4 lượt!`, 'system');
                 }
             } else {
                 tether.turnsUntilPull--;
-                this.addCombatLog(`🪝 Dây móc vẫn đang găm chặt vào ${victim ? victim.name : 'đối thủ'}, sẽ siết kéo vào cuối lượt sau!`, 'system');
+                this.addCombatLog(this.lang === 'en' ? `🪝 Hook is still anchored on ${victim ? victim.name : 'target'}, will pull at the end of next turn!` : `🪝 Dây móc vẫn đang găm chặt vào ${victim ? victim.name : 'đối thủ'}, sẽ siết kéo vào cuối lượt sau!`, 'system');
                 remainingTethers.push(tether);
             }
         }
@@ -6003,15 +6088,15 @@ class GameEngine {
         detonatedHazards.forEach(h => {
             if (window.soundCtrl) window.soundCtrl.playExplosion();
             this.createExplosionBurst(h.x, h.y, 45);
-            this.addFloatingText('💥 BÙM! LỰU ĐẠN NỔ (50 DMG)!', h.x, h.y, '#ef4444');
-            this.addCombatLog(`💥 LỰU ĐẠN TẠI (${h.x}, ${h.y}) PHÁT NỔ! Quét sạch khu vực 3x3 với 50 sát thương!`, 'clash');
+            this.addFloatingText(this.lang === 'en' ? '💥 BOOM! GRENADE (50 DMG)!' : '💥 BÙM! LỰU ĐẠN NỔ (50 DMG)!', h.x, h.y, '#ef4444');
+            this.addCombatLog(this.lang === 'en' ? `💥 GRENADE AT (${h.x}, ${h.y}) DETONATED! Swept 3x3 area with 50 damage!` : `💥 LỰU ĐẠN TẠI (${h.x}, ${h.y}) PHÁT NỔ! Quét sạch khu vực 3x3 với 50 sát thương!`, 'clash');
 
             for (const u of allUnits) {
                 if (u.hp > 0 && Math.abs(u.x - h.x) <= 1 && Math.abs(u.y - h.y) <= 1) {
                     this.applyDamage(u, h.power, h.ownerUnit || null);
                     this.createHitSparks(u.x, u.y, u.color);
-                    this.addFloatingText(`-${h.power} HP! (LỰU ĐẠN)`, u.x, u.y, '#f87171');
-                    this.addCombatLog(`➔ ${u.name} dính trọn vụ nổ Lựu Đạn! Mất ${h.power} HP!`, 'hit');
+                    this.addFloatingText(this.lang === 'en' ? `-${h.power} HP! (GRENADE)` : `-${h.power} HP! (LỰU ĐẠN)`, u.x, u.y, '#f87171');
+                    this.addCombatLog(this.lang === 'en' ? `➔ ${u.name} caught in Grenade blast! Lost ${h.power} HP!` : `➔ ${u.name} dính trọn vụ nổ Lựu Đạn! Mất ${h.power} HP!`, 'hit');
 
                     if (u.charId === 'hookman') {
                         u.revealedTurns = 2;
@@ -6073,7 +6158,7 @@ class GameEngine {
                             });
                         }
                         this.addCombatLog(t('respawnLogMsg', { name: u.name }), 'system');
-                        this.addFloatingText('✨ HỒI SINH!', u.x, u.y, '#10b981');
+                        this.addFloatingText(this.lang === 'en' ? '✨ RESPAWNED!' : '✨ HỒI SINH!', u.x, u.y, '#10b981');
                         this.createBuffSparks(u.x, u.y, '#10b981');
                         if (u.isPlayer && window.soundCtrl) window.soundCtrl.playSelect();
                     }
@@ -6157,7 +6242,7 @@ class GameEngine {
                         u.stats.hillPoints += 1;
                     }
                 }
-                this.addFloatingText('+1 ĐIỂM!', 10, 3, '#38bdf8');
+                this.addFloatingText(this.lang === 'en' ? '+1 POINT!' : '+1 ĐIỂM!', 10, 3, '#38bdf8');
                 this.addCombatLog(
                     this.lang === 'en'
                         ? `⭐ Blue controls the Hill: +1 Point! (${this.blueScore}/${this.SCORE_LIMIT})`
@@ -6172,7 +6257,7 @@ class GameEngine {
                         u.stats.hillPoints += 1;
                     }
                 }
-                this.addFloatingText('+1 ĐIỂM!', 10, 3, '#f43f5e');
+                this.addFloatingText(this.lang === 'en' ? '+1 POINT!' : '+1 ĐIỂM!', 10, 3, '#f43f5e');
                 this.addCombatLog(
                     this.lang === 'en'
                         ? `⭐ Red controls the Hill: +1 Point! (${this.redScore}/${this.SCORE_LIMIT})`
@@ -6326,7 +6411,7 @@ class GameEngine {
                     }
                     this.applyBurn(unit, 3, 5, zone.ownerUnit || null);
                     this.createHitSparks(unit.x, unit.y, '#ea580c');
-                    this.addFloatingText('🔥 BỐC CHÁY!', unit.x, unit.y, '#ea580c');
+                    this.addFloatingText(this.lang === 'en' ? '🔥 BURNING!' : '🔥 BỐC CHÁY!', unit.x, unit.y, '#ea580c');
                     this.addCombatLog(this.lang === 'en'
                         ? `🔥 ${unit.name} entered Fire Zone and caught fire (-5 HP/turn for 3 turns)!`
                         : `🔥 ${unit.name} đi qua Vùng Cháy và bị thiêu đốt (-5 HP/lượt trong 3 lượt)!`, 'hit');
@@ -7575,14 +7660,14 @@ class GameEngine {
             if (blocked) {
                 if (window.soundCtrl && (target.isPlayer || allLivingUnits.some(u => u.isPlayer))) window.soundCtrl.playShield();
                 this.addFloatingText(this.lang === 'en' ? 'BLOCKED SENTRY!' : 'CHẶN ĐẠN SENTRY!', target.x, target.y, '#60a5fa');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn loạt đạn Sentry của ${sentry.ownerName}!`, 'block');
+                this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: ${target.name} raised Shield, blocking ${sentry.ownerName}'s Sentry burst!` : `Nhịp #${stepIndex + 1}: ${target.name} giương Khiên chặn loạt đạn Sentry của ${sentry.ownerName}!`, 'block');
             } else {
                 if (window.soundCtrl && (target.isPlayer || allLivingUnits.some(u => u.isPlayer))) window.soundCtrl.playHit();
                 const dmg = sentry.power || 10;
                 this.applyDamage(target, dmg, sentry.owner || null);
                 this.createHitSparks(target.x, target.y, target.color);
                 this.addFloatingText(`-${dmg} HP (SENTRY 🤖)`, target.x, target.y, '#ea580c');
-                this.addCombatLog(`Nhịp #${stepIndex + 1}: 🤖 Sentry của ${sentry.ownerName} tự động nã đạn vào ${target.name}! (-${dmg} HP)!`, 'hit');
+                this.addCombatLog(this.lang === 'en' ? `Beat #${stepIndex + 1}: 🤖 ${sentry.ownerName}'s Sentry automatically fired at ${target.name}! (-${dmg} HP)!` : `Nhịp #${stepIndex + 1}: 🤖 Sentry của ${sentry.ownerName} tự động nã đạn vào ${target.name}! (-${dmg} HP)!`, 'hit');
 
                 if (target.charId === 'hookman') {
                     target.revealedTurns = 2;
@@ -7626,10 +7711,10 @@ class GameEngine {
             const dmg = zombie.power || 35;
             this.applyDamage(target, dmg, zombie.owner || null);
             this.createHitSparks(target.x, target.y, '#10b981');
-            this.addFloatingText(`🧟 CẮN -${dmg} HP!`, target.x, target.y, '#10b981');
+            this.addFloatingText(this.lang === 'en' ? `🧟 BITE -${dmg} HP!` : `🧟 CẮN -${dmg} HP!`, target.x, target.y, '#10b981');
             this.addCombatLog(
                 this.lang === 'en'
-                    ? `Nhịp #${stepIndex + 1}: ${zombie.name} bit ${target.name} for ${dmg} DMG in 3x3 zone!`
+                    ? `Beat #${stepIndex + 1}: ${zombie.name} bit ${target.name} for ${dmg} DMG in 3x3 zone!`
                     : `Nhịp #${stepIndex + 1}: ${zombie.name} tấn công cắn xé ${target.name} gây ${dmg} sát thương trong vùng 3x3!`,
                 'hit'
             );
