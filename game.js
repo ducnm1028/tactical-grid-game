@@ -1299,6 +1299,27 @@ class GameEngine {
         const dirSubBadge = document.getElementById('directionSubBadge');
         if (dirSubBadge) dirSubBadge.innerText = t('directionSubBadge');
 
+        // Direction buttons tooltips
+        const dirTooltips = {
+            btnKeyQ: { vi: 'Lên-Trái (Q / Num 7)', en: 'Up-Left (Q / Num 7)' },
+            btnKeyW: { vi: 'Lên (W / Num 8)', en: 'Up (W / Num 8)' },
+            btnKeyE: { vi: 'Lên-Phải (E / Num 9)', en: 'Up-Right (E / Num 9)' },
+            btnKeyA: { vi: 'Trái (A / Num 4)', en: 'Left (A / Num 4)' },
+            btnKeyS: { vi: 'Dưới (S / Num 2)', en: 'Down (S / Num 2)' },
+            btnKeyD: { vi: 'Phải (D / Num 6)', en: 'Right (D / Num 6)' },
+            btnKeyZ: { vi: 'Dưới-Trái (Z / Num 1)', en: 'Down-Left (Z / Num 1)' },
+            btnKeyC: { vi: 'Dưới-Phải (C / Num 3)', en: 'Down-Right (C / Num 3)' }
+        };
+        for (const [btnId, labels] of Object.entries(dirTooltips)) {
+            const btn = document.getElementById(btnId);
+            if (btn) btn.title = lang === 'en' ? labels.en : labels.vi;
+        }
+
+        const pathSubtext = document.querySelector('.path-subtext');
+        if (pathSubtext) pathSubtext.innerText = t('pathPlannerSubtext');
+        const btnFinishPath = document.getElementById('btnFinishPath');
+        if (btnFinishPath) btnFinishPath.innerText = t('btnFinishPath');
+
         // Re-render dynamic elements
         this.initCharacterSelectUI();
         this.renderHowToPlayUI();
@@ -1622,9 +1643,9 @@ class GameEngine {
             const isAdrenalineActive = s.id === 'HOOKMAN_ADRENALINE' && unit.buffs && unit.buffs.adrenaline && unit.buffs.adrenaline.turnsLeft > 0;
             const isCigaretteActive = s.id === 'SMOKE_CIGARETTE' && unit.buffs && unit.buffs.cigarette && unit.buffs.cigarette.turnsLeft > 0;
 
-            let sName = s.name;
+            let sName = (this.lang === 'en' && s.name_en) ? s.name_en : s.name;
             let sIcon = s.icon;
-            let sDesc = s.desc;
+            let sDesc = (this.lang === 'en' && s.desc_en) ? s.desc_en : s.desc;
             let sColor = s.color;
             let statusLabel = '';
             let isAmmoEmpty = false;
@@ -1658,12 +1679,12 @@ class GameEngine {
             } else if (s.id === 'SNIPER_DESTRUCTIVE') {
                 const isDestrActive = (unit.buffs && unit.buffs.destructiveShot) || currentQueue.some(act => act.skillId === 'SNIPER_DESTRUCTIVE');
                 if (isDestrActive && !isCooldown) {
-                    statusLabel = `<span class="cd-tag" style="background:#ec4899; color:white;">[+30% XUYÊN]</span>`;
+                    statusLabel = `<span class="cd-tag" style="background:#ec4899; color:white;">[${this.lang === 'en' ? '+30% PIERCE' : '+30% XUYÊN'}]</span>`;
                 }
             } else if (s.id === 'SNIPER_THERMAL') {
                 const isThermalActive = (unit.buffs && unit.buffs.thermalVision && unit.buffs.thermalVision.active) || currentQueue.some(act => act.skillId === 'SNIPER_THERMAL');
                 if (isThermalActive && !isCooldown) {
-                    statusLabel = `<span class="cd-tag" style="background:#06b6d4; color:white;">[+1 TẦM]</span>`;
+                    statusLabel = `<span class="cd-tag" style="background:#06b6d4; color:white;">[${this.lang === 'en' ? '+1 RANGE' : '+1 TẦM'}]</span>`;
                 }
             } else if (s.id === 'BOOM_CHAOS_SHOT') {
                 const isChaosActive = (unit.buffs && unit.buffs.chaosShot) || currentQueue.some(act => act.skillId === 'BOOM_CHAOS_SHOT');
@@ -1677,9 +1698,9 @@ class GameEngine {
                 const queuedCount = currentQueue.filter(act => act.skillId === s.id).length;
                 const availableAmmo = Math.max(0, totalAmmo - queuedCount);
                 if (isCooldown) {
-                    statusLabel = `<span class="cd-tag">[Hồi: ${cd}L]</span>`;
+                    statusLabel = `<span class="cd-tag">[${this.lang === 'en' ? `CD: ${cd}T` : `Hồi: ${cd}L`}]</span>`;
                 } else {
-                    const ammoText = s.type === 'RECT_SLASH' ? 'DÙNG' : 'ĐẠN';
+                    const ammoText = s.type === 'RECT_SLASH' ? (this.lang === 'en' ? 'USE' : 'DÙNG') : (this.lang === 'en' ? 'AMMO' : 'ĐẠN');
                     const tagBg = availableAmmo > 0 ? (sColor || '#f97316') : '#ef4444';
                     statusLabel = `<span class="cd-tag" style="background:${tagBg}; color:white;">[${ammoText}: ${availableAmmo}/${s.maxAmmo}]</span>`;
                 }
@@ -1687,24 +1708,27 @@ class GameEngine {
                     isAmmoEmpty = true;
                 }
             } else if (isTethered) {
-                statusLabel = `<span class="cd-tag" style="background:#ef4444; color:white;">[DÂY CĂNG]</span>`;
+                statusLabel = `<span class="cd-tag" style="background:#ef4444; color:white;">[${this.lang === 'en' ? 'TETHERED' : 'DÂY CĂNG'}]</span>`;
             } else if (isAdrenalineActive) {
-                statusLabel = `<span class="cd-tag" style="background:#10b981; color:white;">[+20% DMG: ${unit.buffs.adrenaline.turnsLeft}L]</span>`;
+                statusLabel = `<span class="cd-tag" style="background:#10b981; color:white;">[${this.lang === 'en' ? `+20% DMG: ${unit.buffs.adrenaline.turnsLeft}T` : `+20% DMG: ${unit.buffs.adrenaline.turnsLeft}L`}]</span>`;
             } else if (isCigaretteActive) {
-                statusLabel = `<span class="cd-tag" style="background:#eab308; color:black; font-weight:bold;">[ĐANG HÚT: ${unit.buffs.cigarette.turnsLeft}L]</span>`;
+                statusLabel = `<span class="cd-tag" style="background:#eab308; color:black; font-weight:bold;">[${this.lang === 'en' ? `SMOKING: ${unit.buffs.cigarette.turnsLeft}T` : `ĐANG HÚT: ${unit.buffs.cigarette.turnsLeft}L`}]</span>`;
             } else if (isCooldown) {
-                statusLabel = `<span class="cd-tag">[Hồi: ${cd}L]</span>`;
+                statusLabel = `<span class="cd-tag">[${this.lang === 'en' ? `CD: ${cd}T` : `Hồi: ${cd}L`}]</span>`;
             }
 
             const isBlocked = isCooldown || isTethered || isCigaretteActive || isAmmoEmpty;
             const isSkill2Plus = idx >= 1;
             const dirReminder = isSkill2Plus ? (this.lang === 'en' ? ' • [Tip: Select direction first]' : ' • [Lưu ý: Phải chọn hướng trước]') : '';
 
+            const cdTooltip = isCooldown ? (this.lang === 'en' ? ` (Cooldown: ${cd} turns)` : ` (Đang hồi ${cd} lượt)`) : '';
+            const tetherTooltip = isTethered ? (this.lang === 'en' ? ' (Hook tether attached to target, will pull 2 tiles next turn end)' : ' (Dây móc đang găm vào đối thủ, cuối lượt sau sẽ giật 2 ô)') : '';
+
             return `
                 <button class="key-badge ${isBlocked ? 'cooldown' : ''}" 
                         data-skill-idx="${idx}" 
                         style="border-color: ${isBlocked ? '#ef4444' : (sColor || '#475569')}" 
-                        title="${sDesc}${dirReminder} ${isCooldown ? `(Đang hồi ${cd} lượt)` : (isTethered ? '(Dây móc đang găm vào đối thủ, cuối lượt sau sẽ giật 2 ô)' : '')}">
+                        title="${sDesc}${dirReminder}${cdTooltip}${tetherTooltip}">
                     <b>[${idx + 1}]</b> ${sIcon} ${sName}${statusLabel}
                 </button>
             `;
@@ -1914,9 +1938,13 @@ class GameEngine {
     updatePathNoticeUI() {
         const notice = document.getElementById('pathPlannerNotice');
         const countText = document.getElementById('pathStepCount');
+        const subtext = document.querySelector('.path-subtext');
+        const finishBtn = document.getElementById('btnFinishPath');
         if (this.isBuildingPath) {
             notice.style.display = 'flex';
-            countText.innerText = `Đang vẽ Lộ trình: ${this.activePath.length} / ${this.activePathMaxSteps} bước`;
+            if (countText) countText.innerText = typeof t === 'function' ? t('pathPlannerNotice', { steps: this.activePath.length, maxSteps: this.activePathMaxSteps }) : (this.lang === 'en' ? `Drawing Route: ${this.activePath.length} / ${this.activePathMaxSteps} steps` : `Đang vẽ Lộ trình: ${this.activePath.length} / ${this.activePathMaxSteps} bước`);
+            if (subtext && typeof t === 'function') subtext.innerText = t('pathPlannerSubtext');
+            if (finishBtn && typeof t === 'function') finishBtn.innerText = t('btnFinishPath');
         } else {
             notice.style.display = 'none';
         }
@@ -2471,6 +2499,7 @@ class GameEngine {
             skillId: skill.id,
             type: skill.type,
             name: skill.name,
+            name_en: skill.name_en,
             icon: skill.icon,
             dir: this.currentSelectedDir,
             dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
@@ -2584,7 +2613,7 @@ class GameEngine {
                             slot.innerHTML = `
                                 <span class="slot-step-num">#${i + 1}</span>
                                 <span class="slot-icon">${act.icon}</span>
-                                <span class="slot-name">${act.name}</span>
+                                <span class="slot-name">${this.getActionName(act)}</span>
                                 <span class="slot-dir" style="letter-spacing: 2px;">${act.dirSymbol || ''}</span>
                             `;
                         } else {
@@ -2689,7 +2718,7 @@ class GameEngine {
                 slot.innerHTML = `
                     <span class="slot-step-num">#${i + 1}</span>
                     <span class="slot-icon">${act.icon}</span>
-                    <span class="slot-name">${act.name}</span>
+                    <span class="slot-name">${this.getActionName(act)}</span>
                     <span class="slot-dir" style="letter-spacing: 2px;">${act.dirSymbol}</span>
                 `;
             } else {
@@ -4386,7 +4415,7 @@ class GameEngine {
                 pSlot.innerHTML = `
                     <span class="slot-step-num">#${stepIndex + 1}</span>
                     <span class="slot-icon">${p1Act.icon}</span>
-                    <span class="slot-name">${p1Act.name}</span>
+                    <span class="slot-name">${this.getActionName(p1Act)}</span>
                     <span class="slot-dir" style="letter-spacing: 2px;">${p1Act.dirSymbol || ''}</span>
                 `;
             }
@@ -4397,7 +4426,7 @@ class GameEngine {
                 cSlot.innerHTML = `
                     <span class="slot-step-num">#${stepIndex + 1}</span>
                     <span class="slot-icon">${p2Act.icon}</span>
-                    <span class="slot-name">${p2Act.name}</span>
+                    <span class="slot-name">${this.getActionName(p2Act)}</span>
                     <span class="slot-dir" style="letter-spacing: 2px;">${p2Act.dirSymbol || ''}</span>
                 `;
             }
@@ -4409,7 +4438,7 @@ class GameEngine {
                 cSlot.innerHTML = `
                     <span class="slot-step-num">#${stepIndex + 1}</span>
                     <span class="slot-icon">${cAct.icon}</span>
-                    <span class="slot-name">${cAct.name}</span>
+                    <span class="slot-name">${this.getActionName(cAct)}</span>
                     <span class="slot-dir" style="letter-spacing: 2px;">${cAct.dirSymbol || ''}</span>
                 `;
             }
