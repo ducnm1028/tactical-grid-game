@@ -22,14 +22,14 @@ const cliGameId = process.argv[2] ? process.argv[2].trim() : null;
 
 if (cliGameId && !cliGameId.startsWith('-')) {
     indexContent = indexContent.replace(
-        /gameId:\s*(?:detectedGameId\s*\|\|\s*)?["'][^"']*["']/,
-        `gameId: detectedGameId || "${cliGameId}"`
+        /gameId:\s*(?:(?:\(typeof detectedGameId[^|]+\|\|)|(?:detectedGameId\s*\|\|))?\s*["'][^"']*["']/,
+        `gameId: (typeof detectedGameId !== 'undefined' ? detectedGameId : null) || "${cliGameId}"`
     );
     fs.writeFileSync(indexHtmlPath, indexContent, 'utf8');
     console.log(`✨ Đã tự động cập nhật Game ID thành [${cliGameId}] vào index.html!\n`);
 }
 
-const idMatch = indexContent.match(/gameId:\s*(?:detectedGameId\s*\|\|\s*)?["']([^"']+)["']/);
+const idMatch = indexContent.match(/gameId:[\s\S]*?\|\|\s*["']([^"']+)["']/);
 const currentGameId = idMatch ? idMatch[1] : null;
 
 if (!currentGameId || currentGameId === 'your_game_id_here') {
