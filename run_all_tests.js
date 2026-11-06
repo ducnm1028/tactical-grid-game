@@ -16,18 +16,19 @@ const testFiles = [
     'test_hat_boom_man.js',
     'test_fake_savior.js',
     'test_medic.js',
-    'test_leaderboard.js'
+    'test_leaderboard.js',
+    'test_english_i18n_coverage.js'
 ];
 
 console.log('====================================================');
-console.log('🚀 BREAKERS COMBINE! - CHẠY TẤT CẢ 13 TEST SUITES');
+console.log('🚀 BREAKERS COMBINE! - CHẠY TẤT CẢ TEST SUITES');
 console.log('====================================================\n');
 
 let totalPassed = 0;
 for (const file of testFiles) {
     console.log(`\n▶ ĐANG CHẠY SUITE: ${file}`);
     try {
-        const output = execSync(`node ${file}`, { stdio: 'pipe' }).toString();
+        const output = execSync(`node ${file}`, { stdio: 'pipe', cwd: __dirname }).toString();
         console.log(output);
         totalPassed++;
     } catch (err) {

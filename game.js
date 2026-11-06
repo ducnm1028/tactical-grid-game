@@ -44,6 +44,9 @@ class GameEngine {
         this.activePath = []; // [{ dir, dx, dy, symbol, x, y }]
         this.activePathMaxSteps = 2;
 
+        // Trạng thái hiển thị quảng cáo GameMonetize SDK
+        this.isAdShowing = false;
+
         // Hệ thống Hồi chiêu, Đạn dược & Vật thể mặt đất (Ground Hazards / Lựu đạn / Vùng Cháy)
         this.cooldowns = {}; // { [skillId]: turnsLeft }
         this.skillAmmo = {}; // { [skillId]: currentAmmo }
@@ -1027,7 +1030,18 @@ class GameEngine {
         }
     }
 
+    triggerAd() {
+        if (typeof sdk !== 'undefined' && typeof sdk.showBanner !== 'undefined') {
+            try {
+                sdk.showBanner();
+            } catch (e) {
+                console.warn('[GameMonetize] showBanner error:', e);
+            }
+        }
+    }
+
     startBattle() {
+        this.triggerAd();
         const langScreen = document.getElementById('languageSelectScreen');
         const menu = document.getElementById('mainMenuScreen');
         const charSel = document.getElementById('charSelectScreen');
@@ -1096,26 +1110,45 @@ class GameEngine {
         if (subElem) subElem.innerText = t('headerSubtitle');
 
         const btnHdrLb = document.getElementById('btnHeaderLeaderboard');
-        if (btnHdrLb) btnHdrLb.innerText = t('btnHeaderLeaderboard');
+        if (btnHdrLb) {
+            btnHdrLb.innerText = t('btnHeaderLeaderboard');
+            btnHdrLb.title = t('tooltipHeaderLeaderboard');
+        }
 
         const btnHudLb = document.getElementById('btnHudLeaderboard');
-        if (btnHudLb) btnHudLb.innerText = t('btnHudLeaderboard');
+        if (btnHudLb) {
+            btnHudLb.innerText = t('btnHudLeaderboard');
+            btnHudLb.title = t('tooltipHudLeaderboard');
+        }
 
         const btnLang = document.getElementById('btnHeaderLang');
-        if (btnLang) btnLang.innerText = lang === 'vi' ? '🌐 English' : '🌐 Tiếng Việt';
+        if (btnLang) {
+            btnLang.innerText = lang === 'vi' ? '🌐 English' : '🌐 Tiếng Việt';
+            btnLang.title = t('tooltipHeaderLang');
+        }
 
         const btnMenu = document.getElementById('btnHeaderMenu');
-        if (btnMenu) btnMenu.innerText = t('btnHeaderMenu');
+        if (btnMenu) {
+            btnMenu.innerText = t('btnHeaderMenu');
+            btnMenu.title = t('tooltipHeaderMenu');
+        }
 
         const btnGuide = document.getElementById('btnHeaderGuide');
-        if (btnGuide) btnGuide.innerText = t('btnHeaderGuide');
+        if (btnGuide) {
+            btnGuide.innerText = t('btnHeaderGuide');
+            btnGuide.title = t('tooltipHeaderGuide');
+        }
 
         const btnChar = document.getElementById('btnOpenCharSelect');
-        if (btnChar) btnChar.innerText = t('btnOpenCharSelect');
+        if (btnChar) {
+            btnChar.innerText = t('btnOpenCharSelect');
+            btnChar.title = t('tooltipOpenCharSelect');
+        }
 
         const soundBtn = document.getElementById('soundToggleBtn');
         if (soundBtn) {
             soundBtn.innerText = (window.soundCtrl && window.soundCtrl.enabled) ? t('soundOn') : t('soundOff');
+            soundBtn.title = t('tooltipSoundToggle');
         }
 
         // Main Menu
@@ -1131,20 +1164,48 @@ class GameEngine {
         const menuDesc = document.querySelector('.menu-description');
         if (menuDesc) menuDesc.innerText = t('menuDescription');
 
+        const btnMenuPlay = document.getElementById('btnMenuPlay');
+        if (btnMenuPlay) btnMenuPlay.title = t('tooltipMenuPlay');
         const playMain = document.querySelector('#btnMenuPlay .btn-main-text');
         if (playMain) playMain.innerText = t('btnMenuPlay');
         const playSub = document.querySelector('#btnMenuPlay .btn-sub-text');
         if (playSub) playSub.innerText = t('btnMenuPlaySub');
 
+        const btnMenuLb = document.getElementById('btnMenuLeaderboard');
+        if (btnMenuLb) btnMenuLb.title = t('tooltipMenuLeaderboard');
         const lbMenuMain = document.querySelector('#btnMenuLeaderboard .btn-main-text');
         if (lbMenuMain) lbMenuMain.innerText = t('btnMenuLeaderboard');
         const lbMenuSub = document.querySelector('#btnMenuLeaderboard .btn-sub-text');
         if (lbMenuSub) lbMenuSub.innerText = t('btnMenuLeaderboardSub');
 
+        const btnMenuGuide = document.getElementById('btnMenuGuide');
+        if (btnMenuGuide) btnMenuGuide.title = t('tooltipMenuGuide');
         const guideMain = document.querySelector('#btnMenuGuide .btn-main-text');
         if (guideMain) guideMain.innerText = t('btnMenuGuide');
         const guideSub = document.querySelector('#btnMenuGuide .btn-sub-text');
         if (guideSub) guideSub.innerText = t('btnMenuGuideSub');
+
+        // Language Select Screen Labels
+        const langBadgeEl = document.querySelector('#languageSelectScreen .lang-badge');
+        if (langBadgeEl) langBadgeEl.innerText = t('langBadge');
+        const langTitleEl = document.querySelector('#languageSelectScreen .lang-title');
+        if (langTitleEl) langTitleEl.innerText = t('langTitle');
+        const langSubEl = document.querySelector('#languageSelectScreen .lang-subtitle');
+        if (langSubEl) langSubEl.innerText = t('langSubtitle');
+        const langViNameEl = document.querySelector('#btnSelectLangVi .lang-card-name');
+        if (langViNameEl) langViNameEl.innerText = t('langCardViTitle');
+        const langViSubEl = document.querySelector('#btnSelectLangVi .lang-card-sub');
+        if (langViSubEl) langViSubEl.innerText = t('langCardViSub');
+        const langEnNameEl = document.querySelector('#btnSelectLangEn .lang-card-name');
+        if (langEnNameEl) langEnNameEl.innerText = t('langCardEnTitle');
+        const langEnSubEl = document.querySelector('#btnSelectLangEn .lang-card-sub');
+        if (langEnSubEl) langEnSubEl.innerText = t('langCardEnSub');
+        const langHintEl = document.querySelector('#languageSelectScreen .lang-footer-hint');
+        if (langHintEl) {
+            langHintEl.innerHTML = lang === 'en'
+                ? `<span>You can switch languages anytime using the <b>🌐</b> button in the top bar.</span>`
+                : `<span>💡 Bạn có thể đổi lại ngôn ngữ bất kỳ lúc nào bằng nút <b>🌐</b> trên thanh tiêu đề.</span>`;
+        }
 
         const pills = document.querySelectorAll('.menu-feature-pills .pill');
         if (pills && pills.length >= 4) {
@@ -1252,6 +1313,21 @@ class GameEngine {
         });
 
         this.updateTeamModeUI();
+        this.updateMatchModeUI();
+
+        // Update Tooltips on Character Mini-Buttons and CPU Selector Options
+        const miniCharButtons = document.querySelectorAll('#p1CharSelectGrid .p-char-mini-btn, #p2CharSelectGrid .p-char-mini-btn, #cpuSelectOptions .cpu-opt-btn');
+        if (miniCharButtons && miniCharButtons.length > 0) {
+            miniCharButtons.forEach(btn => {
+                const charId = btn.getAttribute('data-char') || btn.getAttribute('data-cpuchar');
+                if (charId && charId !== 'random') {
+                    const charObj = getCharacterById(charId);
+                    if (charObj) {
+                        btn.title = `${getCharName(charObj, lang)} - ${getCharTitle(charObj, lang)}`;
+                    }
+                }
+            });
+        }
 
         // Minimap
         const mmTitle = document.querySelector('.minimap-title');
@@ -1278,10 +1354,16 @@ class GameEngine {
         if (dirLabel) dirLabel.innerText = t('directionGroupLabel');
 
         const btnUndo = document.getElementById('btnUndo');
-        if (btnUndo) btnUndo.innerHTML = t('btnUndo');
+        if (btnUndo) {
+            btnUndo.innerHTML = t('btnUndo');
+            btnUndo.title = t('tooltipBtnUndo');
+        }
 
         const btnClear = document.getElementById('btnClear');
-        if (btnClear) btnClear.innerHTML = t('btnClear');
+        if (btnClear) {
+            btnClear.innerHTML = t('btnClear');
+            btnClear.title = t('tooltipBtnClear');
+        }
 
         const finishPathBtn = document.getElementById('btnFinishPath');
         if (finishPathBtn) finishPathBtn.innerText = t('btnFinishPath');
@@ -1320,12 +1402,158 @@ class GameEngine {
         const btnFinishPath = document.getElementById('btnFinishPath');
         if (btnFinishPath) btnFinishPath.innerText = t('btnFinishPath');
 
+        // Rotate Device Overlay & Header Update Button
+        const rotTitle = document.querySelector('#rotateDeviceNotice .rotate-title');
+        if (rotTitle) rotTitle.innerText = t('rotateTitle');
+        const rotDesc = document.querySelector('#rotateDeviceNotice .rotate-desc');
+        if (rotDesc) rotDesc.innerText = t('rotateDesc');
+        const btnUpdate = document.getElementById('btnHeaderUpdate');
+        if (btnUpdate) btnUpdate.innerText = t('btnHeaderUpdate');
+
+        // HUD Static Labels
+        const curFacingLbl = document.getElementById('currentFacingLabel');
+        if (curFacingLbl) curFacingLbl.innerText = t('currentFacing');
+        const cpuStatLbl = document.getElementById('cpuStatusLabelText');
+        if (cpuStatLbl) cpuStatLbl.innerText = t('cpuStatusLabel');
+
+        // 2P Player Card Pills
+        const p1Pill = document.querySelector('.p1-tag');
+        if (p1Pill) p1Pill.innerText = `🎮 ${t('player1Label')}`;
+        const p2Pill = document.querySelector('.p2-tag');
+        if (p2Pill) p2Pill.innerText = `🎮 ${t('player2Label')}`;
+
+        // Game Over Modal Static Labels & Buttons
+        const mvpKillsLbl = document.getElementById('mvpKillsLabel');
+        if (mvpKillsLbl) mvpKillsLbl.innerText = t('mvpStatKills');
+        const mvpDmgLbl = document.getElementById('mvpDmgLabel');
+        if (mvpDmgLbl) mvpDmgLbl.innerText = t('mvpStatDmg');
+        const mvpScoreLbl = document.getElementById('mvpScoreLabel');
+        if (mvpScoreLbl) mvpScoreLbl.innerText = t('mvpStatScore');
+        const pmTitle = document.getElementById('postMatchTableTitle');
+        if (pmTitle) pmTitle.innerText = t('lbFinalScoreboardTitle');
+        const pmThChar = document.getElementById('postMatchThChar');
+        if (pmThChar) pmThChar.innerText = t('lbColChar');
+        const pmThTeam = document.getElementById('postMatchThTeam');
+        if (pmThTeam) pmThTeam.innerText = t('lbColTeam');
+        const pmThScore = document.getElementById('postMatchThScore');
+        if (pmThScore) pmThScore.innerText = t('lbColScore');
+        const restartBtn = document.getElementById('restartBtn');
+        if (restartBtn) restartBtn.innerText = t('restartBtnText');
+        const btnPmHof = document.getElementById('btnPostMatchHof');
+        if (btnPmHof) btnPmHof.innerText = t('btnViewHof');
+        const btnPmMenu = document.getElementById('btnPostMatchMenu');
+        if (btnPmMenu) btnPmMenu.innerText = t('btnHeaderMenu');
+
+        // In-Match Leaderboard Modal Static Labels
+        const lbTitle = document.getElementById('lbModalTitle');
+        if (lbTitle) lbTitle.innerText = t('lbModalTitle');
+        const lbBlueBadge = document.getElementById('lbBlueBadgeText');
+        if (lbBlueBadge) lbBlueBadge.innerText = t('lbBlueTeamBadge');
+        const lbRedBadge = document.getElementById('lbRedBadgeText');
+        if (lbRedBadge) lbRedBadge.innerText = t('lbRedTeamBadge');
+        const lbBScoreLbl = document.getElementById('lbBlueScoreLabel');
+        if (lbBScoreLbl) lbBScoreLbl.innerText = t('lbStatScore');
+        const lbBAliveLbl = document.getElementById('lbBlueAliveLabel');
+        if (lbBAliveLbl) lbBAliveLbl.innerText = t('lbStatAlive');
+        const lbRScoreLbl = document.getElementById('lbRedScoreLabel');
+        if (lbRScoreLbl) lbRScoreLbl.innerText = t('lbStatScore');
+        const lbRAliveLbl = document.getElementById('lbRedAliveLabel');
+        if (lbRAliveLbl) lbRAliveLbl.innerText = t('lbStatAlive');
+        const lbTabAll = document.getElementById('lbTabAll');
+        if (lbTabAll) lbTabAll.innerText = t('lbTabAll');
+        const lbTabBlue = document.getElementById('lbTabBlue');
+        if (lbTabBlue) lbTabBlue.innerText = t('lbTabBlue');
+        const lbTabRed = document.getElementById('lbTabRed');
+        if (lbTabRed) lbTabRed.innerText = t('lbTabRed');
+        const thColChar = document.getElementById('thColChar');
+        if (thColChar) thColChar.innerText = t('lbColChar');
+        const thColTeam = document.getElementById('thColTeam');
+        if (thColTeam) thColTeam.innerText = t('lbColTeam');
+        const thColHp = document.getElementById('thColHp');
+        if (thColHp) thColHp.innerText = t('lbColHp');
+        const colHeaderHill = document.getElementById('colHeaderHill');
+        if (colHeaderHill) colHeaderHill.innerText = t('lbColHill');
+        const thColScore = document.getElementById('thColScore');
+        if (thColScore) thColScore.innerText = t('lbColScore');
+        const lbFooterHint = document.getElementById('lbFooterHint');
+        if (lbFooterHint) lbFooterHint.innerText = `💡 ${t('lbHint')}`;
+        const btnResumeMatch = document.getElementById('btnResumeMatch');
+        if (btnResumeMatch) btnResumeMatch.innerText = t('lbResumeMatch');
+
+        // Hall of Fame Modal Static Labels
+        const hofBadgeEl = document.getElementById('hofBadge') || document.querySelector('#hallOfFameModal .lb-badge');
+        if (hofBadgeEl) hofBadgeEl.innerText = t('hofBadge');
+        const hofModalTitle = document.getElementById('hofModalTitle');
+        if (hofModalTitle) hofModalTitle.innerText = t('hofTitle');
+        const hofModalSub = document.getElementById('hofModalSub');
+        if (hofModalSub) hofModalSub.innerText = t('hofSub');
+        const hofHighScoreLbl = document.getElementById('hofHighScoreLabel');
+        if (hofHighScoreLbl) hofHighScoreLbl.innerText = t('hofHighScore');
+        const hofMaxKillsLbl = document.getElementById('hofMaxKillsLabel');
+        if (hofMaxKillsLbl) hofMaxKillsLbl.innerText = t('hofMaxKills');
+        const hofMaxDmgLbl = document.getElementById('hofMaxDmgLabel');
+        if (hofMaxDmgLbl) hofMaxDmgLbl.innerText = t('hofMaxDmg');
+        const hofHistTitle = document.getElementById('hofHistoryTitle');
+        if (hofHistTitle) hofHistTitle.innerText = t('hofHistoryTitle');
+        const btnClearHof = document.getElementById('btnClearHofHistory');
+        if (btnClearHof) btnClearHof.innerText = t('hofClearHistory');
+        const hofThTime = document.getElementById('hofThTime');
+        if (hofThTime) hofThTime.innerText = t('hofColTime');
+        const hofThMode = document.getElementById('hofThMode');
+        if (hofThMode) hofThMode.innerText = t('hofColMode');
+        const hofThChar = document.getElementById('hofThChar');
+        if (hofThChar) hofThChar.innerText = t('hofColChar');
+        const hofThResult = document.getElementById('hofThResult');
+        if (hofThResult) hofThResult.innerText = t('hofColResult');
+        const hofThKD = document.getElementById('hofThKD');
+        if (hofThKD) hofThKD.innerText = t('hofColKD');
+        const hofThDmg = document.getElementById('hofThDmg');
+        if (hofThDmg) hofThDmg.innerText = t('hofColDmg');
+        const hofThScore = document.getElementById('hofThScore');
+        if (hofThScore) hofThScore.innerText = t('hofColScore');
+        const hofThMvp = document.getElementById('hofThMvp');
+        if (hofThMvp) hofThMvp.innerText = t('hofColMvp');
+        const btnCloseHofBtn = document.getElementById('btnCloseHofBtn');
+        if (btnCloseHofBtn) btnCloseHofBtn.innerText = t('hofClose');
+
+        // Additional UI Button and Table Header Tooltips
+        const btnCloseLb = document.getElementById('btnCloseLeaderboard');
+        if (btnCloseLb) btnCloseLb.title = t('tooltipCloseLeaderboard');
+        const btnCloseHof = document.getElementById('btnCloseHof');
+        if (btnCloseHof) btnCloseHof.title = t('tooltipCloseHof');
+        if (btnClearHof) btnClearHof.title = t('tooltipClearHofHistory');
+        const btnCloseGuideX = document.getElementById('btnCloseGuideX');
+        if (btnCloseGuideX) btnCloseGuideX.title = t('tooltipCloseGuide');
+        if (btnUpdate) btnUpdate.title = t('tooltipHeaderUpdate');
+
+        const thKills = document.getElementById('thColKills');
+        if (thKills) thKills.title = t('tooltipThKills');
+        const thDeaths = document.getElementById('thColDeaths');
+        if (thDeaths) thDeaths.title = t('tooltipThDeaths');
+        const thDmg = document.getElementById('thColDmg');
+        if (thDmg) thDmg.title = t('tooltipThDmg');
+        const thDef = document.getElementById('thColDef');
+        if (thDef) thDef.title = t('tooltipThDef');
+        const thHeal = document.getElementById('thColHeal');
+        if (thHeal) thHeal.title = t('tooltipThHeal');
+        if (colHeaderHill) colHeaderHill.title = t('tooltipThHill');
+        if (thColScore) thColScore.title = t('tooltipThScore');
+
+        // Initial Combat Log Update if still at start
+        const logContent = document.getElementById('combatLog');
+        if (logContent && (!this.turn || (this.turn === 1 && this.phase === 'PLANNING' && (!logContent.children || logContent.children.length <= 1)))) {
+            const entry = logContent.querySelector ? logContent.querySelector('.log-entry.system') : null;
+            if (entry) entry.innerText = t('combatLogInit');
+        }
+
         // Re-render dynamic elements
         this.initCharacterSelectUI();
         this.renderHowToPlayUI();
         this.updateHUD();
         this.updateQueueDisplay();
         this.updateSkillButtons();
+        if (this.isLeaderboardOpen) this.renderInMatchLeaderboard();
+        if (this.isHofOpen) this.renderHallOfFame();
     }
 
     renderHowToPlayUI() {
@@ -1511,7 +1739,7 @@ class GameEngine {
 
         const cpuBadge = document.getElementById('cpuNameBadge');
         if (cpuBadge) {
-            cpuBadge.innerText = `${chosenChar.avatar} ${this.cpu.name.toUpperCase()} [CPU]`;
+            cpuBadge.innerText = `${chosenChar.avatar} ${getCharName(chosenChar, this.lang).toUpperCase()} [CPU]`;
             cpuBadge.style.color = chosenChar.themeColor;
         }
         this.updateTeamRosterPreviews();
@@ -1529,7 +1757,7 @@ class GameEngine {
 
         const pBadge = document.getElementById('playerNameBadge');
         if (pBadge) {
-            pBadge.innerText = `${char.name.toUpperCase()} [${this.lang === 'en' ? 'YOU' : 'BẠN'}]`;
+            pBadge.innerText = `${getCharName(char, this.lang).toUpperCase()} [${this.lang === 'en' ? 'YOU' : 'BẠN'}]`;
         }
         this.updateSkillButtons();
         this.updateTeamRosterPreviews();
@@ -1566,7 +1794,7 @@ class GameEngine {
         const p2Name = document.getElementById('hotseatNextPlayerName');
         const p2Team = document.getElementById('hotseatNextPlayerTeam');
         const p2Avatar = document.getElementById('hotseatNextPlayerAvatar');
-        if (p2Name && this.p2Unit) p2Name.innerText = `Người Chơi 2 [${getCharName(this.p2Unit.character, this.lang)}]`;
+        if (p2Name && this.p2Unit) p2Name.innerText = `${this.lang === 'en' ? 'Player 2' : 'Người Chơi 2'} [${getCharName(this.p2Unit.character, this.lang)}]`;
         if (p2Team && this.p2Unit) p2Team.innerText = this.p2Unit.team === 'BLUE' ? (this.lang === 'en' ? '🔵 Blue Team' : '🔵 Đội Xanh') : (this.lang === 'en' ? '🔴 Red Team' : '🔴 Đội Đỏ');
         if (p2Avatar && this.p2Unit) p2Avatar.innerText = this.p2Unit.avatar;
         if (modal) modal.style.display = 'flex';
@@ -1590,10 +1818,10 @@ class GameEngine {
         if (this.gameMode === 'KOTH' && this.p2Unit.hp <= 0) {
             const respawnLabel = t('respawningTag', { turns: this.p2Unit.respawnTurns });
             this.p2Queue = [
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' }
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' }
             ];
         }
 
@@ -1813,7 +2041,7 @@ class GameEngine {
         soundBtn.addEventListener('click', () => {
             if (window.soundCtrl) {
                 window.soundCtrl.enabled = !window.soundCtrl.enabled;
-                soundBtn.innerText = window.soundCtrl.enabled ? '🔊 Âm thanh: BẬT' : '🔇 Âm thanh: TẮT';
+                soundBtn.innerText = window.soundCtrl.enabled ? t('soundOn') : t('soundOff');
             }
         });
 
@@ -2082,6 +2310,10 @@ class GameEngine {
     }
 
     handleKeyDown(e) {
+        if (this.isAdShowing) {
+            return;
+        }
+
         if (e.code === 'Tab') {
             e.preventDefault();
             this.toggleInMatchLeaderboard();
@@ -2604,7 +2836,7 @@ class GameEngine {
 
             if (this.phase === 'PLANNING') {
                 if (this.activePlanningPlayer === 1) {
-                    if (cStatusElem) cStatusElem.innerText = this.lang === 'en' ? '(Waiting P1 pass)' : '(Chờ P1 giao lượt)';
+                    if (cStatusElem) cStatusElem.innerText = t('p2WaitingP1Status');
                     // Render P1 Queue
                     for (let i = 0; i < 4; i++) {
                         const slot = document.getElementById(`p-slot-${i}`);
@@ -2630,7 +2862,7 @@ class GameEngine {
                         const cSlot = document.getElementById(`c-slot-${i}`);
                         if (cSlot) {
                             cSlot.className = 'queue-slot';
-                            cSlot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">⏳</span><span class="slot-name">${this.lang === 'en' ? 'Pending P2' : 'Chờ P2'}</span>`;
+                            cSlot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">⏳</span><span class="slot-name">${t('p2PendingQueueSlot')}</span>`;
                         }
                     }
 
@@ -2648,7 +2880,7 @@ class GameEngine {
                     }
                 } else {
                     // activePlanningPlayer === 2
-                    if (cStatusElem) cStatusElem.innerText = this.lang === 'en' ? '(Active Planning)' : '(Đang lập lệnh)';
+                    if (cStatusElem) cStatusElem.innerText = t('p2ActivePlanningStatus');
                     // P1 slots masked with secret lock (Anti-peeking)
                     for (let i = 0; i < 4; i++) {
                         const slot = document.getElementById(`p-slot-${i}`);
@@ -2694,10 +2926,10 @@ class GameEngine {
                     }
                 }
             } else if (this.phase === 'RESOLVING') {
-                if (cStatusElem) cStatusElem.innerText = this.lang === 'en' ? '(Resolving...)' : '(Đang thực thi...)';
+                if (cStatusElem) cStatusElem.innerText = t('resolvingStatus');
                 if (commitBtn) {
                     commitBtn.disabled = true;
-                    commitBtn.innerHTML = `<span>${this.lang === 'en' ? 'SIMULTANEOUS RESOLUTION (WEGO)...' : 'ĐANG PHÂN XỬ ĐỒNG THỜI (WEGO)...'}</span>`;
+                    commitBtn.innerHTML = `<span>${t('resolvingWegoProgress')}</span>`;
                     commitBtn.style.animation = 'none';
                 }
             }
@@ -2739,7 +2971,7 @@ class GameEngine {
         if (this.playerQueue.length === 4 && this.phase === 'PLANNING') {
             commitBtn.disabled = false;
             if (isPlayerDead) {
-                commitBtn.innerHTML = `<span>${this.lang === 'en' ? 'WAITING RESPAWN' : 'SẴN SÀNG (CHỜ HỒI SINH)'} ⏳</span>`;
+                commitBtn.innerHTML = `<span>${t('waitingRespawnCommit')} ⏳</span>`;
             } else {
                 commitBtn.innerHTML = `<span>${t('btnCommitPrefix')} (4/4) 🚀</span>`;
             }
@@ -2792,6 +3024,20 @@ class GameEngine {
             }
         }
 
+        const cpuStatusText = document.getElementById('cpuStatusText');
+        if (cpuStatusText) {
+            if (this.cpu && this.cpu.hp <= 0 && (!this.redTeam || this.redTeam.every(u => u.hp <= 0))) {
+                cpuStatusText.innerText = t('cpuStatusDefeated');
+                cpuStatusText.style.color = '#f87171';
+            } else if (this.phase === 'PLANNING') {
+                cpuStatusText.innerText = t('cpuStatusThinking');
+                cpuStatusText.style.color = '#38bdf8';
+            } else {
+                cpuStatusText.innerText = t('cpuStatusReady');
+                cpuStatusText.style.color = '#34d399';
+            }
+        }
+
         // Render Roster Bars & Score
         const pRoster = document.getElementById('playerTeamRosterBar');
         if (pRoster && this.blueTeam && this.blueTeam.length > 0) {
@@ -2809,15 +3055,17 @@ class GameEngine {
                 }
                 let debuffBadges = '';
                 if (u.hp > 0) {
-                    if (u.isOiled) debuffBadges += ' <span style="color:#f59e0b;" title="Dính Dầu">🛢️</span>';
-                    if (u.burnTurns > 0) debuffBadges += ` <span style="color:#ea580c; font-weight:800;" title="Đang Cháy (${u.burnTurns}L)">🔥${u.burnTurns}</span>`;
+                    if (u.isOiled) debuffBadges += ` <span style="color:#f59e0b;" title="${t('statusOiled')}">🛢️</span>`;
+                    if (u.burnTurns > 0) debuffBadges += ` <span style="color:#ea580c; font-weight:800;" title="${t('statusBurning', { turns: u.burnTurns })}">🔥${u.burnTurns}</span>`;
                 }
                 const pTag = u.playerIndex === 1 ? '[P1]' : (u.playerIndex === 2 ? '[P2]' : (u.isPlayer ? (this.lang === 'en' ? 'You' : 'Bạn') : '+CPU'));
                 const pColor = u.playerIndex === 1 ? '#34d399' : (u.playerIndex === 2 ? '#fb7185' : (u.isPlayer ? '#34d399' : '#38bdf8'));
+                const charTitle = u.character ? getCharName(u.character, this.lang) : u.name;
+                const charShort = u.character ? getCharName(u.character, this.lang).split(' (')[0] : u.name;
                 return `
-                    <div class="${chipClass}" title="${u.name}: ${u.hp > 0 ? Math.round(u.hp) + '/' + u.maxHp + ' HP' : statusDisplay}">
+                    <div class="${chipClass}" title="${charTitle}: ${u.hp > 0 ? Math.round(u.hp) + '/' + u.maxHp + ' HP' : statusDisplay}">
                         <span>${u.avatar}</span>
-                        <span>${u.character ? u.character.name.split(' (')[0] : u.name}</span>
+                        <span>${charShort}</span>
                         <span style="color: ${pColor}; font-size: 0.65rem; font-weight:800;">${pTag}</span>
                         <span style="color: ${u.hp > 0 ? '#34d399' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}${debuffBadges}</span>
                     </div>
@@ -2841,15 +3089,17 @@ class GameEngine {
                 }
                 let debuffBadges = '';
                 if (u.hp > 0) {
-                    if (u.isOiled) debuffBadges += ' <span style="color:#f59e0b;" title="Dính Dầu">🛢️</span>';
-                    if (u.burnTurns > 0) debuffBadges += ` <span style="color:#ea580c; font-weight:800;" title="Đang Cháy (${u.burnTurns}L)">🔥${u.burnTurns}</span>`;
+                    if (u.isOiled) debuffBadges += ` <span style="color:#f59e0b;" title="${t('statusOiled')}">🛢️</span>`;
+                    if (u.burnTurns > 0) debuffBadges += ` <span style="color:#ea580c; font-weight:800;" title="${t('statusBurning', { turns: u.burnTurns })}">🔥${u.burnTurns}</span>`;
                 }
                 const pTag = u.playerIndex === 1 ? '[P1]' : (u.playerIndex === 2 ? '[P2]' : '+CPU');
                 const pColor = u.playerIndex === 1 ? '#34d399' : (u.playerIndex === 2 ? '#fb7185' : '#fb7185');
+                const charTitle = u.character ? getCharName(u.character, this.lang) : u.name;
+                const charShort = u.character ? getCharName(u.character, this.lang).split(' (')[0] : u.name;
                 return `
-                    <div class="${chipClass}" title="${u.name}: ${u.hp > 0 ? Math.round(u.hp) + '/' + u.maxHp + ' HP' : statusDisplay}">
+                    <div class="${chipClass}" title="${charTitle}: ${u.hp > 0 ? Math.round(u.hp) + '/' + u.maxHp + ' HP' : statusDisplay}">
                         <span>${u.avatar}</span>
-                        <span>${u.character ? u.character.name.split(' (')[0] : u.name}</span>
+                        <span>${charShort}</span>
                         <span style="color: ${pColor}; font-size: 0.65rem; font-weight:800;">${pTag}</span>
                         <span style="color: ${u.hp > 0 ? '#fb7185' : (u.respawnTurns > 0 ? '#f59e0b' : '#f87171')}; font-weight:800;">${statusDisplay}${debuffBadges}</span>
                     </div>
@@ -3336,6 +3586,12 @@ class GameEngine {
                 simY = destY;
             }
 
+            if (action && !action.name_en) {
+                const savedLang = this.lang;
+                this.lang = 'en';
+                action.name_en = this.getActionName(action);
+                this.lang = savedLang;
+            }
             queue.push(action);
         }
 
@@ -6211,7 +6467,7 @@ class GameEngine {
                     }
                 }
             }
-            this.damageDeployablesInArea(h.x, h.y, 1, h.power, (h.owner === 'PLAYER' ? this.player.team : 'RED'), { name: h.ownerName || 'Lựu Đạn' });
+            this.damageDeployablesInArea(h.x, h.y, 1, h.power, (h.owner === 'PLAYER' ? this.player.team : 'RED'), { name: h.ownerName || t('defaultGrenadeOwner') });
         });
 
         this.groundHazards = this.groundHazards.filter(h => h.turnsLeft > 0);
@@ -6452,10 +6708,10 @@ class GameEngine {
             if (this.gameMode === 'KOTH' && this.p1Unit && this.p1Unit.hp <= 0) {
                 const respawnLabel = t('respawningTag', { turns: this.p1Unit.respawnTurns });
                 this.p1Queue = [
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' }
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' }
                 ];
             }
             this.playerQueue = this.p1Queue;
@@ -6463,10 +6719,10 @@ class GameEngine {
             if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) {
                 const respawnLabel = t('respawningTag', { turns: this.player.respawnTurns });
                 this.playerQueue = [
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: 'Đang chờ hồi sinh' }
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' }
                 ];
             } else {
                 this.playerQueue = [];
@@ -6578,12 +6834,13 @@ class GameEngine {
                 entity.alive = false;
                 entity.respawnTurns = this.RESPAWN_TURNS;
                 this.addCombatLog(`💀 ${entity.name} ${this.lang === 'en' ? 'was eliminated! Respawning in 2 turns...' : 'đã hy sinh! Hồi sinh sau 2 lượt...'}`, 'clash');
-                this.addFloatingText('💀 K.O! (RESPAWN 2L)', entity.x, entity.y, '#f43f5e');
+                this.addFloatingText(this.lang === 'en' ? '💀 K.O! (RESPAWN 2T)' : '💀 K.O! (HỒI SINH 2L)', entity.x, entity.y, '#f43f5e');
             }
         }
     }
 
     handleGameOver(kothWinner = null) {
+        this.triggerAd();
         this.phase = 'GAMEOVER';
         const modal = document.getElementById('gameModal');
         const title = document.getElementById('modalTitle');
@@ -7005,7 +7262,7 @@ class GameEngine {
                 else if (e.rank === 2) rankBadge = '🥈';
                 else if (e.rank === 3) rankBadge = '🥉';
 
-                const playerTag = isPlayer ? `<span class="lb-badge-you">${this.lang === 'en' ? 'YOU' : 'BẠN'}</span>` : '';
+                const playerTag = isPlayer ? `<span class="lb-badge-you">${e.playerIndex === 2 ? 'P2' : (this.isTwoPlayerMode ? 'P1' : (this.lang === 'en' ? 'YOU' : 'BẠN'))}</span>` : '';
                 const teamName = e.team === 'BLUE' ? (this.lang === 'en' ? 'Blue' : 'Xanh') : (this.lang === 'en' ? 'Red' : 'Đỏ');
 
                 return `
@@ -7209,6 +7466,7 @@ class GameEngine {
     }
 
     restartGame() {
+        this.triggerAd();
         const modal = document.getElementById('gameModal');
         if (modal) modal.style.display = 'none';
         const inMatchLb = document.getElementById('inMatchLeaderboardModal');
@@ -7598,8 +7856,8 @@ class GameEngine {
         dep.obj.hp -= dmg;
         const isZombie = (dep.type === 'ZOMBIE');
         const isSentry = (dep.type === 'SENTRY');
-        const label = isZombie ? 'Thây Ma 🧟' : (isSentry ? 'Sentry 🤖' : 'Cổng Dịch Chuyển 🌀');
-        const ownerName = dep.obj.ownerName || (isZombie ? 'Fake Savior' : 'Engie');
+        const label = isZombie ? t('deployableZombie') : (isSentry ? t('deployableSentry') : t('deployableTeleporter'));
+        const ownerName = dep.obj.ownerName || (isZombie ? (this.lang === 'en' ? 'False Prophet' : 'Fake Savior') : 'Engie');
 
         this.createHitSparks(dep.x, dep.y, '#f59e0b');
         this.addFloatingText(`-${dmg} HP (${label})`, dep.x, dep.y, '#f87171');
@@ -7853,6 +8111,12 @@ class GameEngine {
     }
 
     renderLoop(timestamp) {
+        if (this.isAdShowing) {
+            this.lastTime = timestamp;
+            requestAnimationFrame((t) => this.renderLoop(t));
+            return;
+        }
+
         const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1);
         this.lastTime = timestamp;
 
@@ -8013,7 +8277,7 @@ class GameEngine {
 
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 10px sans-serif';
-            ctx.fillText(`${h.turnsLeft}L`, hx + CELL_SIZE / 2 + 10, hy + CELL_SIZE / 2 + 10);
+            ctx.fillText(`${h.turnsLeft}${this.lang === 'en' ? 'T' : 'L'}`, hx + CELL_SIZE / 2 + 10, hy + CELL_SIZE / 2 + 10);
             ctx.restore();
         });
 
@@ -8061,7 +8325,7 @@ class GameEngine {
 
                 ctx.fillStyle = '#ffffff';
                 ctx.font = 'bold 11px sans-serif';
-                ctx.fillText(`${fz.turnsLeft}L`, cx, cy);
+                ctx.fillText(`${fz.turnsLeft}${this.lang === 'en' ? 'T' : 'L'}`, cx, cy);
                 ctx.restore();
             });
         }
@@ -8514,7 +8778,7 @@ class GameEngine {
             ctx.arc(0, 0, 28, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
-            tag = `${tag} [ẨN 7x7]`;
+            tag = `${tag} ${t('tagStealth')}`;
         } else if (isRevealed) {
             ctx.save();
             ctx.strokeStyle = '#f43f5e';
@@ -8524,7 +8788,7 @@ class GameEngine {
             ctx.arc(0, 0, 28, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
-            tag = `${tag} [BỊ LỘ: ${revealedTurns}L]`;
+            tag = `${tag} ${t('tagRevealed', { turns: revealedTurns })}`;
         }
 
         if (hasCigaretteBuff) {
@@ -8559,7 +8823,7 @@ class GameEngine {
             ctx.arc(0, 0, 22, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
-            tag = `${tag} [🔥${fighter.burnTurns}L]`;
+            tag = `${tag} ${t('tagBurn', { turns: fighter.burnTurns })}`;
         }
 
         // Kiểm tra Chế độ Ngắm Bắn (Snipeman)
@@ -8628,7 +8892,7 @@ class GameEngine {
             ctx.arc(0, 0, 26, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
-            tag = `${tag} [🛡️BẤT TỬ]`;
+            tag = `${tag} ${t('tagImmune')}`;
         } else if (fighter.buffs && fighter.buffs.invulnerability && fighter.buffs.invulnerability.primedForNextTurn) {
             ctx.save();
             ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
@@ -8638,7 +8902,7 @@ class GameEngine {
             ctx.arc(0, 0, 25, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
-            tag = `${tag} [⏳HỘ THUẪN]`;
+            tag = `${tag} ${t('tagShield')}`;
         }
 
         // Hiệu ứng Miễn Nhiễm Sát Thương (Hat Boom Man Bật Nhảy)
