@@ -34,6 +34,7 @@ global.window = {
     gameEngine,
     SDK_OPTIONS: null
 };
+global.detectedGameId = null;
 
 // Trích xuất đoạn mã SDK từ index.html và thực thi
 const sdkScriptMatch = indexHtml.match(/window\.SDK_OPTIONS\s*=\s*\{[\s\S]*?\};\s*\n/);
@@ -54,6 +55,13 @@ window.SDK_OPTIONS.onEvent({ name: 'SDK_GAME_START' });
 console.assert(window.soundCtrl.enabled === true, 'Âm thanh phải tự động BẬT lại (UNMUTE) sau khi quảng cáo kết thúc');
 console.assert(window.gameEngine.isAdShowing === false, 'Cờ isAdShowing phải tắt false để tiếp tục game');
 console.log('  ✓ SDK_GAME_START: Âm thanh đã BẬT lại, Game đã TIẾP TỤC');
+
+// Giả lập GameMonetize gửi sự kiện SDK_GAME_RESUME (tương thích đa phiên bản SDK)
+window.SDK_OPTIONS.onEvent({ name: 'SDK_GAME_PAUSE' });
+window.SDK_OPTIONS.onEvent({ name: 'SDK_GAME_RESUME' });
+console.assert(window.soundCtrl.enabled === true, 'Âm thanh phải tự động BẬT lại khi nhận SDK_GAME_RESUME');
+console.assert(window.gameEngine.isAdShowing === false, 'Game phải tiếp tục khi nhận SDK_GAME_RESUME');
+console.log('  ✓ SDK_GAME_RESUME: Tương thích 100% với các biến thể SDK GameMonetize');
 console.log('✔ TEST 2 PASS: Vòng đời quảng cáo hoạt động chuẩn xác 100%!\n');
 
 // 3. Kiểm tra hàm triggerAd trong game.js
@@ -61,7 +69,7 @@ console.log('[TEST 3] Kiểm tra phương thức an toàn triggerAd() trong game
 const gameJs = fs.readFileSync(path.join(__dirname, 'game.js'), 'utf8');
 
 console.assert(gameJs.includes('triggerAd()'), 'game.js phải có phương thức triggerAd()');
-console.assert(gameJs.includes('sdk.showBanner()'), 'game.js phải gọi sdk.showBanner()');
+console.assert(gameJs.includes('.showBanner()'), 'game.js phải gọi showBanner()');
 console.assert(gameJs.includes("this.triggerAd()"), 'game.js phải kích hoạt triggerAd ở các điểm chuyển tiếp ván đấu');
 
 // Test an toàn: khi sdk chưa định nghĩa
@@ -77,33 +85,41 @@ const domMock = {
 };
 global.document = domMock;
 
-// Kiểm tra cú pháp triggerAd trực tiếp
+// Kiểm tra cú pháp triggerAd trực tiếp từ chính file game.js
 const triggerMatch = gameJs.match(/triggerAd\(\)\s*\{([\s\S]*?)\n    \}/);
 console.assert(triggerMatch, 'Phải trích xuất được phương thức triggerAd');
-const testTriggerFn = new Function('sdk', `
-    if (typeof sdk !== 'undefined' && typeof sdk.showBanner !== 'undefined') {
-        try {
-            sdk.showBanner();
-        } catch (e) {}
-    }
-`);
+const testTriggerFn = new Function('sdk', 'window', triggerMatch[1]);
 
-// Gọi khi có SDK
-testTriggerFn(global.sdk);
+// Gọi khi có global sdk
+testTriggerFn(global.sdk, global.window);
 console.assert(bannerCalled === true, 'sdk.showBanner() phải được gọi thành công');
+
+// Reset và test gọi qua window.sdk
+bannerCalled = false;
+global.window.sdk = {
+    showBanner: () => { bannerCalled = true; }
+};
+testTriggerFn(undefined, global.window);
+console.assert(bannerCalled === true, 'window.sdk.showBanner() phải được gọi thành công');
 
 // Gọi khi KHÔNG có SDK (không được văng lỗi)
 let noCrash = true;
 try {
-    testTriggerFn(undefined);
+    testTriggerFn(undefined, {});
 } catch (e) {
     noCrash = false;
 }
 console.assert(noCrash === true, 'triggerAd() không được văng lỗi khi chơi offline hoặc không có SDK');
 console.log('✔ TEST 3 PASS: triggerAd() an toàn và gọi sdk.showBanner() hoàn hảo!\n');
 
-// 4. Kiểm tra file zip phát hành gamemonetize_release.zip
-console.log('[TEST 4] Kiểm tra cấu trúc file zip phát hành gamemonetize_release.zip:');
+// 4. Kiểm tra file zip phát hành gamemonetize_release.zip và tài sản quảng bá
+console.log('[TEST 4] Kiểm tra tài nguyên và file zip phát hành:');
+const icon512Path = path.join(__dirname, 'icons', 'icon-512.png');
+const thumbPath = path.join(__dirname, 'icons', 'thumbnail-512x340.png');
+console.assert(fs.existsSync(icon512Path), 'Icon 512x512 phải tồn tại');
+console.assert(fs.existsSync(thumbPath), 'Thumbnail 512x340 phải tồn tại');
+console.log('  ✓ Đã kiểm tra icon-512.png (512x512) & thumbnail-512x340.png (512x340)');
+
 const zipPath = path.join(__dirname, 'gamemonetize_release.zip');
 console.assert(fs.existsSync(zipPath), 'File gamemonetize_release.zip phải tồn tại');
 

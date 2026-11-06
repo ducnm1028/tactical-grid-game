@@ -50,8 +50,9 @@ function createPng(width, height, r, g, b, a = 255) {
     // Draw dark blue background with gold/cyan circular emblem
     const cx = width / 2;
     const cy = height / 2;
-    const radius = width * 0.42;
-    const innerR = width * 0.25;
+    const minDim = Math.min(width, height);
+    const radius = minDim * 0.42;
+    const innerR = minDim * 0.25;
 
     for (let y = 0; y < height; y++) {
         const offset = y * lineLen;
@@ -68,7 +69,7 @@ function createPng(width, height, r, g, b, a = 255) {
                 rawData[pxOffset + 3] = 255; // A
             } else if (dist <= radius) {
                 // Cyan ring
-                if (dist > radius - (width * 0.05)) {
+                if (dist > radius - (minDim * 0.05)) {
                     rawData[pxOffset] = 56;
                     rawData[pxOffset + 1] = 189;
                     rawData[pxOffset + 2] = 248;
@@ -103,4 +104,5 @@ if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir);
 
 fs.writeFileSync(path.join(iconsDir, 'icon-192.png'), createPng(192, 192));
 fs.writeFileSync(path.join(iconsDir, 'icon-512.png'), createPng(512, 512));
-console.log('Successfully generated icons/icon-192.png and icons/icon-512.png');
+fs.writeFileSync(path.join(iconsDir, 'thumbnail-512x340.png'), createPng(512, 340));
+console.log('Successfully generated icons/icon-192.png, icons/icon-512.png, and icons/thumbnail-512x340.png');

@@ -16,12 +16,24 @@
 
     <!-- GameMonetize.com HTML5 SDK Integration -->
     <script type="text/javascript">
+        // Tự động nhận diện Game ID từ URL parameters nếu được nhúng qua iframe trên cổng GameMonetize
+        var detectedGameId = null;
+        try {
+            if (typeof window !== 'undefined' && window.location && window.location.search) {
+                var searchParams = new URLSearchParams(window.location.search);
+                detectedGameId = searchParams.get('gameId') || searchParams.get('game_id') || searchParams.get('id');
+            }
+        } catch (e) {}
+
         window.SDK_OPTIONS = {
-            gameId: "your_game_id_here", // Điền Game ID do GameMonetize cấp vào đây
+            gameId: (typeof detectedGameId !== 'undefined' ? detectedGameId : null) || "your_game_id_here", // Điền Game ID do GameMonetize cấp vào đây
             onEvent: function (a) {
-                switch (a.name) {
+                if (!a || !a.name) return;
+                var eventName = String(a.name).toUpperCase().trim();
+                switch (eventName) {
                     case "SDK_GAME_PAUSE":
                         // Tạm dừng logic trò chơi và ngắt âm thanh khi quảng cáo hiển thị
+                        window.__isAdShowing = true;
                         if (window.soundCtrl) {
                             window.__prevSoundState = window.soundCtrl.enabled;
                             window.soundCtrl.enabled = false;
@@ -31,7 +43,9 @@
                         }
                         break;
                     case "SDK_GAME_START":
+                    case "SDK_GAME_RESUME":
                         // Khôi phục logic trò chơi và bật lại âm thanh sau khi quảng cáo kết thúc
+                        window.__isAdShowing = false;
                         if (window.soundCtrl && typeof window.__prevSoundState !== 'undefined') {
                             window.soundCtrl.enabled = window.__prevSoundState;
                         }
@@ -40,10 +54,11 @@
                         }
                         break;
                     case "SDK_READY":
+                    case "SDKREADY":
                         console.log("[GameMonetize] SDK Ready!");
                         break;
                     case "SDK_ERROR":
-                        console.warn("[GameMonetize] SDK Error!");
+                        console.warn("[GameMonetize] SDK Error:", a);
                         break;
                 }
             }

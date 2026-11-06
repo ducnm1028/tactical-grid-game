@@ -45,7 +45,7 @@ class GameEngine {
         this.activePathMaxSteps = 2;
 
         // Trạng thái hiển thị quảng cáo GameMonetize SDK
-        this.isAdShowing = false;
+        this.isAdShowing = (typeof window !== 'undefined' && !!window.__isAdShowing) || false;
 
         // Hệ thống Hồi chiêu, Đạn dược & Vật thể mặt đất (Ground Hazards / Lựu đạn / Vùng Cháy)
         this.cooldowns = {}; // { [skillId]: turnsLeft }
@@ -1031,9 +1031,10 @@ class GameEngine {
     }
 
     triggerAd() {
-        if (typeof sdk !== 'undefined' && typeof sdk.showBanner !== 'undefined') {
+        const sdkInstance = (typeof sdk !== 'undefined') ? sdk : (typeof window !== 'undefined' ? window.sdk : undefined);
+        if (sdkInstance && typeof sdkInstance.showBanner === 'function') {
             try {
-                sdk.showBanner();
+                sdkInstance.showBanner();
             } catch (e) {
                 console.warn('[GameMonetize] showBanner error:', e);
             }

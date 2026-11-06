@@ -16,16 +16,35 @@ const projectDir = __dirname;
 const indexHtmlPath = path.join(projectDir, 'index.html');
 const zipOutputPath = path.join(projectDir, 'gamemonetize_release.zip');
 
-// 1. Kiểm tra mã Game ID
-const indexContent = fs.readFileSync(indexHtmlPath, 'utf8');
-const idMatch = indexContent.match(/gameId:\s*["']([^"']+)["']/);
+// 1. Kiểm tra hoặc cập nhật mã Game ID từ tham số dòng lệnh (nếu có)
+let indexContent = fs.readFileSync(indexHtmlPath, 'utf8');
+const cliGameId = process.argv[2] ? process.argv[2].trim() : null;
+
+if (cliGameId && !cliGameId.startsWith('-')) {
+    indexContent = indexContent.replace(
+        /gameId:\s*(?:detectedGameId\s*\|\|\s*)?["'][^"']*["']/,
+        `gameId: detectedGameId || "${cliGameId}"`
+    );
+    fs.writeFileSync(indexHtmlPath, indexContent, 'utf8');
+    console.log(`✨ Đã tự động cập nhật Game ID thành [${cliGameId}] vào index.html!\n`);
+}
+
+const idMatch = indexContent.match(/gameId:\s*(?:detectedGameId\s*\|\|\s*)?["']([^"']+)["']/);
 const currentGameId = idMatch ? idMatch[1] : null;
 
 if (!currentGameId || currentGameId === 'your_game_id_here') {
     console.warn('⚠️  CẢNH BÁO: gameId hiện tại vẫn đang là placeholder: "your_game_id_here"!');
-    console.warn('👉 Hãy lấy Game ID thực tế từ GameMonetize Dashboard và điền vào dòng 20 trong file index.html.\n');
+    console.warn('👉 Bạn có thể truyền trực tiếp ID khi build: node build_gamemonetize.js <YOUR_GAME_ID>');
+    console.warn('   Hoặc điền Game ID từ GameMonetize Dashboard vào file index.html.\n');
 } else {
     console.log(`✅ Game ID đã cấu hình: [${currentGameId}]\n`);
+}
+
+// Đảm bảo icon và thumbnail đầy đủ
+const thumbPath = path.join(projectDir, 'icons', 'thumbnail-512x340.png');
+if (!fs.existsSync(thumbPath)) {
+    console.log('🖼️ Đang sinh thumbnail 512x340 cho GameMonetize...');
+    execSync('node generate_icons.js', { stdio: 'inherit', cwd: projectDir });
 }
 
 // 2. Danh sách các file & thư mục cần đóng gói trực tiếp vào root của zip
