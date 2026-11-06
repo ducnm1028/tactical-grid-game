@@ -17,7 +17,8 @@ const testFiles = [
     'test_fake_savior.js',
     'test_medic.js',
     'test_leaderboard.js',
-    'test_english_i18n_coverage.js'
+    'test_english_i18n_coverage.js',
+    'test_gamemonetize_sdk.js'
 ];
 
 console.log('====================================================');

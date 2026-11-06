@@ -5,6 +5,7 @@
   "main": "game.js",
   "scripts": {
     "test": "node run_all_tests.js",
+    "build:gamemonetize": "node build_gamemonetize.js",
     "generate-icons": "node generate_icons.js",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
