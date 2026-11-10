@@ -44,8 +44,15 @@ function createMockElement(id = '') {
                 fillRect() {}, strokeRect() {}, clearRect() {}, beginPath() {},
                 closePath() {}, arc() {}, fill() {}, stroke() {}, moveTo() {},
                 lineTo() {}, setLineDash() {}, save() {}, restore() {},
-                fillText() {}, measureText() { return { width: 10 }; },
-                createLinearGradient() { return { addColorStop() {} }; }
+                translate() {}, quadraticCurveTo() {},
+                fillText(text) {
+                    if (typeof text === 'string' && typeof vnRegex !== 'undefined' && vnRegex.test(text)) {
+                        throw new Error(`fillText contains Vietnamese in English mode: ${text}`);
+                    }
+                },
+                measureText() { return { width: 10 }; },
+                createLinearGradient() { return { addColorStop() {} }; },
+                createRadialGradient() { return { addColorStop() {} }; }
             };
         }
     };
@@ -92,6 +99,12 @@ engine.selectLanguage('en');
 
 // 1. Dictionary checks
 console.log('[TEST 1] Dictionary Translation Validation:');
+const viKeys = Object.keys(I18N_DICTIONARY.vi);
+const enKeys = new Set(Object.keys(I18N_DICTIONARY.en));
+const missingInEn = viKeys.filter(k => !enKeys.has(k));
+if (missingInEn.length > 0) {
+    throw new Error(`Missing EN translations for keys: ${missingInEn.join(', ')}`);
+}
 if (t('appTitle') !== 'Breakers Combine! - WEGO Tactics 20x7') throw new Error('App title failed in EN');
 if (t('tagStealth') !== '[STEALTH 7x7]') throw new Error('tagStealth failed in EN');
 if (t('tagRevealed', { turns: 2 }) !== '[REVEALED: 2T]') throw new Error('tagRevealed failed in EN');
@@ -105,6 +118,9 @@ if (t('waitingRespawnDesc') !== 'Awaiting respawn') throw new Error('waitingResp
 if (t('hofBadge') !== 'HALL OF FAME • PERSONAL RECORDS') throw new Error('hofBadge failed in EN');
 if (t('tooltipBtnUndo') !== 'Undo last selected action') throw new Error('tooltipBtnUndo failed in EN');
 if (t('tooltipBtnClear') !== 'Clear all 4 actions') throw new Error('tooltipBtnClear failed in EN');
+if (t('tooltipCloseGuide') !== 'Close tactical guide') throw new Error('tooltipCloseGuide failed in EN');
+if (t('tooltipHeaderLang') !== 'Switch to Vietnamese') throw new Error('tooltipHeaderLang failed in EN');
+if (t('tooltipCpuRandom') !== 'Random CPU Hero') throw new Error('tooltipCpuRandom failed in EN');
 console.log('✓ All dictionary tags, labels, and tooltips correctly translated in EN');
 
 // 2. Character translations
@@ -148,7 +164,9 @@ const testActions = [
     { name: 'Bắn Bừa Bãi' },
     { name: 'Bắn Bừa Tên Lửa' },
     { name: 'Cú Bật Nhảy' },
-    { name: 'Lộ Trình (3b)' }
+    { name: 'Lộ Trình (3b)' },
+    { name: 'Súng Tỉa' },
+    { name: 'Nòng Xe Tăng' }
 ];
 testActions.forEach(act => {
     const translated = engine.getActionName(act);
@@ -158,6 +176,15 @@ testActions.forEach(act => {
             throw new Error(`Action translation failed for: ${act.name}`);
         }
     }
+});
+const vnRegex = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+chars.forEach(c => {
+    c.skills.forEach(s => {
+        const tr = engine.getActionName({ name: s.name, type: s.type });
+        if (!tr || vnRegex.test(tr)) {
+            throw new Error(`Skill ${s.name} of ${c.id} failed to translate in getActionName: ${tr}`);
+        }
+    });
 });
 console.log('✓ getActionName accurately maps Vietnamese actions to English');
 
@@ -180,5 +207,128 @@ if (!koText || koText.text !== '💀 K.O! (RESPAWN 2T)') {
     throw new Error(`Expected English KO floating text, got: ${koText ? koText.text : 'null'}`);
 }
 console.log('✓ KOTH KO floating text correctly formatted in English (2T)');
+
+// 7. WAIT and 2-Player mode localization
+console.log('\n[TEST 7] WAIT action & 2P Mode naming in English:');
+const waitTr = engine.getActionName({ type: 'WAIT', name: 'HỒI SINH 2L' });
+if (waitTr !== 'RESPAWN 2T') throw new Error(`WAIT action translation failed: ${waitTr}`);
+
+engine.setMatchMode(true);
+engine.applyLanguageToUI();
+if (!engine.p1Unit.name.includes('(P1)') || vnRegex.test(engine.p1Unit.name)) {
+    throw new Error(`P1 name localization failed: ${engine.p1Unit.name}`);
+}
+if (!engine.p2Unit.name.includes('(P2)') || vnRegex.test(engine.p2Unit.name)) {
+    throw new Error(`P2 name localization failed: ${engine.p2Unit.name}`);
+}
+
+engine.setMatchMode(false);
+engine.applyLanguageToUI();
+if (!engine.cpu.name.includes('Sentinel') || vnRegex.test(engine.cpu.name)) {
+    throw new Error(`CPU Leader name localization failed: ${engine.cpu.name}`);
+}
+console.log('✓ WAIT action, 2P unit naming, and 1P Sentinel leader naming verified cleanly in English');
+
+// 8. Deployables & Entities Dynamic Synchronization on Language Switch
+console.log('\n[TEST 8] Dynamic Deployables & Hotseat Modal Localization:');
+engine.zombies = [{ team: 'BLUE', owner: engine.player, name: 'Thây Ma Xanh', hp: 40 }];
+engine.sentries = [{ team: 'BLUE', owner: engine.player, ownerName: 'Thủ lĩnh', hp: 50 }];
+engine.applyLanguageToUI();
+
+if (engine.zombies[0].name !== 'Blue Zombie' || vnRegex.test(engine.zombies[0].name)) {
+    throw new Error(`Zombie dynamic translation failed: ${engine.zombies[0].name}`);
+}
+if (vnRegex.test(engine.sentries[0].ownerName)) {
+    throw new Error(`Sentry owner dynamic translation failed: ${engine.sentries[0].ownerName}`);
+}
+
+engine.setMatchMode(true);
+engine.p1Queue = [
+    { type: 'PATH_MOVE', name: 'Route' },
+    { type: 'PATH_MOVE', name: 'Route' },
+    { type: 'PATH_MOVE', name: 'Route' },
+    { type: 'PATH_MOVE', name: 'Route' }
+];
+engine.phase = 'PLANNING';
+engine.confirmP1QueueAndTransitionToP2();
+const hsDesc = document.getElementById('hotseatDesc');
+if (vnRegex.test(hsDesc.innerHTML) || !hsDesc.innerHTML.includes('Player 2')) {
+    throw new Error(`Hotseat modal description failed in EN: ${hsDesc.innerHTML}`);
+}
+console.log('✓ Dynamic deployables and hotseat modal localization verified cleanly');
+
+// 9. Hall of Fame Record Localization
+console.log('\n[TEST 9] Hall of Fame Record Localization:');
+engine.getMatchHistory = () => [
+    {
+        id: 'test_m1',
+        dateFormatted: 'Nov 10, 11:00 AM',
+        gameMode: 'DUEL',
+        teamSize: '1v1',
+        playerChar: 'trooper',
+        playerCharName: 'Chiến Binh Xạ Thủ',
+        playerAvatar: '🪖',
+        outcome: 'VICTORY',
+        kills: 1,
+        deaths: 0,
+        damageDealt: 100,
+        score: 150,
+        mvpName: 'Trooper',
+        mvpAvatar: '🪖'
+    }
+];
+const hofTbody = document.getElementById('hofTbody');
+engine.renderHallOfFame();
+if (vnRegex.test(hofTbody.innerHTML) || !hofTbody.innerHTML.includes('Trooper (Assault Gunner)')) {
+    throw new Error(`Hall of fame character localization failed: ${hofTbody.innerHTML}`);
+}
+console.log('✓ Hall of Fame character and date localization verified cleanly');
+
+// 10. End-to-End Game State & Zero-Vietnamese Audit in English
+console.log('\n[TEST 10] Combat Logs, Floating Text, and Canvas Zero-Vietnamese Audit:');
+const loggedCombatLogs = [];
+const origAddCombatLog = engine.addCombatLog.bind(engine);
+engine.addCombatLog = function(msg, type) {
+    if (typeof msg === 'string' && vnRegex.test(msg)) {
+        throw new Error(`addCombatLog contains Vietnamese in English mode: ${msg}`);
+    }
+    loggedCombatLogs.push(msg);
+    origAddCombatLog(msg, type);
+};
+
+const loggedFloatingTexts = [];
+const origAddFloatingText = engine.addFloatingText.bind(engine);
+engine.addFloatingText = function(text, gridX, gridY, color) {
+    if (typeof text === 'string' && vnRegex.test(text)) {
+        throw new Error(`addFloatingText contains Vietnamese in English mode: ${text}`);
+    }
+    loggedFloatingTexts.push(text);
+    origAddFloatingText(text, gridX, gridY, color);
+};
+
+// Test game over screens
+engine.handleGameOver();
+const modalTitle = document.getElementById('modalTitle').innerText;
+const modalDesc = document.getElementById('modalDesc').innerText;
+if (vnRegex.test(modalTitle)) throw new Error(`Game over title contains Vietnamese: ${modalTitle}`);
+if (vnRegex.test(modalDesc)) throw new Error(`Game over desc contains Vietnamese: ${modalDesc}`);
+
+engine.handleGameOver('BLUE_KOTH');
+const kothWinTitle = document.getElementById('modalTitle').innerText;
+const kothWinDesc = document.getElementById('modalDesc').innerText;
+if (vnRegex.test(kothWinTitle)) throw new Error(`KOTH win title contains Vietnamese: ${kothWinTitle}`);
+if (vnRegex.test(kothWinDesc)) throw new Error(`KOTH win desc contains Vietnamese: ${kothWinDesc}`);
+
+engine.handleGameOver('RED_KOTH');
+const kothLossTitle = document.getElementById('modalTitle').innerText;
+const kothLossDesc = document.getElementById('modalDesc').innerText;
+if (vnRegex.test(kothLossTitle)) throw new Error(`KOTH loss title contains Vietnamese: ${kothLossTitle}`);
+if (vnRegex.test(kothLossDesc)) throw new Error(`KOTH loss desc contains Vietnamese: ${kothLossDesc}`);
+
+// Test canvas renders
+engine.renderWorld();
+engine.renderMinimap();
+
+console.log('✓ Combat logs, floating texts, canvas rendering, and game-over modals completely free of Vietnamese');
 
 console.log('\n🎉 ALL ENGLISH I18N CHECKS PASSED 100%!');

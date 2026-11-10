@@ -1105,6 +1105,7 @@ class GameEngine {
         if (typeof document === 'undefined' || !document.querySelector) return;
         const lang = this.lang || 'vi';
         document.title = t('appTitle');
+        if (document.documentElement) document.documentElement.lang = lang;
 
         // Header
         const subElem = document.querySelector('.title-container .subtitle');
@@ -1227,8 +1228,42 @@ class GameEngine {
         if (this.blueTeam && this.redTeam) {
             [...this.blueTeam, ...this.redTeam].forEach(u => {
                 if (u.character) {
-                    u.name = u.isPlayer ? getCharName(u.character, lang) : `${u.team === 'BLUE' ? (lang === 'en' ? 'Ally' : 'Đồng minh') : (lang === 'en' ? 'Enemy' : 'Kẻ địch')} ${getCharName(u.character, lang)}`;
+                    if (this.isTwoPlayerMode && u.playerIndex) {
+                        u.name = `(P${u.playerIndex}) [${getCharName(u.character, lang)}]`;
+                    } else if (!this.isTwoPlayerMode && u.team === 'RED' && u.index === 0) {
+                        u.name = `${lang === 'en' ? 'Sentinel' : 'Thủ lĩnh'} [${getCharName(u.character, lang)}]`;
+                    } else {
+                        u.name = u.isPlayer ? getCharName(u.character, lang) : `${u.team === 'BLUE' ? (lang === 'en' ? 'Ally' : 'Đồng minh') : (lang === 'en' ? 'Enemy' : 'Kẻ địch')} ${getCharName(u.character, lang)}`;
+                    }
                 }
+            });
+        }
+
+        // Đồng bộ hóa tên và sở hữu của các thực thể mặt đất theo ngôn ngữ hiện tại
+        if (this.zombies && this.zombies.length > 0) {
+            this.zombies.forEach(z => {
+                z.name = z.team === 'BLUE' ? (lang === 'en' ? 'Blue Zombie' : 'Thây Ma Xanh') : (lang === 'en' ? 'Red Zombie' : 'Thây Ma Đỏ');
+                if (z.owner) z.ownerName = z.owner.name;
+            });
+        }
+        if (this.sentries && this.sentries.length > 0) {
+            this.sentries.forEach(s => {
+                if (s.owner) s.ownerName = s.owner.name;
+            });
+        }
+        if (this.teleporters && this.teleporters.length > 0) {
+            this.teleporters.forEach(tp => {
+                if (tp.owner) tp.ownerName = tp.owner.name;
+            });
+        }
+        if (this.groundHazards && this.groundHazards.length > 0) {
+            this.groundHazards.forEach(h => {
+                if (h.ownerUnit) h.ownerName = h.ownerUnit.name;
+            });
+        }
+        if (this.fireZones && this.fireZones.length > 0) {
+            this.fireZones.forEach(fz => {
+                if (fz.ownerUnit) fz.creatorName = fz.ownerUnit.name;
             });
         }
 
@@ -1272,11 +1307,23 @@ class GameEngine {
         const hsBtn = document.getElementById('btnHotseatContinue');
         if (hsBtn) hsBtn.innerText = t('hotseatBtnContinue');
 
-        const cpuLabel = document.querySelector('.cpu-select-label');
+        const hsNextName = document.getElementById('hotseatNextPlayerName');
+        if (hsNextName && this.p2Unit) {
+            hsNextName.innerText = `${lang === 'en' ? 'Player 2' : 'Người Chơi 2'} [${getCharName(this.p2Unit.character, lang)}]`;
+        }
+        const hsNextTeam = document.getElementById('hotseatNextPlayerTeam');
+        if (hsNextTeam && this.p2Unit) {
+            hsNextTeam.innerText = this.p2Unit.team === 'BLUE' ? (lang === 'en' ? '🔵 Blue Team' : '🔵 Đội Xanh') : (lang === 'en' ? '🔴 Red Team' : '🔴 Đội Đỏ');
+        }
+
+        const cpuLabel = document.getElementById('cpuSelectHeaderLabel') || document.querySelector('.cpu-select-label');
         if (cpuLabel) cpuLabel.innerText = t('cpuSelectLabel');
 
         const randomBtn = document.querySelector('#cpuSelectOptions [data-cpuchar="random"]');
-        if (randomBtn) randomBtn.innerText = t('cpuOptRandom');
+        if (randomBtn) {
+            randomBtn.innerText = t('cpuOptRandom');
+            randomBtn.title = t('tooltipCpuRandom');
+        }
 
         const csBack = document.getElementById('btnCharSelectBack');
         if (csBack) csBack.innerText = t('btnCharSelectBack');
@@ -1321,7 +1368,9 @@ class GameEngine {
         if (miniCharButtons && miniCharButtons.length > 0) {
             miniCharButtons.forEach(btn => {
                 const charId = btn.getAttribute('data-char') || btn.getAttribute('data-cpuchar');
-                if (charId && charId !== 'random') {
+                if (charId === 'random') {
+                    btn.title = t('tooltipCpuRandom');
+                } else if (charId) {
                     const charObj = getCharacterById(charId);
                     if (charObj) {
                         btn.title = `${getCharName(charObj, lang)} - ${getCharTitle(charObj, lang)}`;
@@ -1595,7 +1644,7 @@ class GameEngine {
                     <h2>${t('guideMainTitle')}</h2>
                     <p>${t('guideMainSub')}</p>
                 </div>
-                <button id="btnCloseGuideX" class="guide-close-btn" title="Close">✕</button>
+                <button id="btnCloseGuideX" class="guide-close-btn" title="${t('tooltipCloseGuide')}">✕</button>
             </div>
 
             <div class="guide-scroll-body">
@@ -1792,6 +1841,12 @@ class GameEngine {
         // Mở Hotseat modal
         this.isHotseatModalOpen = true;
         const modal = document.getElementById('hotseatTransitionModal');
+        const hsTitle = document.getElementById('hotseatTitle');
+        const hsDesc = document.getElementById('hotseatDesc');
+        const hsBtn = document.getElementById('btnHotseatContinue');
+        if (hsTitle) hsTitle.innerText = t('hotseatTransitionTitle');
+        if (hsDesc) hsDesc.innerHTML = t('hotseatTransitionDesc');
+        if (hsBtn) hsBtn.innerText = t('hotseatBtnContinue');
         const p2Name = document.getElementById('hotseatNextPlayerName');
         const p2Team = document.getElementById('hotseatNextPlayerTeam');
         const p2Avatar = document.getElementById('hotseatNextPlayerAvatar');
@@ -1818,11 +1873,12 @@ class GameEngine {
         // Nếu P2 hy sinh trong KOTH, tự động điền lệnh chờ hồi sinh
         if (this.gameMode === 'KOTH' && this.p2Unit.hp <= 0) {
             const respawnLabel = t('respawningTag', { turns: this.p2Unit.respawnTurns });
+            const respawnLabelEn = `RESPAWN ${this.p2Unit.respawnTurns}T`;
             this.p2Queue = [
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
-                { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' }
+                { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' }
             ];
         }
 
@@ -1872,9 +1928,9 @@ class GameEngine {
             const isAdrenalineActive = s.id === 'HOOKMAN_ADRENALINE' && unit.buffs && unit.buffs.adrenaline && unit.buffs.adrenaline.turnsLeft > 0;
             const isCigaretteActive = s.id === 'SMOKE_CIGARETTE' && unit.buffs && unit.buffs.cigarette && unit.buffs.cigarette.turnsLeft > 0;
 
-            let sName = (this.lang === 'en' && s.name_en) ? s.name_en : s.name;
+            let sName = getSkillName(s, this.lang);
             let sIcon = s.icon;
-            let sDesc = (this.lang === 'en' && s.desc_en) ? s.desc_en : s.desc;
+            let sDesc = getSkillDesc(s, this.lang);
             let sColor = s.color;
             let statusLabel = '';
             let isAmmoEmpty = false;
@@ -2204,6 +2260,7 @@ class GameEngine {
             dy: d.dy,
             symbol: d.symbol,
             label: d.label,
+            label_en: d.label_en || d.label,
             x: nextX,
             y: nextY
         });
@@ -2597,6 +2654,7 @@ class GameEngine {
                     skillId: 'SNIPER_SCOPE',
                     type: 'SNIPER_SCOPE',
                     name: this.lang === 'en' ? 'Scope In' : 'Ngắm Bắn',
+                    name_en: 'Scope In',
                     icon: '🎯',
                     dir: this.currentSelectedDir,
                     dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
@@ -2627,6 +2685,7 @@ class GameEngine {
                     skillId: 'SNIPER_SHOT',
                     type: 'SNIPER_SHOT',
                     name: this.lang === 'en' ? 'Sniper Shot' : 'Bắn Súng Tỉa',
+                    name_en: 'Sniper Shot',
                     icon: '💥',
                     dir: this.currentSelectedDir,
                     dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
@@ -2666,6 +2725,7 @@ class GameEngine {
                     skillId: 'TANK_SCOPE',
                     type: 'TANK_SCOPE',
                     name: this.lang === 'en' ? 'Scope In' : 'Ngắm Nòng Pháo',
+                    name_en: 'Scope In',
                     icon: '🎯',
                     dir: this.currentSelectedDir,
                     dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
@@ -2696,6 +2756,7 @@ class GameEngine {
                     skillId: 'TANK_SHOT',
                     type: 'TANK_SHOT',
                     name: this.lang === 'en' ? 'Tank Cannon Shot' : 'Bắn Nòng Xe Tăng',
+                    name_en: 'Tank Cannon Shot',
                     icon: '💥',
                     dir: this.currentSelectedDir,
                     dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
@@ -3236,10 +3297,16 @@ class GameEngine {
             if (act.name_en) return act.name_en;
 
             // Tra cứu động qua cơ sở dữ liệu nhân vật & kỹ năng
-            if (act.skillId && typeof CHARACTERS_DATABASE !== 'undefined') {
+            if (typeof CHARACTERS_DATABASE !== 'undefined') {
                 for (const char of CHARACTERS_DATABASE) {
-                    const sk = char.skills.find(s => s.id === act.skillId);
-                    if (sk && sk.name_en) return sk.name_en;
+                    if (act.skillId) {
+                        const sk = char.skills.find(s => s.id === act.skillId);
+                        if (sk && sk.name_en) return sk.name_en;
+                    }
+                    if (act.name) {
+                        const sk = char.skills.find(s => s.name === act.name);
+                        if (sk && sk.name_en) return sk.name_en;
+                    }
                 }
             }
 
@@ -3272,6 +3339,7 @@ class GameEngine {
                 'Súng Thanh Sắt': 'Iron Rod Gun',
                 'Tầm Nhìn Dò Nhiệt': 'Thermal Vision',
                 'Phát Bắn Hủy Diệt': 'Destructive Shot',
+                'Súng Tỉa': 'Sniper Rifle',
                 'Bắn Súng Tỉa': 'Sniper Shot',
                 'Ngắm Bắn': 'Scope In',
                 'Necromancy': 'Necromancy',
@@ -3282,10 +3350,19 @@ class GameEngine {
                 'Machine Pistol': 'Machine Pistol',
                 'Cú Bật Nhảy': 'Invulnerable Leap',
                 'Phát Bắn Rối Loạn': 'Chaos Shot',
+                'Nòng Xe Tăng': 'Tank Cannon',
                 'Bắn Nòng Xe Tăng': 'Tank Cannon Shot',
                 'Ngắm Nòng Pháo': 'Scope In'
             };
             if (act.name && actionNameMap[act.name]) return actionNameMap[act.name];
+
+            if (act.type === 'WAIT') {
+                if (act.name_en) return act.name_en;
+                if (typeof act.name === 'string' && act.name.includes('HỒI SINH')) {
+                    return act.name.replace('HỒI SINH', 'RESPAWN').replace('L', 'T');
+                }
+                return 'Respawn Wait';
+            }
 
             if (typeof act.name === 'string' && act.name.startsWith('Lộ Trình')) {
                 return act.name.replace('Lộ Trình', 'Route').replace('b)', ' steps)').replace('b', ' steps');
@@ -6708,22 +6785,24 @@ class GameEngine {
 
             if (this.gameMode === 'KOTH' && this.p1Unit && this.p1Unit.hp <= 0) {
                 const respawnLabel = t('respawningTag', { turns: this.p1Unit.respawnTurns });
+                const respawnLabelEn = `RESPAWN ${this.p1Unit.respawnTurns}T`;
                 this.p1Queue = [
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' }
+                    { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' }
                 ];
             }
             this.playerQueue = this.p1Queue;
         } else {
             if (this.gameMode === 'KOTH' && this.player && this.player.hp <= 0) {
                 const respawnLabel = t('respawningTag', { turns: this.player.respawnTurns });
+                const respawnLabelEn = `RESPAWN ${this.player.respawnTurns}T`;
                 this.playerQueue = [
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
-                    { type: 'WAIT', name: respawnLabel, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' }
+                    { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' },
+                    { type: 'WAIT', name: respawnLabel, name_en: respawnLabelEn, icon: '💀', desc: t('waitingRespawnDesc'), desc_en: 'Awaiting respawn' }
                 ];
             } else {
                 this.playerQueue = [];
@@ -7445,13 +7524,16 @@ class GameEngine {
             if (m.outcome === 'DEFEAT') resBadge = `<span class="tag-outcome loss">${t('hofDefeat')}</span>`;
             else if (m.outcome === 'DRAW') resBadge = `<span class="tag-outcome draw">${t('hofDraw')}</span>`;
 
+            const charObj = m.playerChar ? getCharacterById(m.playerChar) : null;
+            const charDisplayName = charObj ? getCharName(charObj, this.lang) : (m.playerCharName || m.playerChar || 'Operator');
+
             return `
                 <tr>
                     <td style="color:#94a3b8; font-size:0.75rem;">${m.dateFormatted || ''}</td>
                     <td style="font-weight:700;">${m.gameMode} (${m.teamSize})</td>
                     <td>
                         <span style="font-size:1.1rem; margin-right:4px;">${m.playerAvatar || '🪖'}</span>
-                        <b>${m.playerCharName || m.playerChar}</b>
+                        <b>${charDisplayName}</b>
                     </td>
                     <td>${resBadge}</td>
                     <td style="font-weight:700; color:#4ade80;">${m.kills} / ${m.deaths}</td>

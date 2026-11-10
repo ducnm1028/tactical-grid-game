@@ -779,6 +779,22 @@ const CHARACTERS_DATABASE = [
     }
 ];
 
+// Ensure desc / desc_en aliases are populated on all character and skill definitions
+CHARACTERS_DATABASE.forEach(c => {
+    if (!c.desc && c.description) c.desc = c.description;
+    if (!c.desc_en && c.description_en) c.desc_en = c.description_en;
+    if (!c.description && c.desc) c.description = c.desc;
+    if (!c.description_en && c.desc_en) c.description_en = c.desc_en;
+    if (c.skills) {
+        c.skills.forEach(s => {
+            if (!s.desc && s.description) s.desc = s.description;
+            if (!s.desc_en && s.description_en) s.desc_en = s.description_en;
+            if (!s.description && s.desc) s.description = s.desc;
+            if (!s.description_en && s.desc_en) s.description_en = s.desc_en;
+        });
+    }
+});
+
 // Helper functions for bilingual support
 function getCharName(char, lang = (typeof getLanguage === 'function' ? getLanguage() : 'vi')) {
     if (!char) return '';
@@ -792,7 +808,8 @@ function getCharTitle(char, lang = (typeof getLanguage === 'function' ? getLangu
 
 function getCharDesc(char, lang = (typeof getLanguage === 'function' ? getLanguage() : 'vi')) {
     if (!char) return '';
-    return (lang === 'en' && char.description_en) ? char.description_en : char.description;
+    if (lang === 'en') return char.description_en || char.desc_en || char.description || char.desc || '';
+    return char.description || char.desc || '';
 }
 
 function getSkillName(skill, lang = (typeof getLanguage === 'function' ? getLanguage() : 'vi')) {
@@ -802,7 +819,8 @@ function getSkillName(skill, lang = (typeof getLanguage === 'function' ? getLang
 
 function getSkillDesc(skill, lang = (typeof getLanguage === 'function' ? getLanguage() : 'vi')) {
     if (!skill) return '';
-    return (lang === 'en' && skill.desc_en) ? skill.desc_en : skill.desc;
+    if (lang === 'en') return skill.description_en || skill.desc_en || skill.description || skill.desc || '';
+    return skill.description || skill.desc || '';
 }
 
 // Helper truy xuất dữ liệu nhân vật

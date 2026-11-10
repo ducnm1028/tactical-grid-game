@@ -295,7 +295,8 @@ const I18N_DICTIONARY = {
 
         // Tooltips
         tooltipHeaderLeaderboard: "Xem Bảng Xếp Hạng Ván Đấu [TAB]",
-        tooltipHeaderLang: "Đổi ngôn ngữ / Switch Language",
+        tooltipHeaderLang: "Đổi sang Tiếng Anh (Switch to English)",
+        tooltipCpuRandom: "Ngẫu nhiên tướng CPU",
         tooltipHeaderMenu: "Quay về menu chính",
         tooltipHeaderGuide: "Xem hướng dẫn chơi",
         tooltipOpenCharSelect: "Mở màn hình chọn tướng",
@@ -633,7 +634,8 @@ const I18N_DICTIONARY = {
 
         // Tooltips
         tooltipHeaderLeaderboard: "View Match Leaderboard [TAB]",
-        tooltipHeaderLang: "Switch Language / Đổi ngôn ngữ",
+        tooltipHeaderLang: "Switch to Vietnamese",
+        tooltipCpuRandom: "Random CPU Hero",
         tooltipHeaderMenu: "Return to Main Menu",
         tooltipHeaderGuide: "View Tactical Field Manual",
         tooltipOpenCharSelect: "Open Hero Selection Screen",
@@ -682,6 +684,14 @@ const I18N_DICTIONARY = {
 };
 
 let currentLanguage = 'vi';
+if (typeof localStorage !== 'undefined') {
+    try {
+        const savedLang = localStorage.getItem('chrono_clash_lang');
+        if (savedLang === 'vi' || savedLang === 'en') {
+            currentLanguage = savedLang;
+        }
+    } catch (e) {}
+}
 
 function getLanguage() {
     return currentLanguage;
