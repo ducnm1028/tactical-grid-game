@@ -151,8 +151,25 @@ if (btnUndo.title !== 'Undo last selected action') throw new Error(`btnUndo titl
 if (btnClear.title !== 'Clear all 4 actions') throw new Error(`btnClear title mismatch: ${btnClear.title}`);
 if (thKills.title !== 'Kills') throw new Error(`thKills title mismatch: ${thKills.title}`);
 if (thScore.title !== 'Total Composite Score') throw new Error(`thScore title mismatch: ${thScore.title}`);
+const pmKills = document.getElementById('postMatchThKills');
+const pmDeaths = document.getElementById('postMatchThDeaths');
+const pmDmg = document.getElementById('postMatchThDmg');
+if (pmKills.title !== 'Kills') throw new Error(`pmKills title mismatch: ${pmKills.title}`);
+if (pmDeaths.title !== 'Deaths') throw new Error(`pmDeaths title mismatch: ${pmDeaths.title}`);
+if (pmDmg.title !== 'Damage Dealt') throw new Error(`pmDmg title mismatch: ${pmDmg.title}`);
+
+const otBadge = document.getElementById('kothOvertimeBadge');
+if (otBadge.innerText !== '🔥 OVERTIME (POINT CONTESTED) 🔥') throw new Error(`otBadge mismatch: ${otBadge.innerText}`);
+const kothHillBadge = document.getElementById('kothHillStatusBadge');
+if (kothHillBadge.innerText !== '⚪ 5x5 HILL: NEUTRAL (0/2)') throw new Error(`kothHillBadge mismatch: ${kothHillBadge.innerText}`);
+
+const cSlot0 = document.getElementById('c-slot-0');
+if (!cSlot0.innerHTML.includes('Secret')) throw new Error(`1P CPU queue secret slot mismatch: ${cSlot0.innerHTML}`);
+
 const hofBadgeEl = document.getElementById('hofBadge');
 if (hofBadgeEl.innerText !== 'HALL OF FAME • PERSONAL RECORDS') throw new Error(`hofBadge mismatch: ${hofBadgeEl.innerText}`);
+const hofWinRateEl = document.getElementById('hofWinRateLabel');
+if (!hofWinRateEl.innerText.includes('Win Rate')) throw new Error(`hofWinRateLabel mismatch: ${hofWinRateEl.innerText}`);
 console.log('✓ UI Button and Table Header Tooltips updated properly in EN');
 
 // 4. Action Translation & ActionName
@@ -227,6 +244,24 @@ engine.applyLanguageToUI();
 if (!engine.cpu.name.includes('Sentinel') || vnRegex.test(engine.cpu.name)) {
     throw new Error(`CPU Leader name localization failed: ${engine.cpu.name}`);
 }
+
+engine.setMatchMode(true);
+engine.gameMode = 'KOTH';
+engine.p1Unit.hp = 0;
+engine.p1Queue = [
+    { type: 'WAIT', name: 'RESPAWN 2T' },
+    { type: 'WAIT', name: 'RESPAWN 2T' },
+    { type: 'WAIT', name: 'RESPAWN 2T' },
+    { type: 'WAIT', name: 'RESPAWN 2T' }
+];
+engine.activePlanningPlayer = 1;
+engine.updateQueueDisplay();
+const commitBtnEl = document.getElementById('btnCommit');
+if (!commitBtnEl.innerHTML.includes('P1 WAITING RESPAWN')) {
+    throw new Error(`P1 waiting respawn commit button mismatch: ${commitBtnEl.innerHTML}`);
+}
+engine.setMatchMode(false);
+engine.p1Unit.hp = 100;
 console.log('✓ WAIT action, 2P unit naming, and 1P Sentinel leader naming verified cleanly in English');
 
 // 8. Deployables & Entities Dynamic Synchronization on Language Switch

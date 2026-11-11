@@ -1308,12 +1308,14 @@ class GameEngine {
         if (hsBtn) hsBtn.innerText = t('hotseatBtnContinue');
 
         const hsNextName = document.getElementById('hotseatNextPlayerName');
-        if (hsNextName && this.p2Unit) {
-            hsNextName.innerText = `${lang === 'en' ? 'Player 2' : 'Người Chơi 2'} [${getCharName(this.p2Unit.character, lang)}]`;
+        const p2Char = (this.p2Unit && this.p2Unit.character) || this.p2Character;
+        if (hsNextName && p2Char) {
+            hsNextName.innerText = `${lang === 'en' ? 'Player 2' : 'Người Chơi 2'} [${getCharName(p2Char, lang)}]`;
         }
         const hsNextTeam = document.getElementById('hotseatNextPlayerTeam');
-        if (hsNextTeam && this.p2Unit) {
-            hsNextTeam.innerText = this.p2Unit.team === 'BLUE' ? (lang === 'en' ? '🔵 Blue Team' : '🔵 Đội Xanh') : (lang === 'en' ? '🔴 Red Team' : '🔴 Đội Đỏ');
+        const p2TeamVal = (this.p2Unit && this.p2Unit.team) || this.p2Team || 'RED';
+        if (hsNextTeam) {
+            hsNextTeam.innerText = p2TeamVal === 'BLUE' ? (lang === 'en' ? '🔵 Blue Team' : '🔵 Đội Xanh') : (lang === 'en' ? '🔴 Red Team' : '🔴 Đội Đỏ');
         }
 
         const cpuLabel = document.getElementById('cpuSelectHeaderLabel') || document.querySelector('.cpu-select-label');
@@ -1451,6 +1453,18 @@ class GameEngine {
         if (pathSubtext) pathSubtext.innerText = t('pathPlannerSubtext');
         const btnFinishPath = document.getElementById('btnFinishPath');
         if (btnFinishPath) btnFinishPath.innerText = t('btnFinishPath');
+        const pathCountEl = document.getElementById('pathStepCount');
+        if (pathCountEl) pathCountEl.innerText = t('pathPlannerNotice', { steps: this.activePath ? this.activePath.length : 0, maxSteps: this.activePathMaxSteps || 2 });
+
+        // KOTH HUD Labels
+        const kothLimitLbl = document.querySelector('.koth-limit-label');
+        if (kothLimitLbl) kothLimitLbl.innerText = t('kothScoreLimitLabel');
+        const otBadge = document.getElementById('kothOvertimeBadge');
+        if (otBadge) otBadge.innerText = t('kothOvertimeBadge');
+        const kothHillBadge = document.getElementById('kothHillStatusBadge');
+        if (kothHillBadge && this.hillScale === 0 && !this.hillOwner) {
+            kothHillBadge.innerText = t('kothHillNeutral');
+        }
 
         // Rotate Device Overlay & Header Update Button
         const rotTitle = document.querySelector('#rotateDeviceNotice .rotate-title');
@@ -1588,6 +1602,27 @@ class GameEngine {
         if (thHeal) thHeal.title = t('tooltipThHeal');
         if (colHeaderHill) colHeaderHill.title = t('tooltipThHill');
         if (thColScore) thColScore.title = t('tooltipThScore');
+
+        const pmThKills = document.getElementById('postMatchThKills');
+        if (pmThKills) pmThKills.title = t('tooltipThKills');
+        const pmThDeaths = document.getElementById('postMatchThDeaths');
+        if (pmThDeaths) pmThDeaths.title = t('tooltipThDeaths');
+        const pmThDmg = document.getElementById('postMatchThDmg');
+        if (pmThDmg) pmThDmg.title = t('tooltipThDmg');
+
+        const mvpTag = document.getElementById('mvpHeaderTag');
+        if (mvpTag && !this.isTwoPlayerMode) mvpTag.innerText = t('lbMvpTitle');
+        const mvpTeam = document.getElementById('mvpTeamBadge');
+        if (mvpTeam) {
+            const isRed = (mvpTeam.className && typeof mvpTeam.className === 'string' && mvpTeam.className.includes('red')) || (mvpTeam.classList && typeof mvpTeam.classList.contains === 'function' && mvpTeam.classList.contains('red'));
+            mvpTeam.innerText = isRed ? (lang === 'en' ? 'Red Team' : 'Đội Đỏ') : (lang === 'en' ? 'Blue Team' : 'Đội Xanh');
+        }
+
+        const hofWinRateLbl = document.getElementById('hofWinRateLabel');
+        if (hofWinRateLbl) {
+            const stats = this.getLifetimeStats ? this.getLifetimeStats() : { wins: 0, totalMatches: 0 };
+            hofWinRateLbl.innerText = `${t('hofWinRate')} (${stats.wins}/${stats.totalMatches} ${t('hofMatches')})`;
+        }
 
         // Initial Combat Log Update if still at start
         const logContent = document.getElementById('combatLog');
@@ -2932,7 +2967,11 @@ class GameEngine {
                     if (commitBtn) {
                         if (this.p1Queue.length === 4) {
                             commitBtn.disabled = false;
-                            commitBtn.innerHTML = `<span>[SPACE] ${t('btnCommitP1')} ➔</span>`;
+                            if (p1 && p1.hp <= 0) {
+                                commitBtn.innerHTML = `<span>${t('p1WaitingRespawn')}</span>`;
+                            } else {
+                                commitBtn.innerHTML = `<span>[SPACE] ${t('btnCommitP1')} ➔</span>`;
+                            }
                             commitBtn.style.animation = 'pulse 1s infinite alternate';
                         } else {
                             commitBtn.disabled = true;
@@ -2978,7 +3017,11 @@ class GameEngine {
                     if (commitBtn) {
                         if (this.p2Queue.length === 4) {
                             commitBtn.disabled = false;
-                            commitBtn.innerHTML = `<span>[SPACE] ${t('btnCommitP2')} 🚀</span>`;
+                            if (p2 && p2.hp <= 0) {
+                                commitBtn.innerHTML = `<span>${t('p2WaitingRespawn')}</span>`;
+                            } else {
+                                commitBtn.innerHTML = `<span>[SPACE] ${t('btnCommitP2')} 🚀</span>`;
+                            }
                             commitBtn.style.animation = 'pulse 1s infinite alternate';
                         } else {
                             commitBtn.disabled = true;
@@ -3023,6 +3066,12 @@ class GameEngine {
                     <span class="slot-icon">?</span>
                     <span class="slot-name">${t('slotEmpty')}</span>
                 `;
+            }
+
+            const cSlot = document.getElementById(`c-slot-${i}`);
+            if (cSlot && this.phase !== 'RESOLVING') {
+                cSlot.className = 'queue-slot';
+                cSlot.innerHTML = `<span class="slot-step-num">#${i + 1}</span><span class="slot-icon">🔒</span><span class="slot-name">${t('slotSecret')}</span>`;
             }
         }
 
@@ -3687,6 +3736,7 @@ class GameEngine {
                         type: 'ROCKET',
                         skillId: 'TROOPER_ROCKET',
                         name: 'Bắn Bừa Tên Lửa',
+                        name_en: 'Wild Rocket',
                         icon: '🚀',
                         dir: bDir,
                         dirSymbol: DIRECTIONS[bDir].symbol,
@@ -3701,6 +3751,7 @@ class GameEngine {
                     type: 'RANGED_LINE',
                     skillId: 'TROOPER_RIFLE',
                     name: 'Bắn Bừa Bãi',
+                    name_en: 'Wild Spray',
                     icon: '🔫',
                     dir: bDir,
                     dirSymbol: DIRECTIONS[bDir].symbol,
@@ -3722,6 +3773,7 @@ class GameEngine {
                 type: 'ROCKET',
                 skillId: 'TROOPER_ROCKET',
                 name: 'Tên Lửa',
+                name_en: 'Rocket',
                 icon: '🚀',
                 dir: alignedDir6,
                 dirSymbol: DIRECTIONS[alignedDir6].symbol,
@@ -3740,6 +3792,7 @@ class GameEngine {
                 type: 'GRENADE',
                 skillId: 'TROOPER_GRENADE',
                 name: 'Lựu Đạn',
+                name_en: 'Frag Grenade',
                 icon: '💣',
                 dir: gDir,
                 dirSymbol: DIRECTIONS[gDir].symbol,
@@ -3759,6 +3812,7 @@ class GameEngine {
                 type: 'RANGED_LINE',
                 skillId: 'TROOPER_RIFLE',
                 name: 'Assault Rifle',
+                name_en: 'Assault Rifle',
                 icon: '🔫',
                 dir: alignedDir5,
                 dirSymbol: DIRECTIONS[alignedDir5].symbol,
@@ -3771,7 +3825,7 @@ class GameEngine {
         if (dist <= 1) {
             if (Math.random() < 0.35) {
                 const sDir = this.getDirectionTowards(dx, dy);
-                return { type: 'SHIELD', name: 'Khiên', icon: '🛡️', dir: sDir, dirSymbol: DIRECTIONS[sDir].symbol, power: 0, range: 1 };
+                return { type: 'SHIELD', name: 'Khiên', name_en: 'Shield', icon: '🛡️', dir: sDir, dirSymbol: DIRECTIONS[sDir].symbol, power: 0, range: 1 };
             }
             return this.createCpuPathMove(simX, simY, this.player.x, this.player.y, 2, true);
         }
@@ -3809,6 +3863,7 @@ class GameEngine {
                     type: 'RANGED_VARIABLE',
                     skillId: 'HOOKMAN_PISTOL',
                     name: 'Bắn Bừa Bãi',
+                    name_en: 'Wild Spray',
                     icon: '🔫',
                     dir: bDir,
                     dirSymbol: DIRECTIONS[bDir].symbol,
@@ -3832,6 +3887,7 @@ class GameEngine {
                 type: 'HOOK_PULL',
                 skillId: 'HOOKMAN_HOOK',
                 name: 'Móc Kéo',
+                name_en: 'Grappling Hook',
                 icon: '🪝',
                 dir: alignedDir6,
                 dirSymbol: DIRECTIONS[alignedDir6].symbol,
@@ -3847,6 +3903,7 @@ class GameEngine {
                 type: 'RANGED_VARIABLE',
                 skillId: 'HOOKMAN_PISTOL',
                 name: 'Silence Pistol',
+                name_en: 'Silence Pistol',
                 icon: '🔫',
                 dir: alignedDir5,
                 dirSymbol: DIRECTIONS[alignedDir5].symbol,
@@ -3860,7 +3917,7 @@ class GameEngine {
         if (dist <= 1) {
             if (Math.random() < 0.3) {
                 const sDir = this.getDirectionTowards(dx, dy);
-                return { type: 'SHIELD', name: 'Khiên', icon: '🛡️', dir: sDir, dirSymbol: DIRECTIONS[sDir].symbol, power: 0, range: 1 };
+                return { type: 'SHIELD', name: 'Khiên', name_en: 'Shield', icon: '🛡️', dir: sDir, dirSymbol: DIRECTIONS[sDir].symbol, power: 0, range: 1 };
             }
             return this.createCpuPathMove(simX, simY, this.player.x, this.player.y, 3, true);
         }
@@ -3877,6 +3934,7 @@ class GameEngine {
                 type: 'BUFF_SMOKE',
                 skillId: 'SMOKE_CIGARETTE',
                 name: 'Thuốc Lá',
+                name_en: 'Cigarette',
                 icon: '🚬',
                 dir: 'LEFT',
                 dirSymbol: '🔥',
@@ -3901,6 +3959,7 @@ class GameEngine {
                         type: 'BOMB_LAUNCHER',
                         skillId: 'SMOKE_BOMB_LAUNCHER',
                         name: 'Bắn Bừa Bom Pháo',
+                        name_en: 'Wild Bomb Shot',
                         icon: '💣',
                         dir: bDir,
                         dirSymbol: DIRECTIONS[bDir].symbol,
@@ -3915,6 +3974,7 @@ class GameEngine {
                     type: 'RANGED_LINE',
                     skillId: 'SMOKE_RIFLE',
                     name: 'Bắn Bừa Bãi',
+                    name_en: 'Wild Spray',
                     icon: '🔫',
                     dir: bDir,
                     dirSymbol: DIRECTIONS[bDir].symbol,
@@ -3940,6 +4000,7 @@ class GameEngine {
                 type: 'BOMB_LAUNCHER',
                 skillId: 'SMOKE_BOMB_LAUNCHER',
                 name: 'Súng Bắn Bom',
+                name_en: 'Bomb Launcher',
                 icon: '💣',
                 dir: alignedDir6,
                 dirSymbol: DIRECTIONS[alignedDir6].symbol,
@@ -3956,6 +4017,7 @@ class GameEngine {
                 type: 'RANGED_LINE',
                 skillId: 'SMOKE_RIFLE',
                 name: 'Combat Rifle',
+                name_en: 'Combat Rifle',
                 icon: '🔫',
                 dir: alignedDir5,
                 dirSymbol: DIRECTIONS[alignedDir5].symbol,
@@ -3969,7 +4031,7 @@ class GameEngine {
         if (dist <= 1) {
             if (Math.random() < 0.35) {
                 const sDir = this.getDirectionTowards(dx, dy);
-                return { type: 'SHIELD', name: 'Khiên', icon: '🛡️', dir: sDir, dirSymbol: DIRECTIONS[sDir].symbol, power: 0, range: 1 };
+                return { type: 'SHIELD', name: 'Khiên', name_en: 'Shield', icon: '🛡️', dir: sDir, dirSymbol: DIRECTIONS[sDir].symbol, power: 0, range: 1 };
             }
             return this.createCpuPathMove(simX, simY, this.player.x, this.player.y, moveBudget, true);
         }
@@ -3995,6 +4057,7 @@ class GameEngine {
                         type: 'RECT_SLASH',
                         skillId: 'RAZOR_BLADE',
                         name: 'Kiếm Gắn Tay',
+                        name_en: 'Arm Blade',
                         icon: '🗡️',
                         dir: cDir,
                         dirSymbol: DIRECTIONS[cDir].symbol,
@@ -4013,6 +4076,7 @@ class GameEngine {
                     type: 'RANGED_LINE',
                     skillId: 'RAZOR_PULSE_RIFLE',
                     name: 'Bắn Bừa Bãi',
+                    name_en: 'Wild Spray',
                     icon: '⚡',
                     dir: bDir,
                     dirSymbol: DIRECTIONS[bDir].symbol,
@@ -4032,6 +4096,7 @@ class GameEngine {
                 type: 'LEAP',
                 skillId: 'RAZOR_LEAP',
                 name: 'Nhảy Đột Kích',
+                name_en: 'Assault Leap',
                 icon: '🦘',
                 dir: leapDir,
                 dirSymbol: DIRECTIONS[leapDir].symbol,
@@ -4048,6 +4113,7 @@ class GameEngine {
                 type: 'RANGED_LINE',
                 skillId: 'RAZOR_PULSE_RIFLE',
                 name: 'Pulse Rifle',
+                name_en: 'Pulse Rifle',
                 icon: '⚡',
                 dir: alignedDir4,
                 dirSymbol: DIRECTIONS[alignedDir4].symbol,
@@ -4060,7 +4126,7 @@ class GameEngine {
         if (dist <= 1) {
             if (Math.random() < 0.3) {
                 const sDir = this.getDirectionTowards(dx, dy);
-                return { type: 'SHIELD', name: 'Khiên', icon: '🛡️', dir: sDir, dirSymbol: DIRECTIONS[sDir].symbol, power: 0, range: 1 };
+                return { type: 'SHIELD', name: 'Khiên', name_en: 'Shield', icon: '🛡️', dir: sDir, dirSymbol: DIRECTIONS[sDir].symbol, power: 0, range: 1 };
             }
             return this.createCpuPathMove(simX, simY, this.player.x, this.player.y, 2, true);
         }
@@ -4080,6 +4146,7 @@ class GameEngine {
                         type: 'FIRE_CANNON',
                         skillId: 'FIREMAN_FIRE_CANNON',
                         name: 'Bắn Bừa Đại Bác Lửa',
+                        name_en: 'Wild Fire Cannon',
                         icon: '💥',
                         dir: bDir,
                         dirSymbol: DIRECTIONS[bDir].symbol,
@@ -4097,6 +4164,7 @@ class GameEngine {
                         type: 'OIL_BARREL',
                         skillId: 'FIREMAN_OIL_BARREL',
                         name: 'Ném Bừa Thùng Dầu',
+                        name_en: 'Wild Oil Barrel',
                         icon: '🛢️',
                         dir: bDir,
                         dirSymbol: DIRECTIONS[bDir].symbol,
@@ -4111,6 +4179,7 @@ class GameEngine {
                     type: 'RANGED_LINE',
                     skillId: 'FIREMAN_GATTLING_FIRE',
                     name: 'Bắn Bừa Gattling Fire',
+                    name_en: 'Wild Gatling Fire',
                     icon: '🔥',
                     dir: bDir,
                     dirSymbol: DIRECTIONS[bDir].symbol,
@@ -4135,6 +4204,7 @@ class GameEngine {
                 type: 'OIL_BARREL',
                 skillId: 'FIREMAN_OIL_BARREL',
                 name: 'Thùng Dầu',
+                name_en: 'Oil Barrel',
                 icon: '🛢️',
                 dir: barrelDir,
                 dirSymbol: DIRECTIONS[barrelDir].symbol,
@@ -4153,6 +4223,7 @@ class GameEngine {
                 type: 'FIRE_CANNON',
                 skillId: 'FIREMAN_FIRE_CANNON',
                 name: 'Đại Bác Lửa',
+                name_en: 'Fire Cannon',
                 icon: '💥',
                 dir: cannonDir,
                 dirSymbol: DIRECTIONS[cannonDir].symbol,
@@ -4195,6 +4266,7 @@ class GameEngine {
                 type: 'DEPLOY_SENTRY',
                 skillId: 'ENGIE_SENTRY',
                 name: 'Xây Sentry',
+                name_en: 'Deploy Sentry',
                 icon: '🤖',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4212,6 +4284,7 @@ class GameEngine {
                 type: 'DEPLOY_TELEPORTER',
                 skillId: 'ENGIE_TELEPORTER',
                 name: 'Cổng Dịch Chuyển',
+                name_en: 'Teleporter',
                 icon: '🌀',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4228,6 +4301,7 @@ class GameEngine {
                 type: 'RANGED_LINE',
                 skillId: 'ENGIE_NAILGUN',
                 name: 'Súng Thanh Sắt',
+                name_en: 'Iron Rod Gun',
                 icon: '🔩',
                 dir: alignedDir5,
                 dirSymbol: DIRECTIONS[alignedDir5].symbol,
@@ -4246,6 +4320,7 @@ class GameEngine {
             type: 'RANGED_LINE',
             skillId: 'ENGIE_NAILGUN',
             name: 'Súng Thanh Sắt',
+            name_en: 'Iron Rod Gun',
             icon: '🔩',
             dir: targetDir,
             dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4275,6 +4350,7 @@ class GameEngine {
                 type: 'BUFF_THERMAL',
                 skillId: 'SNIPER_THERMAL',
                 name: 'Tầm Nhìn Dò Nhiệt',
+                name_en: 'Thermal Vision',
                 icon: '🔭',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4291,6 +4367,7 @@ class GameEngine {
                 type: 'BUFF_DESTRUCTIVE',
                 skillId: 'SNIPER_DESTRUCTIVE',
                 name: 'Phát Bắn Hủy Diệt',
+                name_en: 'Destructive Shot',
                 icon: '⚡',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4310,6 +4387,7 @@ class GameEngine {
                     type: 'SNIPER_SHOT',
                     skillId: 'SNIPER_SHOT',
                     name: 'Bắn Súng Tỉa',
+                    name_en: 'Sniper Shot',
                     icon: '💥',
                     dir: alignedDir,
                     dirSymbol: DIRECTIONS[alignedDir].symbol,
@@ -4323,6 +4401,7 @@ class GameEngine {
                     type: 'SNIPER_SCOPE',
                     skillId: 'SNIPER_SCOPE',
                     name: 'Ngắm Bắn',
+                    name_en: 'Scope In',
                     icon: '🎯',
                     dir: alignedDir,
                     dirSymbol: DIRECTIONS[alignedDir].symbol,
@@ -4348,6 +4427,7 @@ class GameEngine {
                 type: 'SNIPER_SCOPE',
                 skillId: 'SNIPER_SCOPE',
                 name: 'Ngắm Bắn',
+                name_en: 'Scope In',
                 icon: '🎯',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4361,6 +4441,7 @@ class GameEngine {
             type: 'SNIPER_SHOT',
             skillId: 'SNIPER_SHOT',
             name: 'Bắn Súng Tỉa',
+            name_en: 'Sniper Shot',
             icon: '💥',
             dir: targetDir,
             dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4381,6 +4462,7 @@ class GameEngine {
                 type: 'NECROMANCY',
                 skillId: 'SAVIOR_NECROMANCY',
                 name: 'Necromancy',
+                name_en: 'Necromancy',
                 icon: '🧟',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4397,6 +4479,7 @@ class GameEngine {
                 type: 'TELEKINESIS',
                 skillId: 'SAVIOR_TELEKINESIS',
                 name: 'Telekinesis',
+                name_en: 'Telekinesis',
                 icon: '🔮',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4415,6 +4498,7 @@ class GameEngine {
                 type: 'REVOLVER',
                 skillId: 'SAVIOR_REVOLVER',
                 name: 'Revolver',
+                name_en: 'Revolver',
                 icon: '🔫',
                 dir: alignedDir,
                 dirSymbol: DIRECTIONS[alignedDir].symbol,
@@ -4455,6 +4539,7 @@ class GameEngine {
                     type: 'INVULNERABILITY_SHIELD',
                     skillId: 'MEDIC_INVULNERABILITY_SHIELD',
                     name: 'Hộ Thuẫn Bất Tử',
+                    name_en: 'Invulnerability Shield',
                     icon: '🛡️',
                     dir: shieldDir,
                     dirSymbol: DIRECTIONS[shieldDir].symbol,
@@ -4472,6 +4557,7 @@ class GameEngine {
                 type: 'HEAL_STATION',
                 skillId: 'MEDIC_HEAL_STATION',
                 name: 'Trạm Hồi Máu',
+                name_en: 'Healing Station',
                 icon: '🏥',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4488,6 +4574,7 @@ class GameEngine {
                 type: 'MACHINE_PISTOL',
                 skillId: 'MEDIC_MACHINE_PISTOL',
                 name: 'Machine Pistol',
+                name_en: 'Machine Pistol',
                 icon: '🔫',
                 dir: alignedDir,
                 dirSymbol: DIRECTIONS[alignedDir].symbol,
@@ -4532,6 +4619,7 @@ class GameEngine {
                 type: 'BOOM_LEAP',
                 skillId: 'BOOM_LEAP',
                 name: 'Cú Bật Nhảy',
+                name_en: 'Invulnerable Leap',
                 icon: '🦘',
                 dir: leapDir,
                 dirSymbol: DIRECTIONS[leapDir].symbol,
@@ -4548,6 +4636,7 @@ class GameEngine {
                 type: 'BUFF_CHAOS_SHOT',
                 skillId: 'BOOM_CHAOS_SHOT',
                 name: 'Phát Bắn Rối Loạn',
+                name_en: 'Chaos Shot',
                 icon: '🌀',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4567,6 +4656,7 @@ class GameEngine {
                     type: 'TANK_SHOT',
                     skillId: 'TANK_SHOT',
                     name: 'Bắn Nòng Xe Tăng',
+                    name_en: 'Tank Cannon Shot',
                     icon: '💥',
                     dir: alignedDir,
                     dirSymbol: DIRECTIONS[alignedDir].symbol,
@@ -4582,6 +4672,7 @@ class GameEngine {
                     type: 'TANK_SCOPE',
                     skillId: 'TANK_SCOPE',
                     name: 'Ngắm Nòng Pháo',
+                    name_en: 'Scope In',
                     icon: '🎯',
                     dir: alignedDir,
                     dirSymbol: DIRECTIONS[alignedDir].symbol,
@@ -4605,6 +4696,7 @@ class GameEngine {
                 type: 'TANK_SCOPE',
                 skillId: 'TANK_SCOPE',
                 name: 'Ngắm Nòng Pháo',
+                name_en: 'Scope In',
                 icon: '🎯',
                 dir: targetDir,
                 dirSymbol: DIRECTIONS[targetDir].symbol,
@@ -4618,6 +4710,7 @@ class GameEngine {
             type: 'TANK_SHOT',
             skillId: 'TANK_SHOT',
             name: 'Bắn Nòng Xe Tăng',
+            name_en: 'Tank Cannon Shot',
             icon: '💥',
             dir: targetDir,
             dirSymbol: DIRECTIONS[targetDir].symbol,
