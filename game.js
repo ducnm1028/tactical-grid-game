@@ -35,6 +35,7 @@ class GameEngine {
         this.phase = 'LANG_SELECT'; // 'LANG_SELECT' | 'MAIN_MENU' | 'CHAR_SELECT' | 'HOW_TO_PLAY' | 'PLANNING' | 'RESOLVING' | 'GAMEOVER'
         this.previousPhaseBeforeGuide = 'MAIN_MENU';
         this.currentStep = -1;
+        this.resolutionToken = 0;
 
         // Nhân vật được chọn mặc định
         this.selectedCharacter = getCharacterById('trooper');
@@ -935,7 +936,50 @@ class GameEngine {
         }
     }
 
+    closeMatchOverlays() {
+        const gameModal = document.getElementById('gameModal');
+        if (gameModal) gameModal.style.display = 'none';
+        const inMatchLb = document.getElementById('inMatchLeaderboardModal');
+        if (inMatchLb) inMatchLb.style.display = 'none';
+        const hotseatModal = document.getElementById('hotseatTransitionModal');
+        if (hotseatModal) hotseatModal.style.display = 'none';
+        this.isLeaderboardOpen = false;
+        this.isHotseatModalOpen = false;
+    }
+
+    resetMatchEnvironment() {
+        this.resolutionToken = (this.resolutionToken || 0) + 1;
+        this.closeMatchOverlays();
+        this.cancelPathPlanning();
+
+        this.turn = 1;
+        this.currentStep = -1;
+        this.hillScale = 0;
+        this.hillOwner = null;
+        this.blueScore = 0;
+        this.redScore = 0;
+        this.inOvertime = false;
+
+        this.groundHazards = [];
+        this.fireZones = [];
+        this.sentries = [];
+        this.teleporters = [];
+        this.zombies = [];
+        this.playerRevealedTurns = 0;
+        this.cpuRevealedTurns = 0;
+        this.activeHookTethers = [];
+
+        this.playerQueue = [];
+        this.cpuQueue = [];
+        this.p1Queue = [];
+        this.p2Queue = [];
+        this.floatingTexts = [];
+        this.particles = [];
+    }
+
     showLanguageSelectScreen() {
+        this.resolutionToken = (this.resolutionToken || 0) + 1;
+        this.closeMatchOverlays();
         this.cancelPathPlanning();
         this.phase = 'LANG_SELECT';
         const langScreen = document.getElementById('languageSelectScreen');
@@ -972,6 +1016,8 @@ class GameEngine {
     }
 
     showMainMenuScreen() {
+        this.resolutionToken = (this.resolutionToken || 0) + 1;
+        this.closeMatchOverlays();
         this.cancelPathPlanning();
         this.phase = 'MAIN_MENU';
         const langScreen = document.getElementById('languageSelectScreen');
@@ -986,6 +1032,8 @@ class GameEngine {
     }
 
     showCharSelectScreen() {
+        this.resolutionToken = (this.resolutionToken || 0) + 1;
+        this.closeMatchOverlays();
         this.cancelPathPlanning();
         this.phase = 'CHAR_SELECT';
         const langScreen = document.getElementById('languageSelectScreen');
@@ -1020,10 +1068,10 @@ class GameEngine {
     closeHowToPlayScreen() {
         if (this.previousPhaseBeforeGuide === 'CHAR_SELECT') {
             this.showCharSelectScreen();
-        } else if (this.previousPhaseBeforeGuide === 'PLANNING') {
+        } else if (['PLANNING', 'RESOLVING', 'GAMEOVER'].includes(this.previousPhaseBeforeGuide)) {
             const guide = document.getElementById('howToPlayScreen');
             if (guide) guide.style.display = 'none';
-            this.phase = 'PLANNING';
+            this.phase = this.previousPhaseBeforeGuide;
             if (window.soundCtrl) window.soundCtrl.playSelect();
         } else {
             this.showMainMenuScreen();
@@ -1052,15 +1100,11 @@ class GameEngine {
         if (charSel) charSel.style.display = 'none';
         if (guide) guide.style.display = 'none';
 
+        this.resetMatchEnvironment();
+
         if (this.isTwoPlayerMode) {
             this.setupTeams();
-            this.sentries = [];
-            this.teleporters = [];
             this.activePlanningPlayer = 1;
-            this.p1Queue = [];
-            this.p2Queue = [];
-            this.playerQueue = [];
-            this.cpuQueue = [];
             this.selectedCharacter = this.p1Character;
             this.cooldowns = this.p1Unit.cooldowns;
             this.skillAmmo = this.p1Unit.skillAmmo;
@@ -1073,12 +1117,6 @@ class GameEngine {
             this.setupTeams();
         }
 
-        this.turn = 1;
-        this.hillScale = 0;
-        this.hillOwner = null;
-        this.blueScore = 0;
-        this.redScore = 0;
-        this.inOvertime = false;
         this.phase = 'PLANNING';
         if (window.soundCtrl) window.soundCtrl.playCommit();
 
@@ -1620,7 +1658,7 @@ class GameEngine {
 
         const hofWinRateLbl = document.getElementById('hofWinRateLabel');
         if (hofWinRateLbl) {
-            const stats = this.getLifetimeStats ? this.getLifetimeStats() : { wins: 0, totalMatches: 0 };
+            const stats = this.getHallOfFameStats ? this.getHallOfFameStats() : { wins: 0, totalMatches: 0 };
             hofWinRateLbl.innerText = `${t('hofWinRate')} (${stats.wins}/${stats.totalMatches} ${t('hofMatches')})`;
         }
 
@@ -2826,6 +2864,7 @@ class GameEngine {
         }
 
         const action = {
+            ...skill,
             skillId: skill.id,
             type: skill.type,
             name: skill.name,
@@ -2835,30 +2874,6 @@ class GameEngine {
             dirSymbol: DIRECTIONS[this.currentSelectedDir].symbol,
             range: skill.range !== undefined ? skill.range : 1,
             power: skill.power !== undefined ? skill.power : 25,
-            minPower: skill.minPower,
-            maxPower: skill.maxPower,
-            maxAmmo: skill.maxAmmo,
-            pullSteps: skill.pullSteps,
-            delayedPullSteps: skill.delayedPullSteps,
-            leapExtra: skill.leapExtra,
-            damageReductionPercent: skill.damageReductionPercent,
-            rangeForward: skill.rangeForward,
-            widthPerp: skill.widthPerp,
-            cardinalOnly: skill.cardinalOnly,
-            duration: skill.duration,
-            healPerTurn: skill.healPerTurn,
-            dmgBonusPercent: skill.dmgBonusPercent,
-            moveBonus: skill.moveBonus,
-            fuse: skill.fuse,
-            cooldown: skill.cooldown,
-            aoeRadius: skill.aoeRadius,
-            burnTurns: skill.burnTurns,
-            burnDmg: skill.burnDmg,
-            fireZoneDuration: skill.fireZoneDuration,
-            sentryHp: skill.sentryHp,
-            sentryRange: skill.sentryRange,
-            portalHp: skill.portalHp,
-            rangeBonus: skill.rangeBonus,
             color: skill.color || '#38bdf8'
         };
 
@@ -3057,7 +3072,7 @@ class GameEngine {
                     <span class="slot-step-num">#${i + 1}</span>
                     <span class="slot-icon">${act.icon}</span>
                     <span class="slot-name">${this.getActionName(act)}</span>
-                    <span class="slot-dir" style="letter-spacing: 2px;">${act.dirSymbol}</span>
+                    <span class="slot-dir" style="letter-spacing: 2px;">${act.dirSymbol || ''}</span>
                 `;
             } else {
                 slot.className = 'queue-slot';
@@ -4756,6 +4771,16 @@ class GameEngine {
         return oppX;
     }
 
+    applyActionCooldownsOnCommit(cooldownMap, queue) {
+        if (!cooldownMap || !Array.isArray(queue)) return;
+        const deferredCdTypes = ['HOOK_PULL', 'BUFF_SMOKE', 'BOMB_LAUNCHER', 'RECT_SLASH'];
+        for (const act of queue) {
+            if (act && act.cooldown && !deferredCdTypes.includes(act.type)) {
+                cooldownMap[act.skillId] = act.cooldown;
+            }
+        }
+    }
+
     // --- Khóa lệnh & Thực thi lượt đồng thời ---
     commitTurn() {
         if (this.phase !== 'PLANNING') return;
@@ -4769,19 +4794,11 @@ class GameEngine {
 
             // 1. Gán queue và hồi chiêu cho P1
             this.p1Unit.queue = [...this.p1Queue];
-            for (const act of this.p1Queue) {
-                if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
-                    this.p1Unit.cooldowns[act.skillId] = act.cooldown;
-                }
-            }
+            this.applyActionCooldownsOnCommit(this.p1Unit.cooldowns, this.p1Queue);
 
             // 2. Gán queue và hồi chiêu cho P2
             this.p2Unit.queue = [...this.p2Queue];
-            for (const act of this.p2Queue) {
-                if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
-                    this.p2Unit.cooldowns[act.skillId] = act.cooldown;
-                }
-            }
+            this.applyActionCooldownsOnCommit(this.p2Unit.cooldowns, this.p2Queue);
 
             // 3. Sinh hàng đợi hành động cho toàn bộ CPU còn lại
             const allUnits = [...this.blueTeam, ...this.redTeam];
@@ -4789,11 +4806,7 @@ class GameEngine {
                 if (u !== this.p1Unit && u !== this.p2Unit) {
                     if (u.hp > 0) {
                         u.queue = this.generateCpuQueueForUnit(u);
-                        for (const act of u.queue) {
-                            if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
-                                u.cooldowns[act.skillId] = act.cooldown;
-                            }
-                        }
+                        this.applyActionCooldownsOnCommit(u.cooldowns, u.queue);
                     } else {
                         u.queue = [];
                     }
@@ -4818,7 +4831,7 @@ class GameEngine {
 
             this.updateHUD();
             this.currentStep = 0;
-            this.executeResolutionStep(0);
+            this.executeResolutionStep(0, this.resolutionToken);
             return;
         }
 
@@ -4830,11 +4843,7 @@ class GameEngine {
         this.addCombatLog(`--- [${this.lang === 'en' ? 'TURN' : 'LƯỢT'} ${this.turn}] ${this.lang === 'en' ? 'EXECUTION LOCKED' : 'KHÓA LỆNH THỰC THI'} ---`, 'system');
 
         // 1. Đặt hồi chiêu cho các kỹ năng được chọn của Người chơi
-        for (const act of this.playerQueue) {
-            if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
-                this.cooldowns[act.skillId] = act.cooldown;
-            }
-        }
+        this.applyActionCooldownsOnCommit(this.cooldowns, this.playerQueue);
         this.player.queue = [...this.playerQueue];
 
         // 2. Sinh hàng đợi hành động cho toàn bộ Đồng minh CPU Đội Xanh
@@ -4842,11 +4851,7 @@ class GameEngine {
             const ally = this.blueTeam[i];
             if (ally.hp > 0) {
                 ally.queue = this.generateCpuQueueForUnit(ally);
-                for (const act of ally.queue) {
-                    if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
-                        ally.cooldowns[act.skillId] = act.cooldown;
-                    }
-                }
+                this.applyActionCooldownsOnCommit(ally.cooldowns, ally.queue);
             } else {
                 ally.queue = [];
             }
@@ -4857,11 +4862,7 @@ class GameEngine {
             const enemy = this.redTeam[j];
             if (enemy.hp > 0) {
                 enemy.queue = this.generateCpuQueueForUnit(enemy);
-                for (const act of enemy.queue) {
-                    if (act.cooldown && act.type !== 'HOOK_PULL' && act.type !== 'BUFF_SMOKE' && act.type !== 'BOMB_LAUNCHER' && act.type !== 'RECT_SLASH') {
-                        enemy.cooldowns[act.skillId] = act.cooldown;
-                    }
-                }
+                this.applyActionCooldownsOnCommit(enemy.cooldowns, enemy.queue);
             } else {
                 enemy.queue = [];
             }
@@ -4879,10 +4880,11 @@ class GameEngine {
 
         this.updateHUD();
         this.currentStep = 0;
-        this.executeResolutionStep(0);
+        this.executeResolutionStep(0, this.resolutionToken);
     }
 
-    async executeResolutionStep(stepIndex) {
+    async executeResolutionStep(stepIndex, token = this.resolutionToken) {
+        if (token !== this.resolutionToken) return;
         if (stepIndex >= 4) {
             this.finishTurn();
             return;
@@ -4976,6 +4978,7 @@ class GameEngine {
         }
 
         await this.delay(180);
+        if (token !== this.resolutionToken) return;
 
         // --- BƯỚC 2: Xử lý Nhảy Đột Kích & Bật Nhảy Miễn Nhiễm (Leap Resolution) ---
         for (const unit of allAlive) {
@@ -5138,6 +5141,7 @@ class GameEngine {
             }
 
             await this.delay(200);
+            if (token !== this.resolutionToken) return;
         }
 
         for (const unit of allAlive) {
@@ -5146,6 +5150,7 @@ class GameEngine {
         }
 
         await this.delay(120);
+        if (token !== this.resolutionToken) return;
 
         // --- BƯỚC 4: Thực thi Tấn công & Kỹ năng (Attacks & Abilities) ---
         for (const actor of allAlive) {
@@ -5154,13 +5159,16 @@ class GameEngine {
             if (!act || act.type === 'SHIELD' || act.type === 'PATH_MOVE' || act.type === 'DASH' || act.type === 'LEAP' || act.type === 'BOOM_LEAP') continue;
 
             await this.resolveUnitAttack(actor, act, stepIndex);
+            if (token !== this.resolutionToken) return;
         }
 
         // --- BƯỚC 4.5: Sentry Tự Động Quét & Khai Hỏa (11x11, 10 DMG) ---
         await this.resolveSentryAttacks(stepIndex);
+        if (token !== this.resolutionToken) return;
 
         // --- BƯỚC 4.6: Thây Ma CPU Tự Động Quét & Tấn Công (3x3, 35 DMG vào 1 kẻ địch ngẫu nhiên) ---
         await this.resolveZombieAttacks(stepIndex);
+        if (token !== this.resolutionToken) return;
         if (this.zombies) this.zombies = this.zombies.filter(z => z.hp > 0);
 
         this.updateHUD();
@@ -5180,7 +5188,8 @@ class GameEngine {
         }
 
         await this.delay(450);
-        this.executeResolutionStep(stepIndex + 1);
+        if (token !== this.resolutionToken) return;
+        this.executeResolutionStep(stepIndex + 1, token);
     }
 
     async resolveUnitAttack(actor, act, stepIndex) {
@@ -7521,11 +7530,23 @@ class GameEngine {
         }
     }
 
+    escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     getMatchHistory() {
         if (typeof localStorage === 'undefined') return [];
         try {
             const raw = localStorage.getItem('crazy_warfare_match_history');
-            return raw ? JSON.parse(raw) : [];
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return [];
+            return parsed.filter(item => item && typeof item === 'object');
         } catch (e) {
             return [];
         }
@@ -7541,9 +7562,12 @@ class GameEngine {
 
         for (const m of history) {
             if (m.outcome === 'VICTORY') wins++;
-            if (m.score > highestScore) highestScore = m.score;
-            if (m.kills > mostKills) mostKills = m.kills;
-            if (m.damageDealt > mostDamage) mostDamage = m.damageDealt;
+            const score = Number(m.score) || 0;
+            const kills = Number(m.kills) || 0;
+            const dmg = Number(m.damageDealt) || 0;
+            if (score > highestScore) highestScore = score;
+            if (kills > mostKills) mostKills = kills;
+            if (dmg > mostDamage) mostDamage = dmg;
         }
 
         const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
@@ -7619,22 +7643,33 @@ class GameEngine {
 
             const charObj = m.playerChar ? getCharacterById(m.playerChar) : null;
             const charDisplayName = charObj ? getCharName(charObj, this.lang) : (m.playerCharName || m.playerChar || 'Operator');
+            const safeDate = this.escapeHtml(m.dateFormatted || '');
+            const safeMode = this.escapeHtml(m.gameMode || 'DUEL');
+            const safeTeamSize = this.escapeHtml(m.teamSize || '1v1');
+            const safeAvatar = this.escapeHtml(m.playerAvatar || '🪖');
+            const safeCharName = this.escapeHtml(charDisplayName);
+            const safeKills = Number(m.kills) || 0;
+            const safeDeaths = Number(m.deaths) || 0;
+            const safeDmg = Number(m.damageDealt) || 0;
+            const safeScore = Number(m.score) || 0;
+            const safeMvpAvatar = this.escapeHtml(m.mvpAvatar || '👑');
+            const safeMvpName = this.escapeHtml(m.mvpName || '-');
 
             return `
                 <tr>
-                    <td style="color:#94a3b8; font-size:0.75rem;">${m.dateFormatted || ''}</td>
-                    <td style="font-weight:700;">${m.gameMode} (${m.teamSize})</td>
+                    <td style="color:#94a3b8; font-size:0.75rem;">${safeDate}</td>
+                    <td style="font-weight:700;">${safeMode} (${safeTeamSize})</td>
                     <td>
-                        <span style="font-size:1.1rem; margin-right:4px;">${m.playerAvatar || '🪖'}</span>
-                        <b>${charDisplayName}</b>
+                        <span style="font-size:1.1rem; margin-right:4px;">${safeAvatar}</span>
+                        <b>${safeCharName}</b>
                     </td>
                     <td>${resBadge}</td>
-                    <td style="font-weight:700; color:#4ade80;">${m.kills} / ${m.deaths}</td>
-                    <td style="font-weight:700; color:#fbbf24;">${m.damageDealt}</td>
-                    <td style="font-weight:900; color:#fbbf24;">${m.score}</td>
+                    <td style="font-weight:700; color:#4ade80;">${safeKills} / ${safeDeaths}</td>
+                    <td style="font-weight:700; color:#fbbf24;">${safeDmg}</td>
+                    <td style="font-weight:900; color:#fbbf24;">${safeScore}</td>
                     <td>
-                        <span style="font-size:1rem; margin-right:4px;">${m.mvpAvatar || '👑'}</span>
-                        <span style="font-size:0.78rem;">${m.mvpName || '-'}</span>
+                        <span style="font-size:1rem; margin-right:4px;">${safeMvpAvatar}</span>
+                        <span style="font-size:0.78rem;">${safeMvpName}</span>
                     </td>
                 </tr>
             `;
@@ -7643,40 +7678,13 @@ class GameEngine {
 
     restartGame() {
         this.triggerAd();
-        const modal = document.getElementById('gameModal');
-        if (modal) modal.style.display = 'none';
-        const inMatchLb = document.getElementById('inMatchLeaderboardModal');
-        if (inMatchLb) inMatchLb.style.display = 'none';
-        this.isLeaderboardOpen = false;
-        this.turn = 1;
+        this.resetMatchEnvironment();
         this.phase = 'PLANNING';
-        this.currentStep = -1;
-        this.cancelPathPlanning();
         this.setupTeams();
-        this.hillScale = 0;
-        this.hillOwner = null;
-        this.blueScore = 0;
-        this.redScore = 0;
-        this.inOvertime = false;
-
-        this.groundHazards = [];
-        this.fireZones = [];
-        this.sentries = [];
-        this.teleporters = [];
-        this.playerRevealedTurns = 0;
-        this.cpuRevealedTurns = 0;
-        this.activeHookTethers = [];
 
         if (this.isTwoPlayerMode) {
             this.activePlanningPlayer = 1;
-            this.p1Queue = [];
-            this.p2Queue = [];
         }
-
-        this.playerQueue = [];
-        this.cpuQueue = [];
-        this.floatingTexts = [];
-        this.particles = [];
 
         const logElem = document.getElementById('combatLog');
         if (logElem) {

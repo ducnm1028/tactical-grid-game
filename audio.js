@@ -8,16 +8,22 @@ class SoundController {
     init() {
         if (!this.ctx) {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return false;
             this.ctx = new AudioContext();
         }
         if (this.ctx.state === 'suspended') {
             this.ctx.resume();
         }
+        return true;
+    }
+
+    ensureReady() {
+        if (!this.enabled) return false;
+        return this.init();
     }
 
     playTone(freq, type, duration, startVol = 0.2, endVol = 0) {
-        if (!this.enabled) return;
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
@@ -35,7 +41,7 @@ class SoundController {
     }
 
     playMove() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             const osc = this.ctx.createOscillator();
@@ -53,7 +59,7 @@ class SoundController {
     }
 
     playDash() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             const osc = this.ctx.createOscillator();
@@ -71,7 +77,7 @@ class SoundController {
     }
 
     playAttack() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             const bufferSize = this.ctx.sampleRate * 0.18;
@@ -97,7 +103,7 @@ class SoundController {
     }
 
     playHit() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             const osc = this.ctx.createOscillator();
@@ -115,7 +121,7 @@ class SoundController {
     }
 
     playShield() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             const osc = this.ctx.createOscillator();
@@ -134,7 +140,7 @@ class SoundController {
     }
 
     playClash() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             [580, 890].forEach(freq => {
@@ -162,7 +168,7 @@ class SoundController {
     }
 
     playCommit() {
-        this.init();
+        if (!this.ensureReady()) return;
         this.playTone(440, 'triangle', 0.1, 0.2);
         setTimeout(() => this.playTone(660, 'triangle', 0.18, 0.25), 90);
     }
@@ -182,7 +188,7 @@ class SoundController {
     }
 
     playSilencedPistol() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // 1. Tiếng phập giảm thanh trầm (Low thud)
@@ -222,7 +228,7 @@ class SoundController {
     }
 
     playRifleShot() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             for (let i = 0; i < 3; i++) {
@@ -243,7 +249,7 @@ class SoundController {
     }
 
     playRocketLaunch() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             const osc = this.ctx.createOscillator();
@@ -261,7 +267,7 @@ class SoundController {
     }
 
     playExplosion() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             const osc = this.ctx.createOscillator();
@@ -283,7 +289,7 @@ class SoundController {
     }
 
     playAdrenaline() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng tiêm thuốc rít (Injection hiss)
@@ -308,7 +314,7 @@ class SoundController {
     }
 
     playHookThrow() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng vung xích kim loại xé gió
@@ -330,7 +336,7 @@ class SoundController {
     }
 
     playHookPull() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng kim loại cắn vào thịt & giật xích kéo mạnh
@@ -349,7 +355,7 @@ class SoundController {
     }
 
     playCigarette() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // 1. Tiếng bật lửa zippo tanh tách (flint strike click)
@@ -390,7 +396,7 @@ class SoundController {
     }
 
     playBombLauncher() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // 1. Tiếng thụt nòng súng phóng bom (Thump)
@@ -430,7 +436,7 @@ class SoundController {
     }
 
     playPulseRifle() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // 1. Tia năng lượng xung điện cao tần
@@ -462,7 +468,7 @@ class SoundController {
     }
 
     playLeap() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Động cơ phản lực bật nhảy vút cao
@@ -502,7 +508,7 @@ class SoundController {
     }
 
     playCyberBladeSlash() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // 1. Tiếng chém kiếm công nghệ rền vang, năng lượng cực mạnh
@@ -544,7 +550,7 @@ class SoundController {
 
     // --- Engie SFX: Súng Thanh Sắt, Xây Sentry, Cổng Dịch Chuyển ---
     playNailgun() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng bắn thanh sắt kim loại xé gió
@@ -563,7 +569,7 @@ class SoundController {
     }
 
     playWrench() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng mỏ lết / lắp ráp kim loại cạch cạch
@@ -583,7 +589,7 @@ class SoundController {
     }
 
     playSentryShot() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             const osc = this.ctx.createOscillator();
@@ -601,7 +607,7 @@ class SoundController {
     }
 
     playPortalOpen() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng mở cổng không gian cộng hưởng
@@ -620,7 +626,7 @@ class SoundController {
     }
 
     playTeleport() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng dịch chuyển tức thời vút cao
@@ -640,7 +646,7 @@ class SoundController {
 
     // --- Snipeman SFX: Ngắm Bắn, Bắn Tỉa, Phát Bắn Hủy Diệt, Tầm Nhìn Dò Nhiệt ---
     playSniperScope() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng cơ khí kéo kính ngắm và xoay thấu kính tinh chỉnh
@@ -660,7 +666,7 @@ class SoundController {
     }
 
     playSniperShot() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng nổ súng bắn tỉa vang dội uy lực cự ly xa
@@ -692,7 +698,7 @@ class SoundController {
     }
 
     playDestructiveShot() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng nạp năng lượng huỷ diệt và bắn xuyên phá siêu âm
@@ -711,7 +717,7 @@ class SoundController {
     }
 
     playThermalVision() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng quét sóng hồng ngoại dò nhiệt âm vang
@@ -732,7 +738,7 @@ class SoundController {
 
     // --- Hat Boom Man SFX: Ngắm Nòng Pháo, Bắn Đại Bác, Bật Nhảy Miễn Nhiễm, Phát Bắn Rối Loạn ---
     playTankScope() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng bánh răng nâng nòng pháo kim loại nặng
@@ -752,7 +758,7 @@ class SoundController {
     }
 
     playTankShot() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng nổ trầm vang uy lực của nòng pháo xe tăng
@@ -784,7 +790,7 @@ class SoundController {
     }
 
     playBoomLeap() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Cú bật phản lực lò xo kèm chuông bảo hộ miễn nhiễm
@@ -815,7 +821,7 @@ class SoundController {
     }
 
     playChaosCharge() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Nạp năng lượng hỗn loạn (Phát bắn rối loạn 5x5)
@@ -836,7 +842,7 @@ class SoundController {
 
     // --- Fake Savior SFX: Revolver, Telekinesis, Necromancy, Zombie Attack ---
     playRevolver() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng búa đập kim loại và tiếng nổ đanh thép của súng Revolver
@@ -868,7 +874,7 @@ class SoundController {
     }
 
     playTelekinesis() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng sóng tâm linh dị giới rền vang rồi hất văng bùng nổ
@@ -901,7 +907,7 @@ class SoundController {
     }
 
     playNecromancy() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng chuông âm ti trầm tối kết hợp âm thanh triệu hồi linh hồn
@@ -934,7 +940,7 @@ class SoundController {
     }
 
     playZombieAttack() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng gầm gừ cắn xé của thây ma
@@ -953,7 +959,7 @@ class SoundController {
     }
 
     playMachinePistol() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Loạt đạn tiểu liên cực nhanh 3 viên tạch-tạch-tạch
@@ -975,7 +981,7 @@ class SoundController {
     }
 
     playHealStation() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Chuỗi âm bổng cộng hưởng hồi máu êm dịu, ấm áp (E4 - G#4 - B4 - E5)
@@ -998,7 +1004,7 @@ class SoundController {
     }
 
     playInvulnerabilityShield() {
-        this.init();
+        if (!this.ensureReady()) return;
         try {
             const now = this.ctx.currentTime;
             // Tiếng kích hoạt màn chắn năng lượng bất hoại rực rỡ

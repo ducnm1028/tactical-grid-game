@@ -18,7 +18,8 @@ const testFiles = [
     'test_medic.js',
     'test_leaderboard.js',
     'test_english_i18n_coverage.js',
-    'test_gamemonetize_sdk.js'
+    'test_gamemonetize_sdk.js',
+    'test_audit_regression.js'
 ];
 
 console.log('====================================================');
